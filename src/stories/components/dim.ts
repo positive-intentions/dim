@@ -1,6 +1,8 @@
-import { LitElement } from 'lit';
+import { LitElement, html as litHtml } from 'lit';
 
 let currentComponent = {};
+
+export const html = litHtml;
 
 export function useState(initialState, id) {
     // Define a unique property name for each state variable
