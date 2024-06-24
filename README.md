@@ -23,7 +23,7 @@
 
 # Dim
 
-a heavyweight UI framework. a thin wrapper around lit-elements to create functional webcomponents.
+a thin wrapper around lit-elements to create functional webcomponents.
 
 this is early development on this and it’s missing all the bells-and-whistles needed in a proper app. It’s an unstable experimental work-in-progress. it may contain bugs and/or incomplete features. provided for demo and educational purposes only. nobody should be using this in production.
 
