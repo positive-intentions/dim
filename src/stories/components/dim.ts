@@ -1,12 +1,13 @@
 import { LitElement, html as litHtml } from 'lit';
 
 let currentComponent = {};
+let hookIndex = 0;
 
 export const html = litHtml;
 
-export function useState(initialState, id) {
+export function useState(initialState) {
     // Define a unique property name for each state variable
-    const propName = `state-${id}`;
+    const propName = `state-${hookIndex++}`;
 
     currentComponent[propName] = currentComponent?.[propName] ?? initialState;
 
@@ -21,8 +22,9 @@ export function useState(initialState, id) {
     return [() => currentComponent[propName], setState];
 }
 
-export function useEffect(effectCallback, dependencies, id) {
-    const effectPropName = `effect-${id}`;
+export function useEffect(effectCallback, dependencies) {
+    console.log('useEffect called updated')
+    const effectPropName = `effect-${hookIndex++}`;
 
     // Initialize or update the dependencies property
     const hasChangedDependencies = currentComponent[effectPropName] ? 
@@ -54,8 +56,8 @@ export function useEffect(effectCallback, dependencies, id) {
     });
 }
 
-export function useMemo(calculation, dependencies, id) {
-    const memoPropName = `memo-${id}`;
+export function useMemo(calculation, dependencies) {
+    const memoPropName = `memo-${hookIndex++}`;
 
     // Check if the memoized value and dependencies exist
     if (!currentComponent[memoPropName]) {
@@ -86,14 +88,21 @@ export function define({ tag, component: CustomFuntionalComponent }) {
             }, {});
             const functionalComponent = () => CustomFuntionalComponent({
                 ...attributes,
-                children: this.innerHTML,
-                component: this,
+                children: this.innerHTML
             });
 
             currentComponent = this;
+            hookIndex = 0;
 
             return functionalComponent();
         }
     }
-    window.customElements.define(tag, CustomComponent);
+    // window.customElements.define(tag, CustomComponent);
+    // replace if already defined or define as normal
+    if (window.customElements.get(tag)) {
+        // remove existing definition and redefine
+        console.info(`Component ${tag} already defined, unable to redefine. you need to refresh if you want to see changes in the ${tag} component`);
+    } else {
+        window.customElements.define(tag, CustomComponent);
+    }
 }
