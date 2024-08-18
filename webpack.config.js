@@ -12,10 +12,10 @@ module.exports = {
         publicPath: 'auto',
     },
     devServer: {
-      static: path.resolve(__dirname, "/dist"),
-    //   watchContentBase: true,
-      hot: true,
-      historyApiFallback: true,
+        static: path.resolve(__dirname, "/dist"),
+        //   watchContentBase: true,
+        hot: true,
+        historyApiFallback: true,
     },
     module: {
         rules: [
@@ -74,7 +74,7 @@ module.exports = {
             name: 'dim',
             filename: 'remoteEntry.js',
             exposes: {
-                './dim': './src/stories/components/dim.ts',
+                '.': './src/stories/components/dim.ts',
             },
             shared: { react: { singleton: true }, "react-dom": { singleton: true } }
         }),
