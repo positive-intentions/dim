@@ -1,7 +1,5 @@
-
-
 <p align="center">
-  <img src="public/logo192.png" alt="App Logo" />
+  <img src="public/dim.png" alt="App Logo" />
 </p>
 
 <div align="center">
@@ -38,76 +36,74 @@ import {
   useScope,
   useStore,
   html,
-  css
-} from './dim.ts';
+  css,
+} from "./dim.ts";
 
-const Button = function({ children, initialstate = 0 }) {
-    const [count, setCount] = useState(parseInt(initialstate), 'test-state');
+const Button = function ({ children, initialstate = 0 }) {
+  const [count, setCount] = useState(parseInt(initialstate), "test-state");
 
-    useStyle(css`
-        button {
-            background-color: #4CAF50;
-            border: none;
-            color: white;
-            padding: 15px 32px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            margin: 4px 2px;
-            cursor: pointer;
-        }
-    `);
+  useStyle(css`
+    button {
+      background-color: #4caf50;
+      border: none;
+      color: white;
+      padding: 15px 32px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+    }
+  `);
 
-    useScope({
-      // 'dim-span': DimSpan
-    })
+  useScope({
+    // 'dim-span': DimSpan
+  });
 
-    useEffect(() => {
-        console.log("Button mounted");
-        return () => {
-            console.log("Button unmounted");
-        };
-    }, []);
+  useEffect(() => {
+    console.log("Button mounted");
+    return () => {
+      console.log("Button unmounted");
+    };
+  }, []);
 
-    useEffect(() => {
-        console.log("count effect triggered");
-    }, [count]);
+  useEffect(() => {
+    console.log("count effect triggered");
+  }, [count]);
 
-    const someCalculation = useMemo(() => {
-        const result = count() * 2;
-        console.log("memo calculation triggered:", result);
-        return result;
-    }, [count]);
+  const someCalculation = useMemo(() => {
+    const result = count() * 2;
+    console.log("memo calculation triggered:", result);
+    return result;
+  }, [count]);
 
-    const {
-      settings: {
-        username: [username, setUsername]
+  const {
+    settings: {
+      username: [username, setUsername],
+    },
+    config: {
+      button: {
+        label: [label, setLabel],
       },
-      config: {
-        button: {
-          label: [label, setLabel]
-        }
-      }
-    } = useStore({
-      settings: {
-        username: true,
+    },
+  } = useStore({
+    settings: {
+      username: true,
+    },
+    config: {
+      button: {
+        label: true,
       },
-      config: {
-        button: {
-          label: true,
-        }
-      }
-    })
+    },
+  });
 
-    return html`
-        <button @click="${() => setCount(count() + 1)}">
-            ${children}
-            ${count()}
-            ${someCalculation}
-        </button>
-    `;
-}
+  return html`
+    <button @click="${() => setCount(count() + 1)}">
+      ${children} ${count()} ${someCalculation}
+    </button>
+  `;
+};
 
 export default Button;
 ```
