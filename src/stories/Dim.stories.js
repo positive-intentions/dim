@@ -1,22 +1,18 @@
 import { define } from "./components/dim.ts";
-import Button from './components/Button.ts';
+import Todo from './components/todo.js';
 import React from "react";
 
 define({
-    tag: 'my-button',
-    component: Button,
+  tag: 'todo-app',
+  component: Todo,
 });
 
 // More on how to set up stories at: https://storybook.js.org/docs/writing-stories#default-export
 export default {
-  title: "Components/Button",
+  title: "Components/Todo",
   component: () => {
-    // define({
-    //   tag: 'my-button',
-    //   component: Button,
-    // });
     return (
-      <my-button id="aaa" initialstate="33">positive-intentions</my-button>
+      <todo-app>positive-intentions</todo-app>
     )
   },
   parameters: {
