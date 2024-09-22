@@ -1,5 +1,5 @@
-import { html, css } from "lit";
-import { define, useState, useEffect, useMemo, useScope, useStyle, lazy, useLazy, useLazyScope } from "./dim.ts";
+import { html1, css } from "lit";
+import { define, useState, useEffect, useMemo, useScope, useStyle, lazy, useLazy, useLazyScope, customHtml as html } from "./dim.ts";
 
 export const Button = (
     { children, initialstate = 0 },

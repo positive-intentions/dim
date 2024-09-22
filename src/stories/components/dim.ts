@@ -1,5 +1,44 @@
 import { LitElement, unsafeCSS, html, css } from "lit";
 
+export const customHtml = (strings: TemplateStringsArray, ...values: any[]) => {
+    let result = "";
+    strings.forEach((string, i) => {
+        let value = values[i];
+        if (Array.isArray(value)) {
+            value = value.join("");
+        } else if (typeof value === "object" && value !== null && value.strings) {
+            value = customHtml(value.strings, ...value.values);
+        }
+        result += string + (value || "");
+    });
+
+    // Convert result into HTML elements
+    const template = document.createElement("template");
+    template.innerHTML = result;
+    const fragment = template.content;
+
+    if (fragment.children.length === 1) {
+        return fragment.children[0];
+    }
+
+    // Attach event listeners
+    const eventAttributes = ['@click', '@input', '@change', '@submit']; // Add more as needed
+    eventAttributes.forEach(attr => {
+        fragment.querySelectorAll(`[${attr}]`).forEach(element => {
+            const eventHandler = element.getAttribute(attr);
+            if (eventHandler) {
+                const eventName = attr.slice(1); // Remove '@' from attribute name
+                element.addEventListener(eventName, new Function('event', eventHandler));
+                element.removeAttribute(attr); // Clean up the attribute
+            }
+        });
+    });
+
+    return fragment;
+};
+
+// export const customHtml = html;
+
 let currentInstance = null;
 
 function setCurrentInstance(instance) {
@@ -19,6 +58,9 @@ export function define({ tag, component: CustomFunctionalComponent }) {
             super();
             this.hookIndex = 0;
             this.hooks = {};
+            
+            // this.attachShadow({ mode: 'open' });
+            // this.render();
         }
 
         render() {
@@ -40,7 +82,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
                 useMemo,
                 useScope,
                 useStyle,
-                html,
+                html: customHtml,
                 css,
             };
 
@@ -54,6 +96,9 @@ export function define({ tag, component: CustomFunctionalComponent }) {
             setCurrentInstance(null);
 
             return result;
+            // this.shadowRoot.innerHTML = '';
+            // this.shadowRoot.appendChild(result);
+
         }
     }
 
