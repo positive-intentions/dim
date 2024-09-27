@@ -70,11 +70,86 @@ export const css = (strings, ...values) => {
     return new CSSResult(cssText, strings, constructionToken);
 };
 
+export const createHtmlElement = ({ strings, values }) => {
+    // Create a template element for parsing and detaching later
+    const template = document.createElement("template");
+    const rawHTML = strings.reduce((acc, string, index) => {
+        // Check if the current value is an array
+
+        const value = Array.isArray(values[index])
+            ? values[index]
+                .map((v) => {
+                    const div = document.createElement("div");
+                    div.appendChild(v);
+                    return div.innerHTML;
+                })
+                .join("")
+            : values[index];
+
+        return acc + string + (values[index] !== undefined ? value : "");
+    }, "");
+    template.innerHTML = rawHTML.trim();
+
+    // Extract the content fragment from the template
+    const fragment = template.content.cloneNode(true); // Clone to avoid affecting the original template
+
+    // Keep track of the current value index
+    let valueIndex = 0;
+
+    fragment.querySelectorAll("*").forEach((element) => {
+        // Process element attributes
+        const attributes = Array.from(element.attributes);
+        attributes.forEach((attr) => {
+            if (attr.name.startsWith("@")) {
+                // Handle event listeners (e.g., @click)
+                const eventPropName = attr.name.slice(1); // Remove '@' prefix
+                const boundValue = values[valueIndex]; // Get the corresponding value
+
+                if (typeof boundValue === "function") {
+                    element.addEventListener(eventPropName, boundValue);
+                } else {
+                    console.warn(
+                        `Expected a function for ${eventPropName}, but got:`,
+                        boundValue
+                    );
+                }
+
+                element.removeAttribute(attr.name); // Prevent attribute rendering
+                //set focus on the element
+                element.focus();
+
+                valueIndex++;
+            } else if (attr.name.startsWith(".")) {
+                // Handle property bindings (e.g., .value)
+                const propName = attr.name.slice(1); // Remove '.' prefix
+                const boundValue = values[valueIndex]; // Get the corresponding value
+
+                if (boundValue !== undefined && boundValue !== null) {
+                    element[propName] = boundValue;
+                } else {
+                    console.warn(
+                        `Expected a value for ${propName}, but got:`,
+                        boundValue
+                    );
+                }
+
+                element.removeAttribute(attr.name); // Prevent attribute rendering
+                valueIndex++;
+            }
+        });
+    });
+
+    // Detach the template to avoid unnecessary DOM manipulation
+    template.remove();
+
+    return fragment;
+}
+
 export const html = (strings, ...values) => {
-    return {
+    return ({
         // This property needs to remain unminified.
         ["_$litType$"]: 1,
         strings,
         values,
-    };
+    });
 };
