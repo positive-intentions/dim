@@ -64,21 +64,21 @@ export const Button = (
 const NewButton = new Function(`return ${Button.toString()}`)();
 
 const Todo = () => {
-    const LazyButton = useLazyScope(
-        "lazy-button",
-        new Promise((resolve) => {
-            setTimeout(() => {
-                resolve(Button.toString());
-            }, 2000);
-        })
-    );
+    // const LazyButton = useLazyScope(
+    //     "lazy-button",
+    //     new Promise((resolve) => {
+    //         setTimeout(() => {
+    //             resolve(Button.toString());
+    //         }, 2000);
+    //     })
+    // );
 
     const [todos, setTodos] = useState([]);
     const [inputValue, setInputValue] = useState("");
 
     const scope = useScope({
         "some-button": Button,
-        "new-button": NewButton,
+        // "new-button": NewButton,
         // "lazy-button": LazyButton,
     });
 
@@ -148,8 +148,7 @@ const Todo = () => {
           `;
     })}
       </ul>
-      <some-button>Scoped button</some-button>
-      <some-button>Scoped button</some-button>
+      <some-button>some button</some-button>
     </div>
   `;
 };
