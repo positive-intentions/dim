@@ -11,38 +11,15 @@ import {
     useLazyScope,
 } from "./dim.ts";
 
+import AddItemForm from "./AddItemForm.js";
+import ListItem from "./ListItem.js";
+import TodoList from "./TodoList.js";
+
 export const Button = (
     { children, initialstate = 3 },
     { useState, useEffect, useMemo, useStyle, html, css }
 ) => {
     const [count, setCount] = useState(parseInt(initialstate));
-
-    useStyle(css`
-        button {
-            background-color: #029cfd;
-            border: none;
-            border-radius: 10px;
-            color: white;
-            padding: 15px 32px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            margin: 4px 2px;
-            cursor: pointer;
-        }
-    `);
-
-    useEffect(() => {
-        console.log("Button mounted");
-        return () => {
-            console.log("Button unmounted");
-        };
-    }, []);
-
-    useEffect(() => {
-        console.log("count effect triggered");
-    }, [count]);
 
     const someCalculation = useMemo(() => {
         const result = count * 2;
@@ -56,7 +33,7 @@ export const Button = (
 
     return html`
     <button @click="${updateCount}">
-      ${children} ${count} ${someCalculation}
+        ${children} ${count} ${someCalculation}
     </button>
   `;
 };
@@ -74,10 +51,11 @@ const Todo = () => {
     // );
 
     const [todos, setTodos] = useState([]);
-    const [inputValue, setInputValue] = useState("");
 
-    const scope = useScope({
+    useScope({
         "some-button": Button,
+        "add-item-form": AddItemForm,
+        "todo-list": TodoList,
         // "new-button": NewButton,
         // "lazy-button": LazyButton,
     });
@@ -98,10 +76,9 @@ const Todo = () => {
         return todos.length;
     }, [todos]);
 
-    const addTodo = () => {
+    const addTodo = (inputValue) => {
         console.log("adding new item");
         setTodos([...todos, inputValue]);
-        setInputValue("");
     };
 
     const removeTodo = (index) => {
@@ -109,48 +86,17 @@ const Todo = () => {
         setTodos(todos.filter((_, i) => i !== index));
     };
 
-    const handleInput = (e) => {
-        console.log("handling input");
-        e.preventDefault();
-        setInputValue(e.target.value);
-    };
-
-    const clearInput = () => {
-        setInputValue("");
-    };
-
-    console.log("input changed", inputValue);
+    console.log("rendering todo app", todos);
 
     return html`
     <div>
-      <h1>Todo App</h1>
-      <input
-        type="text"
-        placeholder="Add todo"
-        .value="${inputValue}"
-        @change="${handleInput}"
-      />
-      <button @click="${addTodo}">Add</button>
-      <button @click="${clearInput}">Clear</button>
-      <p>Number of todo items: ${numberOfTodoItems}</p>
-      <ul>
-        ${todos.map((todo, index) => {
-        const handleRemove = () => {
-            console.log("removing item", index);
-            removeTodo(index);
-        };
-
-        return html`
-            <li key="${index}">
-              ${todo}
-              <button @click="${handleRemove}">Remove</button>
-            </li>
-          `;
-    })}
-      </ul>
-      <some-button>some button</some-button>
+        <h1>Todo App</h1>
+        <add-item-form .dimProps="${{ onAdd: addTodo }}"></add-item-form>
+        <p>Number of todo items: ${numberOfTodoItems}</p>
+        <todo-list .dimProps="${{ todos, onRemove: removeTodo }}"></todo-list>
+        <some-button>some button</some-button>
     </div>
-  `;
+    `;
 };
 
 // define({ tag: "todo-app", component: Todo });

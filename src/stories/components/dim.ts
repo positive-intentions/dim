@@ -16,6 +16,11 @@ function getCurrentInstance() {
 
 export function define({ tag, component: CustomFunctionalComponent }) {
   class DimComponent extends LitElement {
+    static get properties() {
+      return {
+        dimProps: {type: Object},
+      };
+    }
     constructor() {
       super();
       this.hookIndex = 0;
@@ -35,6 +40,9 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         return acc;
       }, {});
 
+      console.log("attributes", this.attributes, this.dimProps);
+      this.dimProps = this.dimProps || {};
+
       const sharedDependencies = {
         useState,
         useEffect,
@@ -49,6 +57,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
       const result = CustomFunctionalComponent(
         {
           ...attributes,
+          ...this.dimProps,
           children: this.innerHTML,
         },
         sharedDependencies
@@ -102,12 +111,20 @@ export function useEffect(effect, dependencies) {
     component.hooks[hookName] = { dependencies, cleanup };
   }
 
-  // Add event listener to handle unmount
-  component.addEventListener("disconnectedCallback", () => {
-    if (component.hooks[hookName]?.cleanup) {
-      component.hooks[hookName].cleanup();
+  // // Add event listener to handle unmount
+  // component.addEventListener("disconnectedCallback", () => {
+  //   if (component.hooks[hookName]?.cleanup) {
+  //     component.hooks[hookName].cleanup();
+  //   }
+  // });
+
+  component.addController({
+    hostDisconnected() {
+        if (component.hooks[hookName]?.cleanup) {
+            component.hooks[hookName].cleanup();
+        }
     }
-  });
+});
 }
 
 export function useMemo(calculation, dependencies) {
