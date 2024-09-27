@@ -12,33 +12,32 @@ import {
 } from "./dim.ts";
 
 import AddItemForm from "./AddItemForm.js";
-import ListItem from "./ListItem.js";
 import TodoList from "./TodoList.js";
 
-export const Button = (
-    { children, initialstate = 3 },
-    { useState, useEffect, useMemo, useStyle, html, css }
-) => {
-    const [count, setCount] = useState(parseInt(initialstate));
+// export const Button = (
+//     { children, initialstate = 3 },
+//     { useState, useEffect, useMemo, useStyle, html, css }
+// ) => {
+//     const [count, setCount] = useState(parseInt(initialstate));
 
-    const someCalculation = useMemo(() => {
-        const result = count * 2;
-        console.log("memo calculation triggered:", result);
-        return result;
-    }, [count]);
+//     const someCalculation = useMemo(() => {
+//         const result = count * 2;
+//         console.log("memo calculation triggered:", result);
+//         return result;
+//     }, [count]);
 
-    const updateCount = () => {
-        setCount(count + 1);
-    };
+//     const updateCount = () => {
+//         setCount(count + 1);
+//     };
 
-    return html`
-    <button @click="${updateCount}">
-        ${children} ${count} ${someCalculation}
-    </button>
-  `;
-};
+//     return html`
+//     <button @click="${updateCount}">
+//         ${children} ${count} ${someCalculation}
+//     </button>
+//   `;
+// };
 
-const NewButton = new Function(`return ${Button.toString()}`)();
+// const NewButton = new Function(`return ${Button.toString()}`)();
 
 const Todo = () => {
     // const LazyButton = useLazyScope(
@@ -53,9 +52,9 @@ const Todo = () => {
     const [todos, setTodos] = useState([]);
 
     useScope({
-        "some-button": Button,
         "add-item-form": AddItemForm,
         "todo-list": TodoList,
+        // "some-button": Button,
         // "new-button": NewButton,
         // "lazy-button": LazyButton,
     });
@@ -94,7 +93,6 @@ const Todo = () => {
         <add-item-form .dimProps="${{ onAdd: addTodo }}"></add-item-form>
         <p>Number of todo items: ${numberOfTodoItems}</p>
         <todo-list .dimProps="${{ todos, onRemove: removeTodo }}"></todo-list>
-        <some-button>some button</some-button>
     </div>
     `;
 };
