@@ -1,10 +1,28 @@
-import { define } from "./components/dim.ts";
+import {
+  define,
+  useState,
+  useEffect,
+  useMemo,
+  useScope,
+  useStyle,
+  html,
+  css
+} from "./components/dim.ts";
 import Todo from './components/todo.js';
 import React from "react";
 
 define({
   tag: 'todo-app',
   component: Todo,
+  sharedDependencies: [
+    useState,
+    useEffect,
+    useMemo,
+    useScope,
+    useStyle,
+    html,
+    css
+  ]
 });
 
 // More on how to set up stories at: https://storybook.js.org/docs/writing-stories#default-export
