@@ -39,7 +39,13 @@ import TodoList from "./TodoList.js";
 
 // const NewButton = new Function(`return ${Button.toString()}`)();
 
-const Todo = () => {
+const Todo = ({ }, {
+    useState,
+    useEffect,
+    useMemo,
+    useScope,
+    html,
+}) => {
     // const LazyButton = useLazyScope(
     //     "lazy-button",
     //     new Promise((resolve) => {
@@ -97,5 +103,5 @@ const Todo = () => {
     `;
 };
 
-// define({ tag: "todo-app", component: Todo });
+// define({ tag: "todo-app", component: Todo }); // commented out because it is defined in storybook preview.js
 export default Todo;
