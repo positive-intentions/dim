@@ -145,6 +145,61 @@ export const createHtmlElement = ({ strings, values }) => {
     return fragment;
 }
 
+export function expandSelfClosingTags(inputStrings, ...values) {
+
+    let strings = inputStrings.map(str => `${str}`);
+    for (let i = 0; i < strings.length; i++) {
+        const selfClosingTagPosition = strings[i].indexOf('/>');
+        if (selfClosingTagPosition == -1) {
+            continue;
+        }
+
+        // you needs to scan in reverse the strings array from the self closing tag to determine the nearest opening tag name
+        let openingTagName = '';
+        for (let j = i; j >= 0; j--) {
+            if (strings[j].includes('<') && strings[j].includes('>')) {
+                // scan in reverse order for the opening tag from the closing tag position
+                let seekingposition = {
+                    stringIndex: j,
+                    charIndex: selfClosingTagPosition
+                }
+
+                while (seekingposition.charIndex >= 0 && seekingposition.stringIndex >= 0) {
+                    if (strings[seekingposition.stringIndex][seekingposition.charIndex] === '<') {
+                        break;
+                    }
+                    seekingposition.charIndex--;
+                    if (seekingposition.charIndex < 0) {
+                        if (seekingposition.stringIndex > 0) seekingposition.stringIndex--;
+                        seekingposition.charIndex = strings[seekingposition.stringIndex].length - 1;
+                    }
+                }
+
+                const openingTagString = strings[seekingposition.stringIndex].substring(seekingposition.charIndex + 1);
+                const tagnameEndPosition = openingTagString.indexOf(' ');
+                if (tagnameEndPosition >= 0) {
+                    openingTagName = openingTagString.substring(0, tagnameEndPosition);
+                }
+                else {
+                    openingTagName = openingTagString.substring(0, openingTagString.indexOf('>'));
+                }
+                console.log({ openingTagName })
+
+                if (selfClosingTagPosition >= 0) {
+                    strings[i] = strings[i].replace('/>', `></${openingTagName}>`);
+
+                    console.log('string updated:', strings[i]);
+                }
+
+            }
+        }
+    }
+
+    console.log({ inputStrings, strings, values });
+
+    return html(inputStrings, ...values); // Return the modified strings and values
+}
+
 export const html = (strings, ...values) => {
     return ({
         // This property needs to remain unminified.

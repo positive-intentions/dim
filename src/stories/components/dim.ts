@@ -18,7 +18,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
   class DimComponent extends LitElement {
     static get properties() {
       return {
-        dimProps: {type: Object},
+        props: {type: Object},
       };
     }
     constructor() {
@@ -40,8 +40,8 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         return acc;
       }, {});
 
-      console.log("attributes", this.attributes, this.dimProps);
-      this.dimProps = this.dimProps || {};
+      console.log("attributes", this.attributes, this.props);
+      this.props = this.props || {};
 
       const sharedDependencies = {
         useState,
@@ -57,7 +57,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
       const result = CustomFunctionalComponent(
         {
           ...attributes,
-          ...this.dimProps,
+          ...this.props,
           children: this.innerHTML,
         },
         sharedDependencies

@@ -1,4 +1,4 @@
-import { html, css } from "./mini-lit.js";
+import { html, css, expandSelfClosingTags } from "./mini-lit.js";
 import {
     define,
     useState,
@@ -90,9 +90,9 @@ const Todo = () => {
     return html`
     <div>
         <h1>Todo App</h1>
-        <add-item-form .dimProps="${{ onAdd: addTodo }}"></add-item-form>
+        <add-item-form .props="${{ onAdd: addTodo }}"></add-item-form>
         <p>Number of todo items: ${numberOfTodoItems}</p>
-        <todo-list .dimProps="${{ todos, onRemove: removeTodo }}"></todo-list>
+        <todo-list .props="${{ todos, onRemove: removeTodo }}"></todo-list>
     </div>
     `;
 };

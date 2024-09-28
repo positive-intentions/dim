@@ -20,7 +20,7 @@ const TodoList = ({ todos, onRemove }, { useScope, useEffect, html }) => {
 
         return html`
                     <list-item
-                        .dimProps="${{ todo, onRemove: handleRemove }}"
+                        .props="${{ todo, onRemove: handleRemove }}"
                     ></list-item>
                 `;
     })}
