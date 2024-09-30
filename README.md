@@ -4,7 +4,7 @@
 
 <div align="center">
   
-[Live App](https://dim.positive-intentions.com) | [Reddit](https://www.reddit.com/r/positive_intentions) | [Medium](https://medium.com/@positive.intentions.com) | [Discord](https://discord.gg/unnQnR67nR)
+[Live Demo](https://dim.positive-intentions.com)
 </div>
 
 <div align="center">
@@ -108,10 +108,3 @@ const Button = function ({ children, initialstate = 0 }) {
 export default Button;
 ```
 
-### How You Can Help
-
-- **Feedback**: Your insights are invaluable. Share your thoughts on current features, suggest new ones, or report any bugs you encounter.
-- **Development**: Interested in contributing code? [Let's talk!](https://www.reddit.com/r/positive_intentions).
-- **Spread the Word**: Help us grow by sharing the app with others who value privacy and control over their digital communication.
-- **Github Stars**: If you like the project, consider starring the repository. It helps others discover it and boosts our motivation.
-- **Sponsorship**: Development is fueled by passion and coffee. Your sponsorship helps keep both flowing.
