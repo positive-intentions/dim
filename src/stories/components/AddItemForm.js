@@ -1,18 +1,23 @@
 const AddItemForm = ({ onAdd }, { useState, useStyle, html, css }) => {
-    console.log("AddItemForm", onAdd);
     const [inputValue, setInputValue] = useState("");
 
     useStyle(css`
         button {
-        background-color: #029cfd;
-        border: none;
-        border-radius: 5px;
-        color: white;
-        padding: 5px 10px;
-        text-align: center;
-        text-decoration: none;
-        display: inline-block;
-        cursor: pointer;
+            background-color: #029cfd;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            padding: 5px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            color: #666;
+            cursor: not-allowed;
         }
     `);
 
@@ -35,10 +40,10 @@ const AddItemForm = ({ onAdd }, { useState, useStyle, html, css }) => {
         type="text"
         placeholder="Add todo"
         .value="${inputValue}"
-        @change="${handleInput}"
+        @input="${handleInput}"
     />
-    <button @click="${addTodo}">Add</button>
-    <button @click="${clearInput}">Clear</button>
+    <button .disabled="${inputValue ? false : true}" @click="${addTodo}">Add</button>
+    <button @click="${clearInput}">Clear input</button>
   `;
 };
 

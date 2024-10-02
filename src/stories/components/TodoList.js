@@ -1,8 +1,6 @@
 import ListItem from "./ListItem.js";
 
 const TodoList = ({ todos, onRemove }, { useScope, useEffect, html }) => {
-    console.log("todo list render", todos);
-
     useScope({
         "list-item": ListItem,
     });

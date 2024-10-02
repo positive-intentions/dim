@@ -40,7 +40,6 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         return acc;
       }, {});
 
-      console.log("attributes", this.attributes, this.props);
       this.props = this.props || {};
 
       const sharedDependencies = {

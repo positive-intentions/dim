@@ -91,11 +91,9 @@ const Todo = ({ }, {
         setTodos(todos.filter((_, i) => i !== index));
     };
 
-    console.log("rendering todo app", todos);
-
     return html`
     <div>
-        <h1>Todo App</h1>
+        <h1>Todo List</h1>
         <add-item-form .props="${{ onAdd: addTodo }}"></add-item-form>
         <p>Number of todo items: ${numberOfTodoItems}</p>
         <todo-list .props="${{ todos, onRemove: removeTodo }}"></todo-list>
