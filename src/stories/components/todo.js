@@ -9,6 +9,7 @@ import {
     lazy,
     useLazy,
     useLazyScope,
+    useStore
 } from "./dim.ts";
 
 import AddItemForm from "./AddItemForm.js";
@@ -44,6 +45,7 @@ const Todo = ({ }, {
     useEffect,
     useMemo,
     useScope,
+    useStore,
     html,
 }) => {
     // const LazyButton = useLazyScope(
@@ -55,7 +57,16 @@ const Todo = ({ }, {
     //     })
     // );
 
-    const [todos, setTodos] = useState([]);
+    // const [todos, setTodos] = useState([]);
+
+    const {
+        todos: [todos, setTodos]
+    } = useStore({
+        todos: useState(['aaa', 'bbb', 'ccc']),
+        settings: {
+            showCompleted: useState(false)
+        }
+    });
 
     useScope({
         "add-item-form": AddItemForm,

@@ -14,11 +14,15 @@ function getCurrentInstance() {
   return currentInstance;
 }
 
-export function define({ tag, component: CustomFunctionalComponent }) {
+export function define({
+  tag,
+  component: CustomFunctionalComponent,
+  sharedDependencies,
+}) {
   class DimComponent extends LitElement {
     static get properties() {
       return {
-        props: {type: Object},
+        props: { type: Object },
       };
     }
     constructor() {
@@ -48,6 +52,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         useMemo,
         useScope,
         useStyle,
+        useStore,
         html,
         css,
       };
@@ -119,11 +124,11 @@ export function useEffect(effect, dependencies) {
 
   component.addController({
     hostDisconnected() {
-        if (component.hooks[hookName]?.cleanup) {
-            component.hooks[hookName].cleanup();
-        }
-    }
-});
+      if (component.hooks[hookName]?.cleanup) {
+        component.hooks[hookName].cleanup();
+      }
+    },
+  });
 }
 
 export function useMemo(calculation, dependencies) {
@@ -177,4 +182,73 @@ export const useLazyScope = (tag, promise) => {
       define({ tag, component: elementClass });
     }
   });
+};
+
+const getStateKeys = (state) => {
+  const keys = [];
+  const traverse = (obj, path) => {
+    Object.keys(obj).forEach((key) => {
+      if (typeof obj[key] === "object" && obj[key].length === undefined) {
+        traverse(obj[key], `${path}${key}.`);
+      } else {
+        keys.push(`${path}${key}`);
+      }
+    });
+  };
+
+  traverse(state, "");
+  return keys;
+};
+
+// givent the keys and store, update the setters to console log when there is a change
+// the keys are . separated
+const updateSetters = (keys, store) => {
+  keys.forEach((key) => {
+    const keyParts = key.split(".");
+
+    const stateSetter = keyParts.reduce(
+      (acc, part) => acc && acc[part],
+      store
+    )[1];
+
+    const newStateSetter = (value) => {
+      console.log(">>>> custom console.log");
+      stateSetter(value);
+    };
+
+    // update the store to replace the setter
+    keyParts.reduce((acc, part, i) => {
+      if (i === keyParts.length - 1) {
+        acc[part][1] = newStateSetter;
+      }
+      return acc[part];
+    }, store);
+  });
+};
+
+export const useStore = (store) => {
+  const component = getCurrentInstance();
+  const hookIndex = component.hookIndex++;
+  const hookName = `hook-${hookIndex}`;
+
+  // useEffect(() => {
+  //   const keys = getStateKeys(store);
+  //   console.log("keys", keys);
+  //   updateSetters(keys, store);
+
+  //   return () => {
+  //     // cleanup
+  //     console.log("cleanup");
+  //   };
+  // }, []);
+
+  const keys = getStateKeys(store);
+  console.log("keys", keys);
+  updateSetters(keys, store);
+
+  if (!component.hooks[hookName]) {
+    component.hooks[hookName] = store;
+  }
+
+  return store;
 };
