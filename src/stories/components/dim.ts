@@ -201,53 +201,127 @@ const getStateKeys = (state) => {
 };
 
 class CustomEventManager {
-    private listeners: Map<string, Set<[any, (value: any) => void]>> = new Map();
+  private eventListeners: {
+    [key: string]: { mutation: EventListener; query: EventListener };
+  } = {};
 
-    addEventListener(key: string, value: any, setter: (value: any) => void) {
-        if (!this.listeners.has(key)) {
-            this.listeners.set(key, new Set());
-        }
-        this.listeners.get(key)!.add([value, setter]);
+  addEventListener(key: string, value: any, setState: (value: any) => void) {
+    // Remove existing event listeners if they exist
+    if (this.eventListeners[key]) {
+      window.removeEventListener(
+        `mutation-${key}`,
+        this.eventListeners[key].mutation
+      );
+      window.removeEventListener(
+        `query-${key}`,
+        this.eventListeners[key].query
+      );
     }
 
-    removeEventListener(key: string, value: any, setter: (value: any) => void) {
-        if (this.listeners.has(key)) {
-            this.listeners.get(key)!.delete([value, setter]);
-        }
-    }
+    // Define new event listeners
+    const mutationListener = (event: Event) => {
+      console.log(">>> mutation called", event.detail);
+      if (event.detail?.callback && !!value) {
+        return window.dispatchEvent(
+          new CustomEvent(`${event.detail.callback}`, {
+            detail: value,
+            bubbles: true,
+          })
+        );
+      }
 
-    dispatchEvent(key: string, newValue: any) {
-        if (this.listeners.has(key)) {
-            this.listeners.get(key)!.forEach(([value, setter]) => {
-                if (value !== newValue) {
-                    setter(newValue);
-                }
-            });
-        }
-    }
+      setState(event.detail);
+    };
+
+    const queryListener = (event: Event) => {
+      console.log(
+        ">>> query called",
+        value,
+        (event as CustomEvent).detail.callback
+      );
+
+      window.dispatchEvent(
+        new CustomEvent(`${(event as CustomEvent).detail.callback}`, {
+          detail: value,
+          bubbles: true,
+        })
+      );
+    };
+
+    // Add new event listeners
+    // this.setInitialValue(key);
+    window.addEventListener(`query-${key}`, queryListener);
+    window.addEventListener(`mutation-${key}`, mutationListener);
+
+    // Store references to the new event listeners
+    this.eventListeners[key] = {
+      mutation: mutationListener,
+      query: queryListener,
+    };
+  }
+
+  dispatchEvent(key: string, newValue: any) {
+    window.dispatchEvent(
+      new CustomEvent(`mutation-${key}`, {
+        detail: newValue,
+        bubbles: true,
+      })
+    );
+  }
+
+  getInitialValue(key: string) {
+    console.log(">>>> getInitialValue", key);
+    const randomhash = Math.random().toString(36).substring(7);
+    const eventName = `query-${key}-${randomhash}`;
+
+    const initStateHandler = (event) => {
+      console.log(">>>> getInitialValue callback", event);
+
+      window.dispatchEvent(
+        new CustomEvent(`mutation-${key}`, {
+          detail: event.detail,
+          bubbles: true,
+        })
+      );
+      setTimeout(() => {}, 0);
+    };
+
+    const removeInitStateHandler = () => {
+      console.log(">>>> removeInitStateHandler", eventName);
+      window.removeEventListener(eventName, initStateHandler);
+    };
+
+    window.addEventListener(eventName, (e) => {
+      initStateHandler(e);
+      removeInitStateHandler();
+    });
+    window.dispatchEvent(
+      new CustomEvent(`mutation-${key}`, {
+        detail: { callback: eventName },
+        bubbles: true,
+      })
+    );
+  }
 }
-
-const customEventManager = new CustomEventManager();
 
 // givent the keys and store, update the setters to console log when there is a change
 // the keys are . separated
-const updateSetters = (keys, store) => {
+const updateSetters = (keys, store, customEventManager) => {
   keys.forEach((key) => {
     const keyParts = key.split(".");
 
-    const stateHook = keyParts.reduce(
-      (acc, part) => acc && acc[part],
-      store
-    );
+    const stateHook = keyParts.reduce((acc, part) => acc && acc[part], store);
 
     const stateValue = stateHook[0];
     const stateSetter = stateHook[1];
 
-    const newStateSetter = (value) => {
-      console.log(">>>> custom console.log");
-      stateSetter(value);
+    customEventManager.addEventListener(key, stateValue, stateSetter);
+    // if (!stateValue) customEventManager.getInitialValue(key);
 
-      customEventManager.addEventListener(key, stateValue, stateSetter)
+    const newStateSetter = (value) => {
+      // stateSetter(value);
+
+      customEventManager.dispatchEvent(key, value);
     };
 
     // update the store to replace the setter
@@ -258,6 +332,11 @@ const updateSetters = (keys, store) => {
       return acc[part];
     }, store);
   });
+  useEffect(() => {
+    keys.forEach((key) => {
+      customEventManager.getInitialValue(key);
+    });
+  }, []);
 };
 
 export const useStore = (store) => {
@@ -266,12 +345,12 @@ export const useStore = (store) => {
   const hookName = `hook-${hookIndex}`;
 
   const keys = getStateKeys(store);
-  console.log("keys", keys);
-  updateSetters(keys, store);
 
   if (!component.hooks[hookName]) {
-    component.hooks[hookName] = store;
+    component.hooks[hookName] = new CustomEventManager();
   }
+
+  updateSetters(keys, store, component.hooks[hookName]);
 
   return store;
 };

@@ -59,6 +59,8 @@ const Todo = ({ }, {
 
     // const [todos, setTodos] = useState([]);
 
+    const [counter, setCounter] = useState(1);
+
     const {
         todos: [todos, setTodos]
     } = useStore({
@@ -102,10 +104,18 @@ const Todo = ({ }, {
         setTodos(todos.filter((_, i) => i !== index));
     };
 
+
     return html`
     <div>
         <h1>Todo List</h1>
-        <add-item-form .props="${{ onAdd: addTodo }}"></add-item-form>
+        ${Array.from({ length: counter }, () => {
+        return html`
+                <add-item-form .props="${{ onAdd: addTodo }}"></add-item-form>
+            `;
+    })}
+        <button @click="${() => setCounter(counter + 1)}">Add form</button>
+
+        <br />
         <p>Number of todo items: ${numberOfTodoItems}</p>
         <todo-list .props="${{ todos, onRemove: removeTodo }}"></todo-list>
     </div>

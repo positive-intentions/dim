@@ -1,5 +1,15 @@
-const AddItemForm = ({ onAdd }, { useState, useStyle, html, css }) => {
-    const [inputValue, setInputValue] = useState("");
+const AddItemForm = ({ onAdd }, { useState, useStyle, html, css, useStore, useEffect }) => {
+    // const [inputValue, setInputValue] = useState("");
+
+    const {
+        form: {
+            input: [inputValue, setInputValue],
+        }
+    } = useStore({
+        form: {
+            input: useState("")
+        }
+    });
 
     useStyle(css`
         button {
@@ -20,6 +30,10 @@ const AddItemForm = ({ onAdd }, { useState, useStyle, html, css }) => {
             cursor: not-allowed;
         }
     `);
+
+    useEffect(() => {
+        if (!!inputValue) setInputValue(inputValue);
+    }, [inputValue])
 
     const handleInput = (e) => {
         e.preventDefault();
