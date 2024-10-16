@@ -200,20 +200,54 @@ const getStateKeys = (state) => {
   return keys;
 };
 
+class CustomEventManager {
+    private listeners: Map<string, Set<[any, (value: any) => void]>> = new Map();
+
+    addEventListener(key: string, value: any, setter: (value: any) => void) {
+        if (!this.listeners.has(key)) {
+            this.listeners.set(key, new Set());
+        }
+        this.listeners.get(key)!.add([value, setter]);
+    }
+
+    removeEventListener(key: string, value: any, setter: (value: any) => void) {
+        if (this.listeners.has(key)) {
+            this.listeners.get(key)!.delete([value, setter]);
+        }
+    }
+
+    dispatchEvent(key: string, newValue: any) {
+        if (this.listeners.has(key)) {
+            this.listeners.get(key)!.forEach(([value, setter]) => {
+                if (value !== newValue) {
+                    setter(newValue);
+                }
+            });
+        }
+    }
+}
+
+const customEventManager = new CustomEventManager();
+
 // givent the keys and store, update the setters to console log when there is a change
 // the keys are . separated
 const updateSetters = (keys, store) => {
   keys.forEach((key) => {
     const keyParts = key.split(".");
 
-    const stateSetter = keyParts.reduce(
+    const stateHook = keyParts.reduce(
       (acc, part) => acc && acc[part],
       store
-    )[1];
+    );
+
+    const stateValue = stateHook[0];
+    const stateSetter = stateHook[1];
 
     const newStateSetter = (value) => {
       console.log(">>>> custom console.log");
       stateSetter(value);
+
+      customEventManager.addEventListener(key, stateValue, stateSetter)
     };
 
     // update the store to replace the setter
@@ -230,17 +264,6 @@ export const useStore = (store) => {
   const component = getCurrentInstance();
   const hookIndex = component.hookIndex++;
   const hookName = `hook-${hookIndex}`;
-
-  // useEffect(() => {
-  //   const keys = getStateKeys(store);
-  //   console.log("keys", keys);
-  //   updateSetters(keys, store);
-
-  //   return () => {
-  //     // cleanup
-  //     console.log("cleanup");
-  //   };
-  // }, []);
 
   const keys = getStateKeys(store);
   console.log("keys", keys);
