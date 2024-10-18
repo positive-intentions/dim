@@ -1,5 +1,22 @@
-const AddItemForm = ({ onAdd }, { useState, useStyle, html, css }) => {
-    const [inputValue, setInputValue] = useState("");
+const AddItemForm = ({ }, { useState, useStyle, useStore, html, css }) => {
+    // const [inputValue, setInputValue] = useState("");
+    const {
+        form: {
+            input: [inputValue, setInputValue],
+        },
+        todos: [todos, setTodos],
+    } = useStore({
+        form: {
+            input: useState(""),
+        },
+        todos: useState([]),
+    })
+
+
+    const onAdd = (inputValue) => {
+        console.log("adding new item");
+        setTodos([...todos, inputValue]);
+    };
 
     useStyle(css`
         button {

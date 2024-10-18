@@ -5,6 +5,7 @@ import {
   useMemo,
   useScope,
   useStyle,
+  useStore,
   html,
   css
 } from "./components/dim.ts";
@@ -20,7 +21,8 @@ define({
     useMemo,
     useScope,
     useStyle,
-    html,
+    useStore.
+      html,
     css
   ]
 });
@@ -52,23 +54,3 @@ export const Basic = {
     onClick: () => alert("positive-intentions"),
   },
 };
-
-// export const Secondary = {
-//   args: {
-//     label: 'Button',
-//   },
-// };
-
-// export const Large = {
-//   args: {
-//     size: 'large',
-//     label: 'Button',
-//   },
-// };
-
-// export const Small = {
-//   args: {
-//     size: 'small',
-//     label: 'Button',
-//   },
-// };
