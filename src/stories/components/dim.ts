@@ -181,8 +181,10 @@ export const useLazyScope = (tag, promise) => {
 };
 
 class AsyncronousStateManager {
-  private store: any = {};
-  private eventListener: any[] = [];
+  constructor() {
+    this.store = {};
+    this.eventListener = [];
+  }
 
   generateListener(listener) {
     const { listenerId, key, value } = listener;
