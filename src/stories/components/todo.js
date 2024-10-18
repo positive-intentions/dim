@@ -1,79 +1,34 @@
-import { html, css, expandSelfClosingTags } from "./mini-lit.js";
+import { html } from "./mini-lit.js";
 import {
-    define,
-    useState,
-    useEffect,
-    useMemo,
-    useScope,
-    useStyle,
-    lazy,
-    useLazy,
-    useLazyScope,
-} from "./dim.ts";
-
-import AddItemForm from "./AddItemForm.js";
-import TodoList from "./TodoList.js";
-
-// export const Button = (
-//     { children, initialstate = 3 },
-//     { useState, useEffect, useMemo, useStyle, html, css }
-// ) => {
-//     const [count, setCount] = useState(parseInt(initialstate));
-
-//     const someCalculation = useMemo(() => {
-//         const result = count * 2;
-//         console.log("memo calculation triggered:", result);
-//         return result;
-//     }, [count]);
-
-//     const updateCount = () => {
-//         setCount(count + 1);
-//     };
-
-//     return html`
-//     <button @click="${updateCount}">
-//         ${children} ${count} ${someCalculation}
-//     </button>
-//   `;
-// };
-
-// const NewButton = new Function(`return ${Button.toString()}`)();
-
-const Todo = ({ }, {
     useState,
     useEffect,
     useMemo,
     useScope,
     useStore,
-    html,
-}) => {
-    // const LazyButton = useLazyScope(
-    //     "lazy-button",
-    //     new Promise((resolve) => {
-    //         setTimeout(() => {
-    //             resolve(Button.toString());
-    //         }, 2000);
-    //     })
-    // );
+} from "./dim.ts";
 
-    const [todos, setTodos] = useState([]);
-    const [counter, setCounter] = useState(1);
+import AddItemForm from "./AddItemForm.js";
+import TodoList from "./TodoList.js";
+
+const Todo = () => {
     const {
         form: {
-            input: [inputValue, setInputValue],
-        }
+            input: [inputValue],
+            counter: [counter, setCounter],
+        },
+        todos: [todos, setTodos],
     } = useStore({
         form: {
             input: useState(""),
-        }
+            counter: useState(1),
+        },
+        todos: useState([]),
+
     })
 
     useScope({
         "add-item-form": AddItemForm,
         "todo-list": TodoList,
-        // "some-button": Button,
-        // "new-button": NewButton,
-        // "lazy-button": LazyButton,
     });
 
     useEffect(() => {
@@ -92,11 +47,6 @@ const Todo = ({ }, {
         return todos.length;
     }, [todos]);
 
-    const addTodo = (inputValue) => {
-        console.log("adding new item");
-        setTodos([...todos, inputValue]);
-    };
-
     const removeTodo = (index) => {
         console.log("removing item", index);
         setTodos(todos.filter((_, i) => i !== index));
@@ -107,7 +57,7 @@ const Todo = ({ }, {
         <h1>Todo List</h1>
             ${Array.from({ length: counter }, () => {
         return html`
-                    <add-item-form .props="${{ onAdd: addTodo }}"></add-item-form><br/>
+                    <add-item-form></add-item-form><br/>
                 `;
     })}
             <br />

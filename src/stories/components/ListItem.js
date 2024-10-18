@@ -1,12 +1,19 @@
-const ListItem = ({ todo, onRemove }, { useEffect, useStore, useState, html }) => {
+import {
+    useState,
+    useEffect,
+    useStore,
+} from "./dim.ts";
+import { html } from "./mini-lit.js";
+
+const ListItem = ({ todo, onRemove }) => {
     const {
         form: {
-            input: [inputValue, setInputValue],
-        }
+            input: [inputValue],
+        },
     } = useStore({
         form: {
             input: useState(""),
-        }
+        },
     })
     useEffect(() => {
         console.log("List item mounted");

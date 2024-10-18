@@ -184,15 +184,6 @@ class AsyncronousStateManager {
   private store: any = {};
   private eventListener: any[] = [];
 
-  // constructor() {
-  //   // this.store = {};
-  //   // this.eventListener = [];
-  // }
-
-  registerListener(listener) {
-    this.generateListener(listener);
-  }
-
   generateListener(listener) {
     const { listenerId, key, value } = listener;
 
@@ -238,8 +229,6 @@ class AsyncronousStateManager {
 
     const newState = this.store[key] || value[0];
 
-    console.log("created listener", this.eventListener);
-
     return [newState, newSetter];
   }
 
@@ -250,7 +239,7 @@ class AsyncronousStateManager {
 
     if (existingListender) {
       window.removeEventListener(
-        `${existingListender.key}-$}`,
+        `${existingListender.key}`,
         existingListender.listener
       );
 
@@ -263,8 +252,7 @@ class AsyncronousStateManager {
 
 const asyncronousStateManager = new AsyncronousStateManager();
 
-const getStateKeys = (state, listenerId) => {
-  const keys = [];
+const createListeners = (store, listenerId) => {
   const traverse = (obj, path) => {
     Object.keys(obj).forEach((key) => {
       if (typeof obj[key] === "object" && obj[key].length === undefined) {
@@ -278,31 +266,20 @@ const getStateKeys = (state, listenerId) => {
           });
 
         obj[key] = [asyncState, asyncSetState].concat(obj[key]);
-        console.log("setting listeners");
-
-        keys.push<any>({
-          [`${listenerId}`]: {
-            key: `${path}${key}`,
-            value: obj[key],
-          },
-        });
       }
     });
   };
 
-  traverse(state, "");
-  return keys;
+  traverse(store, "");
 };
 
 export const useStore = (store) => {
-  const [randomId] = useState(Math.random().toString(36).substring(7));
+  const [randomId] = useState(crypto.getRandomValues(new Uint8Array(8)));
 
-  const keys = getStateKeys(store, randomId);
-  console.log("keys", keys);
+  createListeners(store, randomId);
 
   useEffect(() => {
     return () => {
-      console.log("removing listeners");
       asyncronousStateManager.removeListeners(randomId);
     };
   }, []);

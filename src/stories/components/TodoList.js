@@ -1,13 +1,32 @@
+import {
+    useState,
+    useEffect,
+    useScope,
+    useStore,
+} from "./dim.ts";
+import { html } from "./mini-lit.js";
+
 import ListItem from "./ListItem.js";
 
-const TodoList = ({ todos, onRemove }, { useScope, useEffect, html }) => {
+const TodoList = () => {
     useScope({
         "list-item": ListItem,
     });
 
+    const {
+        todos: [todos, setTodos],
+    } = useStore({
+        todos: useState([]),
+    })
+
     useEffect(() => {
         console.log("todos list updated");
     }, [todos]);
+
+    const onRemove = (index) => {
+        console.log("removing item", index);
+        setTodos(todos.filter((_, i) => i !== index));
+    };
 
     return html`
         <ul>
