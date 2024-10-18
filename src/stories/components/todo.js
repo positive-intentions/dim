@@ -107,10 +107,10 @@ const Todo = ({ }, {
         <h1>Todo List</h1>
             ${Array.from({ length: counter }, () => {
         return html`
-                    <add-item-form .props="${{ onAdd: addTodo }}"></add-item-form>
+                    <add-item-form .props="${{ onAdd: addTodo }}"></add-item-form><br/>
                 `;
     })}
-
+            <br />
             <button @click="${() => setCounter(counter + 1)}">Add form</button>
             <button @click="${() => setCounter(counter - 1)}">remove form</button>
             <br />
