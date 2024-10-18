@@ -5,6 +5,7 @@ import {
   useMemo,
   useScope,
   useStyle,
+  useStore,
   html,
   css
 } from "./components/dim.ts";
@@ -20,7 +21,8 @@ define({
     useMemo,
     useScope,
     useStyle,
-    html,
+    useStore.
+      html,
     css
   ]
 });

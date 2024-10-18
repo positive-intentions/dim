@@ -1,5 +1,14 @@
-const AddItemForm = ({ onAdd }, { useState, useStyle, html, css }) => {
-    const [inputValue, setInputValue] = useState("");
+const AddItemForm = ({ onAdd }, { useState, useStyle, useStore, html, css }) => {
+    // const [inputValue, setInputValue] = useState("");
+    const {
+        form: {
+            input: [inputValue, setInputValue],
+        }
+    } = useStore({
+        form: {
+            input: useState(""),
+        }
+    })
 
     useStyle(css`
         button {

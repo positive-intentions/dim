@@ -18,7 +18,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
   class DimComponent extends LitElement {
     static get properties() {
       return {
-        props: {type: Object},
+        props: { type: Object },
       };
     }
     constructor() {
@@ -48,6 +48,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         useMemo,
         useScope,
         useStyle,
+        useStore,
         html,
         css,
       };
@@ -119,11 +120,11 @@ export function useEffect(effect, dependencies) {
 
   component.addController({
     hostDisconnected() {
-        if (component.hooks[hookName]?.cleanup) {
-            component.hooks[hookName].cleanup();
-        }
-    }
-});
+      if (component.hooks[hookName]?.cleanup) {
+        component.hooks[hookName].cleanup();
+      }
+    },
+  });
 }
 
 export function useMemo(calculation, dependencies) {
@@ -177,4 +178,134 @@ export const useLazyScope = (tag, promise) => {
       define({ tag, component: elementClass });
     }
   });
+};
+
+class AsyncronousStateManager {
+  private store: any = {};
+  private eventListener: any[] = [];
+
+  // constructor() {
+  //   // this.store = {};
+  //   // this.eventListener = [];
+  // }
+
+  registerListener(listener) {
+    this.generateListener(listener);
+  }
+
+  generateListener(listener) {
+    const { listenerId, key, value } = listener;
+
+    // Remove existing event listeners if they exist
+    const existingListender = this.eventListener.find(
+      (listener) => listener.listenerId === listenerId
+    );
+
+    const listenerName = `${key}`;
+
+    if (existingListender) {
+      window.removeEventListener(listenerName, existingListender.listener);
+
+      this.eventListener = this.eventListener.filter(
+        (listener) => listener.listenerId !== listenerId
+      );
+    }
+
+    // Create a new event listener
+    const newListener = (event) => {
+      value[1](event.detail);
+
+      this.store = {
+        ...this.store,
+        [key]: event.detail,
+      };
+    };
+
+    window.addEventListener(listenerName, newListener);
+
+    this.eventListener.push({
+      listenerId,
+      listener: newListener,
+    });
+
+    const newSetter = (newValue) => {
+      window.dispatchEvent(
+        new CustomEvent(listenerName, {
+          detail: newValue,
+        })
+      );
+    };
+
+    const newState = this.store[key] || value[0];
+
+    console.log("created listener", this.eventListener);
+
+    return [newState, newSetter];
+  }
+
+  removeListeners(listenerId) {
+    const existingListender = this.eventListener.find(
+      (listener) => listener.listenerId === listenerId
+    );
+
+    if (existingListender) {
+      window.removeEventListener(
+        `${existingListender.key}-$}`,
+        existingListender.listener
+      );
+
+      this.eventListener = this.eventListener.filter(
+        (listener) => listener.listenerId !== listenerId
+      );
+    }
+  }
+}
+
+const asyncronousStateManager = new AsyncronousStateManager();
+
+const getStateKeys = (state, listenerId) => {
+  const keys = [];
+  const traverse = (obj, path) => {
+    Object.keys(obj).forEach((key) => {
+      if (typeof obj[key] === "object" && obj[key].length === undefined) {
+        traverse(obj[key], `${path}${key}.`);
+      } else {
+        const [asyncState, asyncSetState] =
+          asyncronousStateManager.generateListener({
+            listenerId,
+            key: `${path}${key}`,
+            value: obj[key],
+          });
+
+        obj[key] = [asyncState, asyncSetState].concat(obj[key]);
+        console.log("setting listeners");
+
+        keys.push<any>({
+          [`${listenerId}`]: {
+            key: `${path}${key}`,
+            value: obj[key],
+          },
+        });
+      }
+    });
+  };
+
+  traverse(state, "");
+  return keys;
+};
+
+export const useStore = (store) => {
+  const [randomId] = useState(Math.random().toString(36).substring(7));
+
+  const keys = getStateKeys(store, randomId);
+  console.log("keys", keys);
+
+  useEffect(() => {
+    return () => {
+      console.log("removing listeners");
+      asyncronousStateManager.removeListeners(randomId);
+    };
+  }, []);
+
+  return store;
 };

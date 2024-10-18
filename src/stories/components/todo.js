@@ -44,6 +44,7 @@ const Todo = ({ }, {
     useEffect,
     useMemo,
     useScope,
+    useStore,
     html,
 }) => {
     // const LazyButton = useLazyScope(
@@ -56,6 +57,16 @@ const Todo = ({ }, {
     // );
 
     const [todos, setTodos] = useState([]);
+    const [counter, setCounter] = useState(1);
+    const {
+        form: {
+            input: [inputValue, setInputValue],
+        }
+    } = useStore({
+        form: {
+            input: useState(""),
+        }
+    })
 
     useScope({
         "add-item-form": AddItemForm,
@@ -94,8 +105,17 @@ const Todo = ({ }, {
     return html`
     <div>
         <h1>Todo List</h1>
-        <add-item-form .props="${{ onAdd: addTodo }}"></add-item-form>
+            ${Array.from({ length: counter }, () => {
+        return html`
+                    <add-item-form .props="${{ onAdd: addTodo }}"></add-item-form>
+                `;
+    })}
+
+            <button @click="${() => setCounter(counter + 1)}">Add form</button>
+            <button @click="${() => setCounter(counter - 1)}">remove form</button>
+            <br />
         <p>Number of todo items: ${numberOfTodoItems}</p>
+        <p>input value: ${inputValue}</p>
         <todo-list .props="${{ todos, onRemove: removeTodo }}"></todo-list>
     </div>
     `;
