@@ -10,6 +10,19 @@ import {
 import AddItemForm from "./AddItemForm.js";
 import TodoList from "./TodoList.js";
 
+const SomeDummyComponent = () => {
+    useEffect(() => {
+        console.log("SomeDummyComponent mounted");
+        return () => {
+            console.log("SomeDummyComponent unmounted");
+        };
+    }, []);
+
+    console.log("SomeDummyComponent rendered");
+
+    return html`<div>SomeDummyComponent</div>`;
+}
+
 const Todo = () => {
     const {
         form: {
@@ -29,6 +42,7 @@ const Todo = () => {
     useScope({
         "add-item-form": AddItemForm,
         "todo-list": TodoList,
+        "some-dummy-component": SomeDummyComponent,
     });
 
     useEffect(() => {
@@ -67,6 +81,7 @@ const Todo = () => {
         <p>Number of todo items: ${numberOfTodoItems}</p>
         <p>input value: ${inputValue}</p>
         <todo-list .props="${{ todos, onRemove: removeTodo }}"></todo-list>
+        <some-dummy-component></some-dummy-component>
     </div>
     `;
 };
