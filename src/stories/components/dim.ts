@@ -1,5 +1,5 @@
 import { LitElement } from "lit";
-import { html, css, unsafeCSS } from "./mini-lit";
+import { css, html, unsafeCSS } from "./mini-lit";
 
 let currentInstance = null;
 
@@ -180,10 +180,73 @@ export const useLazyScope = (tag, promise) => {
   });
 };
 
+let db;
+const databaseName = "DimDatabase";
+const objectStoreName = "DimStore";
+
 class AsyncronousStateManager {
   constructor() {
     this.store = {};
     this.eventListener = [];
+    this.openDatabase().catch(console.error);
+  }
+
+  async openDatabase() {
+    return new Promise((resolve, reject) => {
+      let request = indexedDB.open(databaseName, 1);
+
+      request.onupgradeneeded = function (event) {
+        db = event.target.result;
+        if (!db.objectStoreNames.contains(objectStoreName)) {
+          db.createObjectStore(objectStoreName, { keyPath: "id" });
+        }
+      };
+
+      request.onsuccess = function (event) {
+        db = event.target.result;
+        resolve(db);
+      };
+
+      request.onerror = function (event) {
+        reject("Error opening database: " + event.target.error);
+      };
+    });
+  }
+
+  async writeValue(id, value) {
+    return new Promise((resolve, reject) => {
+      let transaction = db.transaction([objectStoreName], "readwrite");
+      let objectStore = transaction.objectStore(objectStoreName);
+      let request = objectStore.put({ id: id, value: value });
+
+      request.onsuccess = function (event) {
+        resolve("Value written successfully");
+      };
+
+      request.onerror = function (event) {
+        reject("Error writing value: " + event.target.error);
+      };
+    });
+  }
+
+  async readValue(id, newState) {
+    return new Promise((resolve, reject) => {
+      let transaction = db.transaction([objectStoreName], "readonly");
+      let objectStore = transaction.objectStore(objectStoreName);
+      let request = objectStore.get(id);
+
+      request.onsuccess = function (event) {
+        if (request.result) {
+          resolve({ value: request.result.value, newState });
+        } else {
+          resolve(null);
+        }
+      };
+
+      request.onerror = function (event) {
+        reject("Error reading value: " + event.target.error);
+      };
+    });
   }
 
   generateListener(listener) {
@@ -204,10 +267,11 @@ class AsyncronousStateManager {
       );
     }
 
+    const newState = this.store[key] || value[0];
+
     // Create a new event listener
     const newListener = (event) => {
       value[1](event.detail);
-
       this.store = {
         ...this.store,
         [key]: event.detail,
@@ -222,14 +286,14 @@ class AsyncronousStateManager {
     });
 
     const newSetter = (newValue) => {
+      this.writeValue(key, newValue).catch(console.error);
+
       window.dispatchEvent(
         new CustomEvent(listenerName, {
           detail: newValue,
         })
       );
     };
-
-    const newState = this.store[key] || value[0];
 
     return [newState, newSetter];
   }
@@ -275,12 +339,58 @@ const createListeners = (store, listenerId) => {
   traverse(store, "");
 };
 
+type DebouncedEventDispatcher = (eventName: string, value: any) => void;
+
+function createDebouncedEventDispatcher(
+  delay: number
+): DebouncedEventDispatcher {
+  const timeoutIds: { [key: string]: number | undefined } = {};
+
+  return (eventName: string, value: any) => {
+    if (timeoutIds[eventName] !== undefined) {
+      clearTimeout(timeoutIds[eventName]);
+    }
+
+    timeoutIds[eventName] = window.setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent(eventName, {
+          detail: value,
+        })
+      );
+      timeoutIds[eventName] = undefined;
+    }, delay);
+  };
+}
+
+const debouncedDispatcher = createDebouncedEventDispatcher(10);
+
+const loadFromDatabase = (store) => {
+  const traverse = (obj, path) => {
+    Object.keys(obj).forEach((key) => {
+      if (typeof obj[key] === "object" && obj[key].length === undefined) {
+        traverse(obj[key], `${path}${key}.`);
+      } else {
+        asyncronousStateManager
+          .readValue(`${path}${key}`, obj[key])
+          .then(({ value }) => {
+            debouncedDispatcher(`${path}${key}`, value);
+          })
+          .catch(console.error);
+      }
+    });
+  };
+
+  traverse(store, "");
+};
+
 export const useStore = (store) => {
   const [randomId] = useState(crypto.getRandomValues(new Uint8Array(8)));
 
   createListeners(store, randomId);
 
   useEffect(() => {
+    loadFromDatabase(store);
+
     return () => {
       asyncronousStateManager.removeListeners(randomId);
     };
