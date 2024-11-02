@@ -181,26 +181,24 @@ export const useLazyScope = (tag, promise) => {
 };
 
 let db;
+const databaseName = "DimDatabase";
+const objectStoreName = "DimStore";
 
 class AsyncronousStateManager {
   constructor() {
     this.store = {};
     this.eventListener = [];
-    this.openDatabase()
-      .then(() => {
-        console.log("Database opened successfully");
-      })
-      .catch(console.error);
+    this.openDatabase().catch(console.error);
   }
 
   async openDatabase() {
     return new Promise((resolve, reject) => {
-      let request = indexedDB.open("MyDatabase", 1);
+      let request = indexedDB.open(databaseName, 1);
 
       request.onupgradeneeded = function (event) {
         db = event.target.result;
-        if (!db.objectStoreNames.contains("MyObjectStore")) {
-          db.createObjectStore("MyObjectStore", { keyPath: "id" });
+        if (!db.objectStoreNames.contains(objectStoreName)) {
+          db.createObjectStore(objectStoreName, { keyPath: "id" });
         }
       };
 
@@ -217,8 +215,8 @@ class AsyncronousStateManager {
 
   async writeValue(id, value) {
     return new Promise((resolve, reject) => {
-      let transaction = db.transaction(["MyObjectStore"], "readwrite");
-      let objectStore = transaction.objectStore("MyObjectStore");
+      let transaction = db.transaction([objectStoreName], "readwrite");
+      let objectStore = transaction.objectStore(objectStoreName);
       let request = objectStore.put({ id: id, value: value });
 
       request.onsuccess = function (event) {
@@ -233,8 +231,8 @@ class AsyncronousStateManager {
 
   async readValue(id, newState) {
     return new Promise((resolve, reject) => {
-      let transaction = db.transaction(["MyObjectStore"], "readonly");
-      let objectStore = transaction.objectStore("MyObjectStore");
+      let transaction = db.transaction([objectStoreName], "readonly");
+      let objectStore = transaction.objectStore(objectStoreName);
       let request = objectStore.get(id);
 
       request.onsuccess = function (event) {
@@ -288,11 +286,7 @@ class AsyncronousStateManager {
     });
 
     const newSetter = (newValue) => {
-      this.writeValue(key, newValue)
-        .then((value) => {
-          console.log("Value written successfully: " + value);
-        })
-        .catch(console.error);
+      this.writeValue(key, newValue).catch(console.error);
 
       window.dispatchEvent(
         new CustomEvent(listenerName, {
