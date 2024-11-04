@@ -188,7 +188,67 @@ class AsyncronousStateManager {
   constructor() {
     this.store = {};
     this.eventListener = [];
+    this.salt = null;
+    this.password = "my-strong-password";
     this.openDatabase().catch(console.error);
+
+    this.initEncryption();
+  }
+
+  initEncryption() {
+    // Usage example
+    const password = "my-strong-password";
+    const data = "Hello, World!";
+
+    generateKey(password).then(({ key, salt }) => {
+      // add salt to the state
+      this.salt = salt;
+      console.log("Salt:", salt);
+    });
+
+    // (async (context) => {
+    //   // Encrypt data
+    //   const { key, salt } = await generateKey(password);
+
+    //   const stringifiedSalt = JSON.stringify(Array.from(salt));
+    //   const stringifiedKey = JSON.stringify(Array.from(key));
+    //   const deserializeKey = new Uint8Array(key);
+    //   const deserializeSalt = new Uint8Array(salt);
+    //   context.salt = deserializeSalt;
+
+    //   const { encryptedData, iv } = await encryptData(key, data);
+
+    //   const stringifiedIv = JSON.stringify(Array.from(iv));
+    //   const stringifiedEncryptedData = JSON.stringify(
+    //     Array.from(encryptedData)
+    //   );
+    //   const deserializeEncryptedData = new Uint8Array(encryptedData);
+    //   const deserializeIv = new Uint8Array(iv);
+
+    //   console.log({
+    //     stringifiedSalt,
+    //     stringifiedIv,
+    //     stringifiedKey,
+    //     stringifiedEncryptedData,
+    //   });
+
+    //   // Save salt, iv, and encryptedData (e.g., in a database or file)
+    //   console.log("Encrypted Data:", new Uint8Array(encryptedData));
+    //   console.log("Salt:", new Uint8Array(salt), salt);
+    //   console.log("IV:", new Uint8Array(iv));
+
+    //   // Decrypt data
+    //   const { key: decryptionKey } = await generateKey(
+    //     password,
+    //     deserializeSalt
+    //   ); // Derive the key with the same salt
+    //   const decryptedData = await decryptData(
+    //     decryptionKey,
+    //     deserializeEncryptedData,
+    //     deserializeIv
+    //   );
+    //   console.log("Decrypted Data:", decryptedData);
+    // })(this);
   }
 
   async openDatabase() {
@@ -213,31 +273,66 @@ class AsyncronousStateManager {
     });
   }
 
+  async encryptDataPromise(data) {
+    const { key } = await generateKey(this.password, this.salt);
+    const { encryptedData, iv } = await encryptData(key, data);
+    console.log(">>> Encrypted Data:", new Uint8Array(encryptedData));
+    const serializedEncryptedData = JSON.stringify(encryptedData);
+    return {
+      encryptedData: arrayBufferToString(encryptedData),
+      iv: arrayBufferToString(iv),
+    };
+  }
+
+  async decryptDataPromise(encryptedData, iv) {
+    const { key } = await generateKey(this.password, this.salt);
+    const deserializedEncryptedData = stringToArrayBuffer(encryptedData);
+    const deserializeIv = stringToArrayBuffer(iv);
+    const decryptedData = await decryptData(
+      key,
+      deserializedEncryptedData,
+      deserializeIv
+    );
+
+    return decryptedData;
+  }
+
   async writeValue(id, value) {
     return new Promise((resolve, reject) => {
-      let transaction = db.transaction([objectStoreName], "readwrite");
-      let objectStore = transaction.objectStore(objectStoreName);
-      let request = objectStore.put({ id: id, value: value });
+      this.encryptDataPromise(value).then(({ encryptedData, iv }) => {
+        let transaction = db.transaction([objectStoreName], "readwrite");
+        let objectStore = transaction.objectStore(objectStoreName);
+        console.log(">>> Encrypted Data:", new Uint8Array(encryptedData));
 
-      request.onsuccess = function (event) {
-        resolve("Value written successfully");
-      };
+        // const value = arrayBufferToString(encryptedData);
+        let request = objectStore.put({ id, iv, value: encryptedData });
 
-      request.onerror = function (event) {
-        reject("Error writing value: " + event.target.error);
-      };
+        request.onsuccess = function (event) {
+          resolve("Value written successfully");
+        };
+
+        request.onerror = function (event) {
+          reject("Error writing value: " + event.target.error);
+        };
+      });
     });
   }
 
   async readValue(id, newState) {
     return new Promise((resolve, reject) => {
-      let transaction = db.transaction([objectStoreName], "readonly");
-      let objectStore = transaction.objectStore(objectStoreName);
-      let request = objectStore.get(id);
-
-      request.onsuccess = function (event) {
+      request.onsuccess = (event) => {
         if (request.result) {
-          resolve({ value: request.result.value, newState });
+          let transaction = db.transaction([objectStoreName], "readonly");
+          let objectStore = transaction.objectStore(objectStoreName);
+          let request = objectStore.get(id);
+          this.decryptDataPromise(this.result.value, this.result.iv)
+            .then((decryptedData) => {
+              console.log(">>> Decrypted Data:", decryptedData);
+              resolve({ value: request.result.value, newState });
+            })
+            .catch((e) => {
+              reject("Error decrypting value: " + e);
+            });
         } else {
           resolve(null);
         }
@@ -383,6 +478,75 @@ const loadFromDatabase = (store) => {
   traverse(store, "");
 };
 
+async function generateKey(password, salt = null) {
+  const encoder = new TextEncoder();
+
+  // If no salt is provided, generate a new random one
+  if (!salt) {
+    salt = crypto.getRandomValues(new Uint8Array(16));
+  }
+
+  // Encode the password into binary format
+  const passwordKey = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+
+  // Derive a key using PBKDF2 with the provided or generated salt
+  const derivedKey = await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    passwordKey,
+    {
+      name: "AES-GCM",
+      length: 256,
+    },
+    true,
+    ["encrypt", "decrypt"]
+  );
+
+  return { key: derivedKey, salt: salt };
+}
+
+// Encrypt data with AES-GCM
+async function encryptData(key, data) {
+  const encoder = new TextEncoder();
+  const iv = crypto.getRandomValues(new Uint8Array(12)); // Initialization vector
+
+  const encryptedData = await crypto.subtle.encrypt(
+    {
+      name: "AES-GCM",
+      iv: iv,
+    },
+    key,
+    encoder.encode(data)
+  );
+
+  return { encryptedData, iv };
+}
+
+// Decrypt data with AES-GCM
+async function decryptData(key, encryptedData, iv) {
+  const decryptedData = await crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv: iv,
+    },
+    key,
+    encryptedData
+  );
+
+  const decoder = new TextDecoder();
+  return decoder.decode(decryptedData);
+}
+
 export const useStore = (store) => {
   const [randomId] = useState(crypto.getRandomValues(new Uint8Array(8)));
 
@@ -398,3 +562,13 @@ export const useStore = (store) => {
 
   return store;
 };
+
+function arrayBufferToString(buffer) {
+  const decoder = new TextDecoder("utf-8");
+  return decoder.decode(buffer);
+}
+
+function stringToArrayBuffer(string) {
+  const encoder = new TextEncoder();
+  return encoder.encode(string).buffer;
+}
