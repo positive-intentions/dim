@@ -179,6 +179,85 @@ export const useLazyScope = (tag, promise) => {
     }
   });
 };
+async function generateKey(password, salt = null) {
+  const encoder = new TextEncoder();
+
+  // If no salt is provided, generate a new random one
+  if (!salt) {
+    salt = crypto.getRandomValues(new Uint8Array(16));
+  }
+
+  // Encode the password into binary format
+  const passwordKey = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+
+  // Derive a key using PBKDF2 with the provided or generated salt
+  const derivedKey = await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    passwordKey,
+    {
+      name: "AES-GCM",
+      length: 256,
+    },
+    true,
+    ["encrypt", "decrypt"]
+  );
+
+  return { key: derivedKey, salt: salt };
+}
+
+async function encryptData(key, data) {
+  const enc = new TextEncoder();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encryptedData = await crypto.subtle.encrypt(
+    {
+      name: "AES-GCM",
+      iv: iv,
+    },
+    key,
+    enc.encode(data)
+  );
+
+  return { encryptedData, iv };
+}
+
+async function decryptData(key, encryptedData, iv) {
+  const decryptedData = await crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv: iv,
+    },
+    key,
+    encryptedData
+  );
+
+  const dec = new TextDecoder();
+  return dec.decode(decryptedData);
+}
+
+function arrayBufferToString(buffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+}
+
+function stringToArrayBuffer(str) {
+  const binaryString = atob(str);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
 
 let db;
 const databaseName = "DimDatabase";
@@ -188,7 +267,62 @@ class AsyncronousStateManager {
   constructor() {
     this.store = {};
     this.eventListener = [];
+    this.password = "my-strong-password";
+    this.key = null;
+    this.salt = null;
     this.openDatabase().catch(console.error);
+    this.initEncryption().catch(console.error);
+  }
+
+  async initEncryption() {
+    const stringifiedSalt = "7G8WKM1oWgCy2og2NB68cQ==";
+    const stringifiedKey = "DNtvCq4ssPoXFQ20w/biT2yTvVTLrMUfzeJCsv0iN8o=";
+    const deserializeKey = await crypto.subtle.importKey(
+      "raw",
+      stringToArrayBuffer(stringifiedKey),
+      { name: "AES-GCM" },
+      true,
+      ["encrypt", "decrypt"]
+    );
+    const deserializeSalt = stringToArrayBuffer(stringifiedSalt);
+    this.key = deserializeKey;
+    this.salt = deserializeSalt;
+  }
+
+  async encryptDataPromise(data) {
+    const { encryptedData, iv } = await encryptData(
+      this.key,
+      JSON.stringify(data)
+    );
+    const encryptedDataString = arrayBufferToString(encryptedData);
+    const ivString = arrayBufferToString(iv);
+    this.decryptDataPromise(encryptedDataString, ivString, this.key).then(
+      (decryptedData) => {
+        console.log({
+          encryptedDataString,
+          ivString,
+          decryptedData,
+        });
+      }
+    );
+    return {
+      encryptedData: arrayBufferToString(encryptedData),
+      iv: arrayBufferToString(iv),
+    };
+  }
+
+  async decryptDataPromise(encryptedData, iv, key) {
+    const deserializedEncryptedData = stringToArrayBuffer(encryptedData);
+    const deserializeIv = string - ToArrayBuffer(iv);
+    const decryptedData = await decryptData(
+      key || this.key,
+      deserializedEncryptedData,
+      deserializeIv
+    ).catch((e) => {
+      console.error("Error decrypting data: ", e);
+    });
+
+    return JSON.parse(decryptedData);
   }
 
   async openDatabase() {
@@ -214,37 +348,134 @@ class AsyncronousStateManager {
   }
 
   async writeValue(id, value) {
-    return new Promise((resolve, reject) => {
-      let transaction = db.transaction([objectStoreName], "readwrite");
-      let objectStore = transaction.objectStore(objectStoreName);
-      let request = objectStore.put({ id: id, value: value });
+    const { encryptedData, iv } = await this.encryptDataPromise(value);
+    let transaction2 = db.transaction([objectStoreName], "readwrite");
+    let objectStore2 = transaction2.objectStore(objectStoreName);
+    let request2 = objectStore2.put({
+      id: "encrypted-" + id,
+      iv: iv,
+      value: encryptedData,
+    });
 
-      request.onsuccess = function (event) {
-        resolve("Value written successfully");
+    request2.onsuccess = function (event) {
+      console.log("Encrypted value written successfully");
+    };
+
+    request2.onerror = function (event) {
+      console.log("Error writing value: " + event.target.error);
+    };
+
+    return new Promise((resolve, reject) => {
+      // let transaction = db.transaction([objectStoreName], "readwrite");
+      // let objectStore = transaction.objectStore(objectStoreName);
+      // let request = objectStore.put({ id: id, value: value });
+
+      // request.onsuccess = function (event) {
+      //   resolve("Value written successfully");
+      // };
+
+      // request.onerror = function (event) {
+      //   reject("Error writing value: " + event.target.error);
+      // };
+
+      let transaction2 = db.transaction([objectStoreName], "readwrite");
+      let objectStore2 = transaction2.objectStore(objectStoreName);
+      let request2 = objectStore2.put({
+        id: "encrypted-" + id,
+        iv: iv,
+        value: encryptedData,
+      });
+
+      request2.onsuccess = function (event) {
+        resolve("Encrypted value written successfully");
       };
 
-      request.onerror = function (event) {
+      request2.onerror = function (event) {
         reject("Error writing value: " + event.target.error);
       };
     });
   }
 
   async readValue(id, newState) {
-    return new Promise((resolve, reject) => {
-      let transaction = db.transaction([objectStoreName], "readonly");
-      let objectStore = transaction.objectStore(objectStoreName);
-      let request = objectStore.get(id);
+    let transaction2 = db.transaction([objectStoreName], "readonly");
+    let objectStore2 = transaction2.objectStore(objectStoreName);
+    let request2 = objectStore2.get("encrypted-" + id);
+    const decryptDataPromise = this.decryptDataPromise;
+    const key = this.key;
 
-      request.onsuccess = function (event) {
-        if (request.result) {
-          resolve({ value: request.result.value, newState });
+    request2.onsuccess = async function (event) {
+      if (request2.result) {
+        console.log({
+          value: request2.result.value,
+          iv: request2.result.iv,
+          newState,
+        });
+
+        const decryptedData = await decryptDataPromise(
+          request2.result.value,
+          request2.result.iv,
+          key
+        );
+
+        console.log({
+          decryptedData,
+        });
+      } else {
+        console.log({});
+      }
+    };
+
+    request2.onerror = function (event) {
+      console.log("Error reading value: " + event.target.error);
+    };
+
+    return new Promise((resolve, reject) => {
+      //   let transaction = db.transaction([objectStoreName], "readonly");
+      //   let objectStore = transaction.objectStore(objectStoreName);
+      //   let request = objectStore.get(id);
+
+      //   request.onsuccess = function (event) {
+      //     if (request.result) {
+      //       resolve({ value: request.result.value, newState });
+      //     } else {
+      //       resolve({});
+      //     }
+      //   };
+
+      //   request.onerror = function (event) {
+      //     reject("Error reading value: " + event.target.error);
+      //   };
+      let transaction2 = db.transaction([objectStoreName], "readonly");
+      let objectStore2 = transaction2.objectStore(objectStoreName);
+      let request2 = objectStore2.get("encrypted-" + id);
+      const decryptDataPromise = this.decryptDataPromise;
+      const key = this.key;
+
+      request2.onsuccess = async function (event) {
+        if (request2.result) {
+          console.log({
+            value: request2.result.value,
+            iv: request2.result.iv,
+            newState,
+          });
+
+          const decryptedData = await decryptDataPromise(
+            request2.result.value,
+            request2.result.iv,
+            key
+          );
+
+          resolve({
+            value: decryptedData,
+            newState,
+          });
         } else {
-          resolve(null);
+          resolve({});
         }
       };
 
-      request.onerror = function (event) {
-        reject("Error reading value: " + event.target.error);
+      request2.onerror = function (event) {
+        console.log("Error reading value: " + event.target.error);
       };
     });
   }
@@ -357,6 +588,7 @@ function createDebouncedEventDispatcher(
           detail: value,
         })
       );
+
       timeoutIds[eventName] = undefined;
     }, delay);
   };
