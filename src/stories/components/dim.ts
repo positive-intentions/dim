@@ -313,7 +313,7 @@ class AsyncronousStateManager {
 
   async decryptDataPromise(encryptedData, iv, key) {
     const deserializedEncryptedData = stringToArrayBuffer(encryptedData);
-    const deserializeIv = string - ToArrayBuffer(iv);
+    const deserializeIv = stringToArrayBuffer(iv);
     const decryptedData = await decryptData(
       key || this.key,
       deserializedEncryptedData,
