@@ -179,12 +179,19 @@ export const useLazyScope = (tag, promise) => {
     }
   });
 };
-async function generateKey(password, salt = null) {
+async function generateKey(password, salt = '') {
   const encoder = new TextEncoder();
+
+  const passwordSha256Hash = await crypto.subtle.digest(
+    "SHA-256",
+    encoder.encode(password)
+  );
+
+  console.log("password", password, arrayBufferToString(passwordSha256Hash))
 
   // If no salt is provided, generate a new random one
   if (!salt) {
-    salt = crypto.getRandomValues(new Uint8Array(16));
+    salt = stringToArrayBuffer(arrayBufferToString(passwordSha256Hash));
   }
 
   // Encode the password into binary format
@@ -201,7 +208,7 @@ async function generateKey(password, salt = null) {
     {
       name: "PBKDF2",
       salt: salt,
-      iterations: 100000,
+      iterations: 1000000,
       hash: "SHA-256",
     },
     passwordKey,
@@ -267,26 +274,134 @@ class AsyncronousStateManager {
   constructor() {
     this.store = {};
     this.eventListener = [];
-    this.password = "my-strong-password";
+    this.password = null;
     this.key = null;
     this.salt = null;
     this.openDatabase().catch(console.error);
-    this.initEncryption().catch(console.error);
+    this.init().catch(console.error);
+
   }
 
-  async initEncryption() {
-    const stringifiedSalt = "7G8WKM1oWgCy2og2NB68cQ==";
-    const stringifiedKey = "DNtvCq4ssPoXFQ20w/biT2yTvVTLrMUfzeJCsv0iN8o=";
-    const deserializeKey = await crypto.subtle.importKey(
-      "raw",
-      stringToArrayBuffer(stringifiedKey),
-      { name: "AES-GCM" },
-      true,
-      ["encrypt", "decrypt"]
-    );
-    const deserializeSalt = stringToArrayBuffer(stringifiedSalt);
-    this.key = deserializeKey;
-    this.salt = deserializeSalt;
+    async getOrCreateBiometricCredential () {
+      return await new Promise((resolve, reject) => {
+        (async () => {
+          try {
+            // Check if WebAuthn is supported in the browser
+            if (!window.PublicKeyCredential) {
+              reject("WebAuthn is not supported in this browser.");
+            }
+        
+            // Create a random challenge (this would usually come from the server)
+            const challenge = new Uint8Array(32);
+            window.crypto.getRandomValues(challenge);
+        
+            const publicKeyCredentialCreationOptions = {
+              challenge: challenge,  // Random challenge from the server
+              rp: {
+                name: "positive-intentions",  // Name of your site/service
+                id: window.location.hostname
+              },
+              user: {
+                id: Uint8Array.from(window.crypto.getRandomValues(new Uint8Array(16))),  // User ID (must be unique per user)
+                name: "me@positive-intentions.com",  // Username/email for the user
+                displayName: "Device User"
+              },
+              pubKeyCredParams: [
+                {
+                  type: "public-key",
+                  alg: -7  // Algorithm, usually ECDSA with SHA-256
+                }
+              ],
+              authenticatorSelection: {
+                authenticatorAttachment: "platform",  // Use device's biometric (platform) authenticator
+                userVerification: "required"
+              },
+              timeout: 60000,
+              attestation: "direct"  // Attestation type
+            };
+        
+            // Register a new passkey if none exist
+            let credentials;
+            try {
+              credentials = await navigator.credentials.get({
+                publicKey: {
+                  challenge: challenge,
+                  rpId: window.location.hostname,  // The relying party's domain (this website)
+                  allowCredentials: [], // Empty to allow user to choose from any available credentials
+                  userVerification: "required"
+                }
+              }).then((credentials) => {
+                console.log("Biometric Authentication successful!");
+                console.log("Credential ID:", credentials.id);
+                resolve(credentials.id);
+              });
+            } catch (error) {
+              console.log("No credentials found, attempting to create one.");
+        
+              // If no credentials are available, we create a new one
+              const newCredential = await navigator.credentials.create({ publicKey: publicKeyCredentialCreationOptions });
+              
+              // Store the credential for future logins (typically, you'd send this to a server)
+              console.log("New passkey created:", newCredential);
+              
+              // Now that we've created a passkey, attempt to use it for authentication
+              credentials = await navigator.credentials.get({
+                publicKey: {
+                  challenge: challenge,
+                  rpId: window.location.hostname,
+                  allowCredentials: [
+                    {
+                      id: newCredential.rawId,
+                      type: "public-key",
+                      transports: ["internal"]
+                    }
+                  ],
+                  userVerification: "required"
+                }
+              });
+              console.log("Biometric Authentication successful after creating passkey!");
+              console.log("Credential ID:", credentials.id);
+              resolve(credentials.id);
+            }
+            
+          } catch (error) {
+            // Log the error if authentication or registration fails
+            reject("Error during authentication or registration:", error);
+  
+          }
+      })();
+      });
+    }
+
+  async init() {
+    if(!this.password) {
+      const shouldUseWebAuth = confirm("would you like to use WebAuthn instead of password?");
+      if (shouldUseWebAuth) {
+        console.log("Using WebAuthn");
+        this.password = await this.getOrCreateBiometricCredential();
+      } else {
+        const promptInput = prompt("Enter password");
+        if (promptInput) {
+          console.log("Password entered: ", promptInput);
+          this.password = promptInput;
+        }
+      }
+    }
+
+    const { key } = await generateKey(this.password, this.salt);
+    this.key = key;
+
+    window.dispatchEvent(new Event("async-state-auth-ready"));
+    return;
+  }
+
+  async authReady() {
+    return new Promise((resolve, reject) => {
+      // listen for auth ready event
+      window.addEventListener("async-state-auth-ready", () => {
+        resolve();
+      });
+    });
   }
 
   async encryptDataPromise(data) {
@@ -366,18 +481,6 @@ class AsyncronousStateManager {
     };
 
     return new Promise((resolve, reject) => {
-      // let transaction = db.transaction([objectStoreName], "readwrite");
-      // let objectStore = transaction.objectStore(objectStoreName);
-      // let request = objectStore.put({ id: id, value: value });
-
-      // request.onsuccess = function (event) {
-      //   resolve("Value written successfully");
-      // };
-
-      // request.onerror = function (event) {
-      //   reject("Error writing value: " + event.target.error);
-      // };
-
       let transaction2 = db.transaction([objectStoreName], "readwrite");
       let objectStore2 = transaction2.objectStore(objectStoreName);
       let request2 = objectStore2.put({
@@ -430,21 +533,6 @@ class AsyncronousStateManager {
     };
 
     return new Promise((resolve, reject) => {
-      //   let transaction = db.transaction([objectStoreName], "readonly");
-      //   let objectStore = transaction.objectStore(objectStoreName);
-      //   let request = objectStore.get(id);
-
-      //   request.onsuccess = function (event) {
-      //     if (request.result) {
-      //       resolve({ value: request.result.value, newState });
-      //     } else {
-      //       resolve({});
-      //     }
-      //   };
-
-      //   request.onerror = function (event) {
-      //     reject("Error reading value: " + event.target.error);
-      //   };
       let transaction2 = db.transaction([objectStoreName], "readonly");
       let objectStore2 = transaction2.objectStore(objectStoreName);
       let request2 = objectStore2.get("encrypted-" + id);
@@ -621,7 +709,11 @@ export const useStore = (store) => {
   createListeners(store, randomId);
 
   useEffect(() => {
-    loadFromDatabase(store);
+    const initEncryption = async () => {
+      await asyncronousStateManager.authReady();
+      loadFromDatabase(store);
+    };
+    initEncryption();
 
     return () => {
       asyncronousStateManager.removeListeners(randomId);
