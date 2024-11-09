@@ -1,11 +1,11 @@
-import { html } from "./mini-lit.js";
 import {
-    useState,
     useEffect,
     useMemo,
     useScope,
+    useState,
     useStore,
 } from "./dim.ts";
+import { html } from "./mini-lit.js";
 
 import AddItemForm from "./AddItemForm.js";
 import TodoList from "./TodoList.js";
@@ -24,7 +24,7 @@ const Todo = () => {
         },
         todos: useState([]),
 
-    })
+    }, { password: "123" });
 
     useScope({
         "add-item-form": AddItemForm,
