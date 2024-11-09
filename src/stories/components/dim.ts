@@ -277,8 +277,9 @@ class AsyncronousStateManager {
     this.password = null;
     this.key = null;
     this.salt = null;
+    this.biometricInProgress = false;
     this.openDatabase().catch(console.error);
-    this.init().catch(console.error);
+    // this.init().catch(console.error);
 
   }
 
@@ -333,6 +334,7 @@ class AsyncronousStateManager {
               }).then((credentials) => {
                 console.log("Biometric Authentication successful!");
                 console.log("Credential ID:", credentials.id);
+                this.biometricInProgress = false;
                 resolve(credentials.id);
               });
             } catch (error) {
@@ -361,6 +363,7 @@ class AsyncronousStateManager {
               });
               console.log("Biometric Authentication successful after creating passkey!");
               console.log("Credential ID:", credentials.id);
+              this.biometricInProgress = false;
               resolve(credentials.id);
             }
             
@@ -375,32 +378,48 @@ class AsyncronousStateManager {
 
   async init() {
     if(!this.password) {
-      const shouldUseWebAuth = confirm("would you like to use WebAuthn instead of password?");
-      if (shouldUseWebAuth) {
-        console.log("Using WebAuthn");
-        this.password = await this.getOrCreateBiometricCredential();
-      } else {
+      // const shouldUseWebAuth = confirm("would you like to use WebAuthn instead of password?");
+      // if (shouldUseWebAuth && !this.biometricInProgress) {
+      //   console.log("Using WebAuthn");
+      //   this.biometricInProgress = true;
+      //   this.password = await this.getOrCreateBiometricCredential();
+      // } else {
         const promptInput = prompt("Enter password");
         if (promptInput) {
           console.log("Password entered: ", promptInput);
           this.password = promptInput;
+        } else {
+          console.error("No password entered");
+          this.password = 'promptInput';
         }
       }
-    }
+    // }
 
     const { key } = await generateKey(this.password, this.salt);
     this.key = key;
 
     window.dispatchEvent(new Event("async-state-auth-ready"));
+    // setTimeout(() => {
+    //   window.dispatchEvent(new Event("async-state-auth-ready"));
+    // }, 1);
     return;
   }
 
   async authReady() {
+    // await this.init();
     return new Promise((resolve, reject) => {
       // listen for auth ready event
-      window.addEventListener("async-state-auth-ready", () => {
-        resolve();
-      });
+      this.init()
+      .then(() => {
+        if (this.key) {
+          resolve();
+          return;
+        }
+        window.addEventListener("async-state-auth-ready", () => {
+          resolve();
+        });
+      })
+      .catch(console.error);
     });
   }
 
@@ -682,7 +701,7 @@ function createDebouncedEventDispatcher(
   };
 }
 
-const debouncedDispatcher = createDebouncedEventDispatcher(10);
+const debouncedDispatcher = createDebouncedEventDispatcher(100);
 
 const loadFromDatabase = (store) => {
   const traverse = (obj, path) => {
