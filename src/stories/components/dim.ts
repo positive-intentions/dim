@@ -178,15 +178,27 @@ let asyncronousStateManager;
 
 export const useStore = (store, config) => {
   const [randomId] = useState(crypto.getRandomValues(new Uint8Array(8)));
+  const [storeReady, setStoreReady] = useState(false);
 
   useEffect(() => {
-    if (!asyncronousStateManager) {
-      asyncronousStateManager = new AsyncronousStateManager(config);
-    }
     const init = async () => {
-      await asyncronousStateManager.authReady();
-      asyncronousStateManager.loadFromDatabase(store);
-    };
+      console.log("init");
+      await asyncronousStateManager.authReady()
+      .catch((error) => {
+        console.error("Error with auth", error);
+      });
+      console.log("auth ready");
+      await asyncronousStateManager.loadFromDatabase(store)
+        .catch((error) => {
+          console.error("Error loading store from database", error);
+        });
+      setStoreReady(true);
+    }; 
+    // if (!storeReady) {
+      if (!asyncronousStateManager) {
+        asyncronousStateManager = new AsyncronousStateManager(config);
+      }
+    // }
     init();
 
     return () => {
@@ -195,6 +207,8 @@ export const useStore = (store, config) => {
   }, []);
 
   asyncronousStateManager.createListeners(store, randomId);
+
+  store.storeLoaded = [storeReady];
 
   return store;
 };

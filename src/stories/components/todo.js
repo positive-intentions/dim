@@ -17,14 +17,16 @@ const Todo = () => {
             counter: [counter, setCounter],
         },
         todos: [todos, setTodos],
+        storeLoaded: [storeLoaded],
     } = useStore({
         form: {
             input: useState(""),
             counter: useState(1),
         },
         todos: useState([]),
+    }, { password: "" });
 
-    }, { password: "123" });
+    // console.log("storeLoaded", storeLoaded);
 
     useScope({
         "add-item-form": AddItemForm,
@@ -51,6 +53,10 @@ const Todo = () => {
         console.log("removing item", index);
         setTodos(todos.filter((_, i) => i !== index));
     };
+
+    if(!storeLoaded) {
+        return html`<div>decrypting...</div>`;
+    }
 
     return html`
     <div>

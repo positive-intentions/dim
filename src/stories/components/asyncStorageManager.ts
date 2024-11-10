@@ -167,22 +167,18 @@ export default class AsyncronousStateManager {
   }
 
   async init() {
-    const getCredentials = async () => {
+    console.log('init>>', this.password)
+    // const getCredentials = async () => {
       if (!this.password) {
         const shouldUseWebAuth =
           !!false &&
           confirm("would you like to use WebAuthn instead of password?");
         if (shouldUseWebAuth) {
           console.log("Using WebAuthn");
-          alert("Please use your biometric to authenticate");
-          const deboubncedGetCredentials = debounce(
-            this.getOrCreateBiometricCredential,
-            1000
-          );
-          this.password = await deboubncedGetCredentials();
+          this.password = await this.getOrCreateBiometricCredential();
           return;
         } else {
-          const promptInput = prompt("Enter password");
+          const promptInput = prompt("Enter password for encryption");
           if (promptInput) {
             console.log("Password entered: ", promptInput);
             this.password = promptInput;
@@ -190,11 +186,12 @@ export default class AsyncronousStateManager {
             console.error("No password entered");
             this.password = "promptInput";
           }
-          return;
         }
       }
-    };
-    await getCredentials();
+    // };
+    // await getCredentials();
+
+    console.log('generating key')
 
     const { key } = await generateKey(this.password, this.salt);
     this.key = key;
@@ -204,21 +201,20 @@ export default class AsyncronousStateManager {
   }
 
   async authReady() {
-    // await this.init();
-    const { key } = await generateKey(this.password, this.salt);
     return new Promise((resolve, reject) => {
       // listen for auth ready event
+      const authReadyListener = () => {
+        // remove listener
+        console.log("auth ready");
+        window.removeEventListener("async-state-auth-ready", authReadyListener);
+        resolve();
+      }
+      window.addEventListener("async-state-auth-ready", authReadyListener);
+
       this.init()
-        .then(() => {
-          if (key) {
-            resolve();
-            return;
-          }
-          window.addEventListener("async-state-auth-ready", () => {
-            resolve();
-          });
-        })
-        .catch(console.error);
+        .catch(e => {
+          reject(e);
+        });
     });
   }
 
@@ -245,28 +241,40 @@ export default class AsyncronousStateManager {
   }
 
   async decryptData(key, encryptedData, iv) {
-    const encoder = new TextEncoder();
-    const passwordSha256Hash = await crypto.subtle.digest(
-      "SHA-256",
-      encoder.encode(this.password)
-    );
-    const aad = new Uint8Array(passwordSha256Hash);
-    const decryptedData = await crypto.subtle.decrypt(
-      {
-        name: "AES-GCM",
-        iv: iv,
-        additionalData: aad,
-      },
-      key,
-      encryptedData
-    );
+    return new Promise((resolve, reject) => {
 
-    const dec = new TextDecoder();
-    return dec.decode(decryptedData);
+      const decryptData = async () => {
+        const encoder = new TextEncoder();
+        const passwordSha256Hash = await crypto.subtle.digest(
+          "SHA-256",
+          encoder.encode(this.password)
+        );
+        const aad = new Uint8Array(passwordSha256Hash);
+        const decryptedData = await crypto.subtle.decrypt(
+          {
+            name: "AES-GCM",
+            iv: iv,
+            additionalData: aad,
+          },
+          key,
+          encryptedData
+        );
+    
+        if (!decryptedData) {
+          reject("Decryption failed");
+        } else {
+          const dec = new TextDecoder();
+          return resolve(dec.decode(decryptedData));
+        }
+      };
+
+      decryptData().catch(reject);
+    });
   }
 
   async encryptDataPromise(data) {
-    const { key } = await generateKey(this.password, this.salt);
+    // const { key } = await generateKey(this.password, this.salt);
+    const key = this.key || await generateKey(this.password, this.salt);
     const { encryptedData, iv } = await this.encryptData(
       key,
       JSON.stringify(data)
@@ -295,9 +303,7 @@ export default class AsyncronousStateManager {
       key,
       deserializedEncryptedData,
       deserializeIv
-    ).catch((e) => {
-      console.error("Error decrypting data: ", e);
-    });
+    );
 
     return JSON.parse(decryptedData);
   }
@@ -365,8 +371,10 @@ export default class AsyncronousStateManager {
     let transaction2 = db.transaction([objectStoreName], "readonly");
     let objectStore2 = transaction2.objectStore(objectStoreName);
     let request2 = objectStore2.get("encrypted-" + id);
-    const { key } = await generateKey(this.password, this.salt);
+    // const { key } = await generateKey(this.password, this.salt);
+    const key = this.key || await generateKey(this.password, this.salt);
     const decryptDataPromise = this.decryptDataPromise.bind(this);
+    console.log('reading value')
 
     request2.onsuccess = async (event) => {
       if (request2.result) {
@@ -495,21 +503,27 @@ export default class AsyncronousStateManager {
   }
 
   loadFromDatabase(store) {
-    const traverse = (obj, path) => {
-      Object.keys(obj).forEach((key) => {
-        if (typeof obj[key] === "object" && obj[key].length === undefined) {
-          traverse(obj[key], `${path}${key}.`);
-        } else {
-          this.readValue(`${path}${key}`, obj[key])
-            .then(({ value }) => {
-              debouncedDispatcher(`${path}${key}`, value);
-            })
-            .catch(console.error);
-        }
-      });
-    };
-
-    traverse(store, "");
+    return new Promise((resolve, reject) => {
+      const traverse = (obj, path) => {
+        Object.keys(obj).forEach((key) => {
+          if (typeof obj[key] === "object" && obj[key].length === undefined) {
+            traverse(obj[key], `${path}${key}.`);
+          } else {
+            this.readValue(`${path}${key}`, obj[key])
+              .then(({ value }) => {
+                debouncedDispatcher(`${path}${key}`, value, resolve);
+              })
+              .catch((e) => {
+                console.error(e)
+                resolve();
+              
+              });
+          }
+        });
+      };
+  
+      traverse(store, "");
+    });
   }
 
   createListeners(store, listenerId) {
@@ -540,16 +554,18 @@ function createDebouncedEventDispatcher(
 ): DebouncedEventDispatcher {
   const timeoutIds: { [key: string]: number | undefined } = {};
 
-  return (eventName: string, value: any) => {
+  return (eventName: string, value: any, resolve: any) => {
     if (timeoutIds[eventName] !== undefined) {
       clearTimeout(timeoutIds[eventName]);
     }
 
     timeoutIds[eventName] = window.setTimeout(() => {
-      window.dispatchEvent(
-        new CustomEvent(eventName, {
-          detail: value,
-        })
+      resolve(
+        window.dispatchEvent(
+          new CustomEvent(eventName, {
+            detail: value,
+          })
+        )
       );
 
       timeoutIds[eventName] = undefined;
