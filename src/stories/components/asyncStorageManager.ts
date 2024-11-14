@@ -167,31 +167,28 @@ export default class AsyncronousStateManager {
   }
 
   async init() {
-    console.log('init>>', this.password)
     // const getCredentials = async () => {
-      if (!this.password) {
-        const shouldUseWebAuth =
-          !!false &&
-          confirm("would you like to use WebAuthn instead of password?");
-        if (shouldUseWebAuth) {
-          console.log("Using WebAuthn");
-          this.password = await this.getOrCreateBiometricCredential();
-          return;
+    if (!this.password) {
+      const shouldUseWebAuth =
+        !!false &&
+        confirm("would you like to use WebAuthn instead of password?");
+      if (shouldUseWebAuth) {
+        console.log("Using WebAuthn");
+        this.password = await this.getOrCreateBiometricCredential();
+        return;
+      } else {
+        const promptInput = prompt("Enter password for encryption");
+        if (promptInput) {
+          console.log("Password entered: ", promptInput);
+          this.password = promptInput;
         } else {
-          const promptInput = prompt("Enter password for encryption");
-          if (promptInput) {
-            console.log("Password entered: ", promptInput);
-            this.password = promptInput;
-          } else {
-            console.error("No password entered");
-            this.password = "promptInput";
-          }
+          console.error("No password entered");
+          this.password = "promptInput";
         }
       }
+    }
     // };
     // await getCredentials();
-
-    console.log('generating key')
 
     const { key } = await generateKey(this.password, this.salt);
     this.key = key;
@@ -208,30 +205,22 @@ export default class AsyncronousStateManager {
         console.log("auth ready");
         window.removeEventListener("async-state-auth-ready", authReadyListener);
         resolve();
-      }
+      };
       window.addEventListener("async-state-auth-ready", authReadyListener);
 
-      this.init()
-        .catch(e => {
-          reject(e);
-        });
+      this.init().catch((e) => {
+        reject(e);
+      });
     });
   }
 
   async encryptData(key, data) {
     const enc = new TextEncoder();
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    const encoder = new TextEncoder();
-    const passwordSha256Hash = await crypto.subtle.digest(
-      "SHA-256",
-      encoder.encode(this.password)
-    );
-    const aad = new Uint8Array(passwordSha256Hash);
     const encryptedData = await crypto.subtle.encrypt(
       {
         name: "AES-GCM",
         iv: iv,
-        additionalData: aad,
       },
       key,
       enc.encode(data)
@@ -242,24 +231,16 @@ export default class AsyncronousStateManager {
 
   async decryptData(key, encryptedData, iv) {
     return new Promise((resolve, reject) => {
-
       const decryptData = async () => {
-        const encoder = new TextEncoder();
-        const passwordSha256Hash = await crypto.subtle.digest(
-          "SHA-256",
-          encoder.encode(this.password)
-        );
-        const aad = new Uint8Array(passwordSha256Hash);
         const decryptedData = await crypto.subtle.decrypt(
           {
             name: "AES-GCM",
             iv: iv,
-            additionalData: aad,
           },
           key,
           encryptedData
         );
-    
+
         if (!decryptedData) {
           reject("Decryption failed");
         } else {
@@ -274,7 +255,7 @@ export default class AsyncronousStateManager {
 
   async encryptDataPromise(data) {
     // const { key } = await generateKey(this.password, this.salt);
-    const key = this.key || await generateKey(this.password, this.salt);
+    const key = this.key || (await generateKey(this.password, this.salt));
     const { encryptedData, iv } = await this.encryptData(
       key,
       JSON.stringify(data)
@@ -372,9 +353,8 @@ export default class AsyncronousStateManager {
     let objectStore2 = transaction2.objectStore(objectStoreName);
     let request2 = objectStore2.get("encrypted-" + id);
     // const { key } = await generateKey(this.password, this.salt);
-    const key = this.key || await generateKey(this.password, this.salt);
+    const key = this.key || (await generateKey(this.password, this.salt));
     const decryptDataPromise = this.decryptDataPromise.bind(this);
-    console.log('reading value')
 
     request2.onsuccess = async (event) => {
       if (request2.result) {
@@ -514,14 +494,12 @@ export default class AsyncronousStateManager {
                 debouncedDispatcher(`${path}${key}`, value, resolve);
               })
               .catch((e) => {
-                console.error(e)
                 resolve();
-              
               });
           }
         });
       };
-  
+
       traverse(store, "");
     });
   }

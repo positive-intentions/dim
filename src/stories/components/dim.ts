@@ -183,28 +183,26 @@ export const useStore = (store, config) => {
   useEffect(() => {
     const init = async () => {
       console.log("init");
-      await asyncronousStateManager.authReady()
-      .catch((error) => {
+      await asyncronousStateManager.authReady().catch((error) => {
         console.error("Error with auth", error);
       });
       console.log("auth ready");
-      await asyncronousStateManager.loadFromDatabase(store)
-        .catch((error) => {
-          console.error("Error loading store from database", error);
-        });
+      await asyncronousStateManager.loadFromDatabase(store).catch((error) => {
+        console.error("Error loading store from database", error);
+      });
       setStoreReady(true);
-    }; 
+    };
     // if (!storeReady) {
-      if (!asyncronousStateManager) {
-        asyncronousStateManager = new AsyncronousStateManager(config);
-      }
+    if (!asyncronousStateManager) {
+      asyncronousStateManager = new AsyncronousStateManager(config);
+    }
     // }
     init();
 
     return () => {
       asyncronousStateManager.removeListeners(randomId);
     };
-  }, []);
+  }, [config?.password]);
 
   asyncronousStateManager.createListeners(store, randomId);
 
