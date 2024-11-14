@@ -1,7 +1,7 @@
 import {
-    useState,
     useEffect,
     useScope,
+    useState,
     useStore,
 } from "./dim.ts";
 import { html } from "./mini-lit.js";

@@ -1,28 +1,29 @@
 import {
+  css,
   define,
-  useState,
+  html,
   useEffect,
   useMemo,
   useScope,
-  useStyle,
+  useState,
   useStore,
-  html,
-  css
+  useStyle
 } from "./components/dim.ts";
-import Todo from './components/todo.js';
+// import Todo from './components/todo.js';
 import React from "react";
+import EncryptionGate from './components/EncryptionGate.js';
 
 define({
-  tag: 'todo-app',
-  component: Todo,
+  tag: 'todo-app2',
+  component: EncryptionGate,
   sharedDependencies: [
     useState,
     useEffect,
     useMemo,
     useScope,
     useStyle,
-    useStore.
-      html,
+    useStore,
+    html,
     css
   ]
 });
@@ -32,7 +33,11 @@ export default {
   title: "Components/Todo",
   component: () => {
     return (
-      <todo-app>positive-intentions</todo-app>
+      <todo-app2>
+        <h1>
+          positive-intentions
+        </h1>
+      </todo-app2>
     )
   },
   parameters: {
