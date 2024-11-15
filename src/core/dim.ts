@@ -1,5 +1,6 @@
 import { LitElement } from "lit";
-import { html, css, unsafeCSS } from "./mini-lit";
+import AsyncronousStateManager from "./async-manager";
+import { css, html, unsafeCSS } from "./mini-lit";
 
 let currentInstance = null;
 
@@ -180,78 +181,6 @@ export const useLazyScope = (tag, promise) => {
   });
 };
 
-class AsyncronousStateManager {
-  constructor() {
-    this.store = {};
-    this.eventListener = [];
-  }
-
-  generateListener(listener) {
-    const { listenerId, key, value } = listener;
-
-    // Remove existing event listeners if they exist
-    const existingListender = this.eventListener.find(
-      (listener) => listener.listenerId === listenerId
-    );
-
-    const listenerName = `${key}`;
-
-    if (existingListender) {
-      window.removeEventListener(listenerName, existingListender.listener);
-
-      this.eventListener = this.eventListener.filter(
-        (listener) => listener.listenerId !== listenerId
-      );
-    }
-
-    // Create a new event listener
-    const newListener = (event) => {
-      value[1](event.detail);
-
-      this.store = {
-        ...this.store,
-        [key]: event.detail,
-      };
-    };
-
-    window.addEventListener(listenerName, newListener);
-
-    this.eventListener.push({
-      listenerId,
-      listener: newListener,
-    });
-
-    const newSetter = (newValue) => {
-      window.dispatchEvent(
-        new CustomEvent(listenerName, {
-          detail: newValue,
-        })
-      );
-    };
-
-    const newState = this.store[key] || value[0];
-
-    return [newState, newSetter];
-  }
-
-  removeListeners(listenerId) {
-    const existingListender = this.eventListener.find(
-      (listener) => listener.listenerId === listenerId
-    );
-
-    if (existingListender) {
-      window.removeEventListener(
-        `${existingListender.key}`,
-        existingListender.listener
-      );
-
-      this.eventListener = this.eventListener.filter(
-        (listener) => listener.listenerId !== listenerId
-      );
-    }
-  }
-}
-
 const asyncronousStateManager = new AsyncronousStateManager();
 
 const createListeners = (store, listenerId) => {
@@ -275,12 +204,57 @@ const createListeners = (store, listenerId) => {
   traverse(store, "");
 };
 
+type DebouncedEventDispatcher = (eventName: string, value: any) => void;
+
+function createDebouncedEventDispatcher(
+  delay: number
+): DebouncedEventDispatcher {
+  const timeoutIds: { [key: string]: number | undefined } = {};
+
+  return (eventName: string, value: any) => {
+    if (timeoutIds[eventName] !== undefined) {
+      clearTimeout(timeoutIds[eventName]);
+    }
+
+    timeoutIds[eventName] = window.setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent(eventName, {
+          detail: value,
+        })
+      );
+      timeoutIds[eventName] = undefined;
+    }, delay);
+  };
+}
+
+const debouncedDispatcher = createDebouncedEventDispatcher(10);
+
+const loadFromDatabase = (store) => {
+  const traverse = (obj, path) => {
+    Object.keys(obj).forEach((key) => {
+      if (typeof obj[key] === "object" && obj[key].length === undefined) {
+        traverse(obj[key], `${path}${key}.`);
+      } else {
+        asyncronousStateManager
+          .readValue(`${path}${key}`, obj[key])
+          .then(({ value }) => {
+            debouncedDispatcher(`${path}${key}`, value);
+          })
+          .catch(console.error);
+      }
+    });
+  };
+
+  traverse(store, "");
+};
+
 export const useStore = (store) => {
   const [randomId] = useState(crypto.getRandomValues(new Uint8Array(8)));
 
   createListeners(store, randomId);
 
   useEffect(() => {
+    loadFromDatabase(store);
     return () => {
       asyncronousStateManager.removeListeners(randomId);
     };

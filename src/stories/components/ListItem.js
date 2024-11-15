@@ -1,9 +1,9 @@
 import {
-    useState,
     useEffect,
+    useState,
     useStore,
-} from "./dim.ts";
-import { html } from "./mini-lit.js";
+} from "../../core/dim.ts";
+import { html } from "../../core/mini-lit.js";
 
 const ListItem = ({ todo, onRemove }) => {
     const {

@@ -1,11 +1,11 @@
-import { html } from "./mini-lit.js";
 import {
-    useState,
     useEffect,
     useMemo,
     useScope,
+    useState,
     useStore,
-} from "./dim.ts";
+} from "../../core/dim.ts";
+import { html } from "../../core/mini-lit.js";
 
 import AddItemForm from "./AddItemForm.js";
 import TodoList from "./TodoList.js";
