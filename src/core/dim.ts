@@ -1,5 +1,6 @@
 import { LitElement } from "lit";
 import AsyncronousStateManager from "./async-manager";
+import StorageManager from "./storage-manager";
 import { css, html, unsafeCSS } from "./mini-lit";
 
 let currentInstance = null;
@@ -182,79 +183,15 @@ export const useLazyScope = (tag, promise) => {
 };
 
 const asyncronousStateManager = new AsyncronousStateManager();
-
-const createListeners = (store, listenerId) => {
-  const traverse = (obj, path) => {
-    Object.keys(obj).forEach((key) => {
-      if (typeof obj[key] === "object" && obj[key].length === undefined) {
-        traverse(obj[key], `${path}${key}.`);
-      } else {
-        const [asyncState, asyncSetState] =
-          asyncronousStateManager.generateListener({
-            listenerId,
-            key: `${path}${key}`,
-            value: obj[key],
-          });
-
-        obj[key] = [asyncState, asyncSetState].concat(obj[key]);
-      }
-    });
-  };
-
-  traverse(store, "");
-};
-
-type DebouncedEventDispatcher = (eventName: string, value: any) => void;
-
-function createDebouncedEventDispatcher(
-  delay: number
-): DebouncedEventDispatcher {
-  const timeoutIds: { [key: string]: number | undefined } = {};
-
-  return (eventName: string, value: any) => {
-    if (timeoutIds[eventName] !== undefined) {
-      clearTimeout(timeoutIds[eventName]);
-    }
-
-    timeoutIds[eventName] = window.setTimeout(() => {
-      window.dispatchEvent(
-        new CustomEvent(eventName, {
-          detail: value,
-        })
-      );
-      timeoutIds[eventName] = undefined;
-    }, delay);
-  };
-}
-
-const debouncedDispatcher = createDebouncedEventDispatcher(10);
-
-const loadFromDatabase = (store) => {
-  const traverse = (obj, path) => {
-    Object.keys(obj).forEach((key) => {
-      if (typeof obj[key] === "object" && obj[key].length === undefined) {
-        traverse(obj[key], `${path}${key}.`);
-      } else {
-        asyncronousStateManager
-          .readValue(`${path}${key}`, obj[key])
-          .then(({ value }) => {
-            debouncedDispatcher(`${path}${key}`, value);
-          })
-          .catch(console.error);
-      }
-    });
-  };
-
-  traverse(store, "");
-};
+const storageManager = new StorageManager();
 
 export const useStore = (store) => {
   const [randomId] = useState(crypto.getRandomValues(new Uint8Array(8)));
 
-  createListeners(store, randomId);
+  asyncronousStateManager.createListeners(store, randomId);
 
   useEffect(() => {
-    loadFromDatabase(store);
+    storageManager.loadFromDatabase(store);
     return () => {
       asyncronousStateManager.removeListeners(randomId);
     };

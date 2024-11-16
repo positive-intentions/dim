@@ -20,7 +20,7 @@ const Todo = () => {
     } = useStore({
         form: {
             input: useState(""),
-            counter: useState(1),
+            counter: useState(100),
         },
         todos: useState([]),
 

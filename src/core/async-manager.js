@@ -1,69 +1,33 @@
-let db;
-const databaseName = "DimDatabase";
-const objectStoreName = "DimStore";
+import StorageManager from "./storage-manager";
+
+function createDebouncedEventDispatcher(
+    delay
+  ) {
+    const timeoutIds = {};
+  
+    return (eventName, value) => {
+      if (timeoutIds[eventName] !== undefined) {
+        clearTimeout(timeoutIds[eventName]);
+      }
+  
+      timeoutIds[eventName] = window.setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent(eventName, {
+            detail: value,
+          })
+        );
+        timeoutIds[eventName] = undefined;
+      }, delay);
+    };
+  }
+  
+  const debouncedDispatcher = createDebouncedEventDispatcher(10);
 
 class AsyncronousStateManager {
     constructor() {
         this.store = {};
-        this.eventListener = []; this.openDatabase().catch(console.error);
-    }
-
-    async openDatabase() {
-        return new Promise((resolve, reject) => {
-            let request = indexedDB.open(databaseName, 1);
-
-            request.onupgradeneeded = function (event) {
-                db = event.target.result;
-                if (!db.objectStoreNames.contains(objectStoreName)) {
-                    db.createObjectStore(objectStoreName, { keyPath: "id" });
-                }
-            };
-
-            request.onsuccess = function (event) {
-                db = event.target.result;
-                resolve(db);
-            };
-
-            request.onerror = function (event) {
-                reject("Error opening database: " + event.target.error);
-            };
-        });
-    }
-
-    async writeValue(id, value) {
-        return new Promise((resolve, reject) => {
-            let transaction = db.transaction([objectStoreName], "readwrite");
-            let objectStore = transaction.objectStore(objectStoreName);
-            let request = objectStore.put({ id: id, value: value });
-
-            request.onsuccess = function (event) {
-                resolve("Value written successfully");
-            };
-
-            request.onerror = function (event) {
-                reject("Error writing value: " + event.target.error);
-            };
-        });
-    }
-
-    async readValue(id, newState) {
-        return new Promise((resolve, reject) => {
-            let transaction = db.transaction([objectStoreName], "readonly");
-            let objectStore = transaction.objectStore(objectStoreName);
-            let request = objectStore.get(id);
-
-            request.onsuccess = function (event) {
-                if (request.result) {
-                    resolve({ value: request.result.value, newState });
-                } else {
-                    resolve(null);
-                }
-            };
-
-            request.onerror = function (event) {
-                reject("Error reading value: " + event.target.error);
-            };
-        });
+        this.eventListener = [];
+        this.db = new StorageManager();
     }
 
     generateListener(listener) {
@@ -102,12 +66,14 @@ class AsyncronousStateManager {
         });
 
         const newSetter = (newValue) => {
-            this.writeValue(key, newValue).catch(console.error);
-            window.dispatchEvent(
-                new CustomEvent(listenerName, {
-                    detail: newValue,
-                })
-            );
+            this.db.writeValue(key, newValue).catch(console.error);
+            // window.dispatchEvent(
+            //     new CustomEvent(listenerName, {
+            //         detail: newValue,
+            //     })
+            // );
+
+            debouncedDispatcher(listenerName, newValue);
         };
 
         const newState = this.store[key] || value[0];
@@ -131,6 +97,27 @@ class AsyncronousStateManager {
             );
         }
     }
+
+    createListeners = (store, listenerId) => {
+        const traverse = (obj, path) => {
+          Object.keys(obj).forEach((key) => {
+            if (typeof obj[key] === "object" && obj[key].length === undefined) {
+              traverse(obj[key], `${path}${key}.`);
+            } else {
+              const [asyncState, asyncSetState] =
+                this.generateListener({
+                  listenerId,
+                  key: `${path}${key}`,
+                  value: obj[key],
+                });
+      
+              obj[key] = [asyncState, asyncSetState].concat(obj[key]);
+            }
+          });
+        };
+      
+        traverse(store, "");
+      };
 }
 
 
