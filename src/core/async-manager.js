@@ -1,11 +1,13 @@
 import StorageManager from "./storage-manager";
 import {debouncedDispatcher} from './mini-lit.js';
+import CryptoManager from "./crypto-manager.js";
 
 class AsyncronousStateManager {
-    constructor() {
+    constructor(crypto) {
         this.store = {};
         this.eventListener = [];
         this.db = new StorageManager();
+        this.crypto = crypto;
     }
 
     generateListener(listener) {
@@ -27,12 +29,17 @@ class AsyncronousStateManager {
         }
 
         // Create a new event listener
-        const newListener = (event) => {
-            value[1](event.detail);
+        const newListener = async (event) => {
+            const decryptedValue = await this.crypto.decryptData({...event.detail, crypto: this.crypto});
+            console.log({
+                key,
+                decryptedValue
+            });
+            value[1](decryptedValue);
 
             this.store = {
                 ...this.store,
-                [key]: event.detail,
+                [key]: decryptedValue,
             };
         };
 
@@ -44,14 +51,27 @@ class AsyncronousStateManager {
         });
 
         const newSetter = (newValue) => {
-            this.db.writeValue(key, newValue).catch(console.error);
+            const storeToDB = async ()=> {
+                const encryptedValue = await this.crypto.encryptData(newValue);
+                console.log({
+                    key,
+                    encryptedValue
+                });
+                await this.db.writeValue(key, encryptedValue, this.crypto);
+            }
+            storeToDB();
             // window.dispatchEvent(
             //     new CustomEvent(listenerName, {
             //         detail: newValue,
             //     })
             // );
 
-            debouncedDispatcher(listenerName, newValue);
+
+            const encryptAndDispatch = async (listenerName, newValue) => {
+                const encryptedValue = await this.crypto.encryptData(newValue);
+                debouncedDispatcher(listenerName, encryptedValue);
+            }
+            encryptAndDispatch(listenerName, newValue);
         };
 
         const newState = this.store[key] || value[0];
