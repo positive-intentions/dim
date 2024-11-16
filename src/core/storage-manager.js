@@ -1,29 +1,8 @@
+import {debouncedDispatcher} from './mini-lit.js';
+
 let db;
 const databaseName = "DimDatabase";
 const objectStoreName = "DimStore";
-
-function createDebouncedEventDispatcher(
-    delay
-  ) {
-    const timeoutIds = {};
-  
-    return (eventName, value) => {
-      if (timeoutIds[eventName] !== undefined) {
-        clearTimeout(timeoutIds[eventName]);
-      }
-  
-      timeoutIds[eventName] = window.setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent(eventName, {
-            detail: value,
-          })
-        );
-        timeoutIds[eventName] = undefined;
-      }, delay);
-    };
-  }
-  
-  const debouncedDispatcher = createDebouncedEventDispatcher(10);
 
 class StorageManager {
     constructor() {
