@@ -2,6 +2,7 @@ import { LitElement } from "lit";
 import AsyncronousStateManager from "./async-manager";
 import StorageManager from "./storage-manager";
 import { css, html, unsafeCSS } from "./mini-lit";
+import CryptoManager from "./crypto-manager";
 
 let currentInstance = null;
 
@@ -182,8 +183,9 @@ export const useLazyScope = (tag, promise) => {
   });
 };
 
-const asyncronousStateManager = new AsyncronousStateManager();
-const storageManager = new StorageManager();
+const cryptoManager = new CryptoManager('password')
+const asyncronousStateManager = new AsyncronousStateManager(cryptoManager);
+const storageManager = new StorageManager(cryptoManager);
 
 export const useStore = (store) => {
   const [randomId] = useState(crypto.getRandomValues(new Uint8Array(8)));

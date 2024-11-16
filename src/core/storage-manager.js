@@ -5,8 +5,9 @@ const databaseName = "DimDatabase";
 const objectStoreName = "DimStore";
 
 class StorageManager {
-    constructor() {
+    constructor(crypto) {
         this.openDatabase();
+        this.crypto = crypto;
     }
 
     async openDatabase() {
@@ -33,39 +34,49 @@ class StorageManager {
 
     
 
-    async writeValue(id, value) {
+    async writeValue(id, value, crypto) {
         return new Promise((resolve, reject) => {
-            let transaction = db.transaction([objectStoreName], "readwrite");
-            let objectStore = transaction.objectStore(objectStoreName);
-            let request = objectStore.put({ id: id, value: value });
 
-            request.onsuccess = function (event) {
-                resolve("Value written successfully");
-            };
-
-            request.onerror = function (event) {
-                reject("Error writing value: " + event.target.error);
-            };
+            const encryptAndStore = async () => {
+                const encryptedValue = await crypto.encryptData(value);
+                let transaction = db.transaction([objectStoreName], "readwrite");
+                let objectStore = transaction.objectStore(objectStoreName);
+    
+                let request = objectStore.put({ id: id, value: encryptedValue });
+    
+                request.onsuccess = function (event) {
+                    resolve("Value written successfully");
+                };
+    
+                request.onerror = function (event) {
+                    reject("Error writing value: " + event.target.error);
+                };
+            }
+            encryptAndStore().catch(reject);
         });
     }
 
-    async readValue(id, newState) {
+    async readValue(id, newState, crypto) {
         return new Promise((resolve, reject) => {
-            let transaction = db.transaction([objectStoreName], "readonly");
-            let objectStore = transaction.objectStore(objectStoreName);
-            let request = objectStore.get(id);
-
-            request.onsuccess = function (event) {
-                if (request.result) {
-                    resolve({ value: request.result.value, newState });
-                } else {
-                    resolve(null);
-                }
-            };
-
-            request.onerror = function (event) {
-                reject("Error reading value: " + event.target.error);
-            };
+            const decryptAndReturn = async () => {
+                let transaction = db.transaction([objectStoreName], "readonly");
+                let objectStore = transaction.objectStore(objectStoreName);
+                let request = objectStore.get(id);
+    
+                request.onsuccess = async function (event) {
+                    if (request.result) {
+                        const decryptedValue = await crypto?.decryptData({...request.result.value, crypto});
+                        resolve({ value: decryptedValue, newState });
+                    } else {
+                        resolve(null);
+                    }
+                };
+    
+                request.onerror = function (event) {
+                    reject("Error reading value: " + event.target.error);
+                };
+            }
+            decryptAndReturn().catch(reject);
         });
     }
 
@@ -76,10 +87,15 @@ class StorageManager {
               traverse(obj[key], `${path}${key}.`);
             } else {
               this
-                .readValue(`${path}${key}`, obj[key])
+                .readValue(`${path}${key}`, obj[key], this.crypto)
                 .then((response) => {
                     if (response) {
                         // throw new Error("Value not found in database");
+                        console.log({
+                            key: `${path}${key}`,
+                            value: response.value       
+                        })
+
                         debouncedDispatcher(`${path}${key}`, response.value);
                     }
                 })

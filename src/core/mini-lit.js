@@ -230,4 +230,4 @@ function createDebouncedEventDispatcher(
     };
   }
   
-  export const debouncedDispatcher = createDebouncedEventDispatcher(10);
+  export const debouncedDispatcher = createDebouncedEventDispatcher(200);
