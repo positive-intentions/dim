@@ -1,7 +1,7 @@
 import { LitElement } from "lit";
 import AsyncronousStateManager from "./async-manager";
-import StorageManager from "./storage-manager";
 import { css, html, unsafeCSS } from "./mini-lit";
+import StorageManager from "./storage-manager";
 
 let currentInstance = null;
 
