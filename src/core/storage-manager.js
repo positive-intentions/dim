@@ -83,7 +83,13 @@ class StorageManager {
                         .then((response) => {
                             if (response) {
                                 // throw new Error("Value not found in database");
-                                debouncedDispatcher(`${path}${key}`, response.value);
+                                debouncedDispatcher(`${path}${key}`, () => {
+                                    window.dispatchEvent(
+                                        new CustomEvent(`${path}${key}`, {
+                                            detail: response.value,
+                                        })
+                                    );
+                                });
                             }
                         })
                         .catch(console.error);

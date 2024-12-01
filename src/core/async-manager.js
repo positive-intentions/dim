@@ -1,11 +1,33 @@
+import CryptoManager from "./crypto-manager";
+import { debouncedDispatcher } from './mini-lit.js';
 import StorageManager from "./storage-manager";
-import {debouncedDispatcher} from './mini-lit.js';
+
+
+
+const debouncedDispatcherHandler = (listenerName, newValue, cryptoManager, db) => debouncedDispatcher(listenerName, () => {
+    const handleAsyncDispatch = async (newValue) => {
+        const encryptedValue = await cryptoManager.encryptData(newValue);
+        console.log("encryptedValue", encryptedValue);
+        db.writeValue(listenerName, encryptedValue).catch(console.error);
+        window.dispatchEvent(
+            new CustomEvent(listenerName, {
+                detail: encryptedValue,
+            })
+        );
+    };
+    handleAsyncDispatch(newValue);
+})
+
+
 
 class AsyncronousStateManager {
     constructor() {
         this.store = {};
         this.eventListener = [];
         this.db = new StorageManager();
+
+        const password = "password";
+        this.cryptoManager = new CryptoManager(password);
     }
 
     generateListener(listener) {
@@ -28,12 +50,20 @@ class AsyncronousStateManager {
 
         // Create a new event listener
         const newListener = (event) => {
-            value[1](event.detail);
+            const updateState = async (eventValue) => {
+                const decryptedValue = await this.cryptoManager.decryptData(eventValue);
+                console.log("decryptedValue", decryptedValue);
 
-            this.store = {
-                ...this.store,
-                [key]: event.detail,
+                value[1](decryptedValue);
+
+                this.store = {
+                    ...this.store,
+                    [key]: decryptedValue,
+                };
             };
+            updateState(event.detail);
+
+            debouncedDispatcherHandler
         };
 
         window.addEventListener(listenerName, newListener);
@@ -44,14 +74,7 @@ class AsyncronousStateManager {
         });
 
         const newSetter = (newValue) => {
-            this.db.writeValue(key, newValue).catch(console.error);
-            // window.dispatchEvent(
-            //     new CustomEvent(listenerName, {
-            //         detail: newValue,
-            //     })
-            // );
-
-            debouncedDispatcher(listenerName, newValue);
+            debouncedDispatcherHandler(listenerName, newValue, this.cryptoManager, this.db);
         };
 
         const newState = this.store[key] || value[0];
@@ -78,24 +101,24 @@ class AsyncronousStateManager {
 
     createListeners = (store, listenerId) => {
         const traverse = (obj, path) => {
-          Object.keys(obj).forEach((key) => {
-            if (typeof obj[key] === "object" && obj[key].length === undefined) {
-              traverse(obj[key], `${path}${key}.`);
-            } else {
-              const [asyncState, asyncSetState] =
-                this.generateListener({
-                  listenerId,
-                  key: `${path}${key}`,
-                  value: obj[key],
-                });
-      
-              obj[key] = [asyncState, asyncSetState].concat(obj[key]);
-            }
-          });
+            Object.keys(obj).forEach((key) => {
+                if (typeof obj[key] === "object" && obj[key].length === undefined) {
+                    traverse(obj[key], `${path}${key}.`);
+                } else {
+                    const [asyncState, asyncSetState] =
+                        this.generateListener({
+                            listenerId,
+                            key: `${path}${key}`,
+                            value: obj[key],
+                        });
+
+                    obj[key] = [asyncState, asyncSetState].concat(obj[key]);
+                }
+            });
         };
-      
+
         traverse(store, "");
-      };
+    };
 }
 
 
