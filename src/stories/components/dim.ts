@@ -1,5 +1,5 @@
 import { LitElement } from "lit";
-import { html, css, unsafeCSS } from "./mini-lit";
+import { css, html, unsafeCSS } from "./mini-lit";
 
 let currentInstance = null;
 
@@ -42,6 +42,18 @@ export function define({ tag, component: CustomFunctionalComponent }) {
 
       this.props = this.props || {};
 
+      const querySelector = this.shadowRoot?.querySelector.bind(
+        this.shadowRoot
+      );
+      const getRef = (ref) => {
+        const component = querySelector(ref);
+        const refHookName =
+          Object.keys(component.hooks).find(
+            (o) => !!component.hooks[o].current
+          ) || "";
+        return component.hooks[refHookName].current;
+      };
+
       const sharedDependencies = {
         useState,
         useEffect,
@@ -51,6 +63,9 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         useStore,
         html,
         css,
+        useRef,
+        querySelector,
+        getRef,
       };
 
       // Call the functional component
@@ -179,6 +194,18 @@ export const useLazyScope = (tag, promise) => {
     }
   });
 };
+
+export function useRef() {
+  const component = getCurrentInstance();
+  const hookIndex = component.hookIndex++;
+  const hookName = `hook-${hookIndex}`;
+
+  if (!component.hooks[hookName]) {
+    component.hooks[hookName] = { current: component };
+  }
+
+  return component.hooks[hookName];
+}
 
 class AsyncronousStateManager {
   constructor() {
