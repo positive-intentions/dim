@@ -10,7 +10,7 @@ import { html } from "../../core/mini-lit.js";
 import AddItemForm from "./AddItemForm.js";
 import TodoList from "./TodoList.js";
 
-const Todo = () => {
+const Todo = (_, { getRef }) => {
     const {
         form: {
             input: [inputValue],
@@ -52,6 +52,13 @@ const Todo = () => {
         setTodos(todos.filter((_, i) => i !== index));
     };
 
+    const validateInput = () => {
+        const componentRef = getRef("add-item-form");
+        if (componentRef?.checkValidity) {
+            console.log(componentRef.checkValidity());
+        }
+    };
+
     return html`
     <div>
         <h1>Todo List</h1>
@@ -67,6 +74,7 @@ const Todo = () => {
         <p>Number of todo items: ${numberOfTodoItems}</p>
         <p>input value: ${inputValue}</p>
         <todo-list .props="${{ todos, onRemove: removeTodo }}"></todo-list>
+        <button @click="${validateInput}">Validate input has more than 3 chars</button>
     </div>
     `;
 };

@@ -1,14 +1,16 @@
 import React from "react";
 import {
+  html,
   css,
   define,
   useEffect,
   useMemo,
+  useRef,
   useScope,
   useState,
   useStore,
   useStyle
-} from "../core//dim.ts";
+} from "../core/dim.ts";
 import Todo from './components/todo.js';
 
 define({
@@ -20,8 +22,9 @@ define({
     useMemo,
     useScope,
     useStyle,
-    useStore.
-      html,
+    useStore,
+    useRef,
+    html,
     css
   ]
 });

@@ -1,4 +1,4 @@
-const AddItemForm = ({ }, { useState, useStyle, useStore, html, css }) => {
+const AddItemForm = ({ }, { useState, useStyle, useStore, html, css, useRef }) => {
     // const [inputValue, setInputValue] = useState("");
     const {
         form: {
@@ -50,6 +50,15 @@ const AddItemForm = ({ }, { useState, useStyle, useStore, html, css }) => {
     const addTodo = () => {
         onAdd(inputValue);
         clearInput();
+    };
+
+    const ref = useRef();
+
+    // Attach custom methods to the element instance
+    ref.current = {
+        checkValidity: () => {
+            return inputValue.length > 3; // Example rule: valid if input length > 3
+        },
     };
 
     return html`
