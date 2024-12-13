@@ -94,8 +94,7 @@
 <a name='L29'></a><a href='#L29'>29</a>
 <a name='L30'></a><a href='#L30'>30</a>
 <a name='L31'></a><a href='#L31'>31</a>
-<a name='L32'></a><a href='#L32'>32</a>
-<a name='L33'></a><a href='#L33'>33</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L32'></a><a href='#L32'>32</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -126,47 +125,45 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useState, useEffect, useMemo } from './dim.ts';
-import { html } from 'lit';
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { html } from "lit";
+import { useEffect, useMemo, useState } from "../../core/dim.ts";
 &nbsp;
-const Button = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >fu</span>nction({ children, initialstate = <span class="branch-0 cbranch-no" title="branch not covered" >0 </span>}) {</span>
-    const [count, setCount] = <span class="cstat-no" title="statement not covered" >useState(parseInt(initialstate), 'test-state');</span>
+const Button = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >fu</span>nction ({ children, initialstate = <span class="branch-0 cbranch-no" title="branch not covered" >0 </span>}) {</span>
+  const [count, setCount] = <span class="cstat-no" title="statement not covered" >useState(parseInt(initialstate), "test-state");</span>
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    useEffect(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >        console.log("Button mounted");</span>
-<span class="cstat-no" title="statement not covered" >        return <span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >            console.log("Button unmounted");</span>
-        };
-    }, []);
+<span class="cstat-no" title="statement not covered" >  useEffect(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >    console.log("Button mounted");</span>
+<span class="cstat-no" title="statement not covered" >    return <span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >      console.log("Button unmounted");</span>
+    };
+  }, []);
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    useEffect(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >        console.log("count effect triggered");</span>
-    }, [count()]);
+<span class="cstat-no" title="statement not covered" >  useEffect(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >    console.log("count effect triggered");</span>
+  }, [count()]);
 &nbsp;
-    const someCalculation = <span class="cstat-no" title="statement not covered" >useMemo(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
-        const result = <span class="cstat-no" title="statement not covered" >count() * 2;</span>
-<span class="cstat-no" title="statement not covered" >        console.log("memo calculation triggered:", result);</span>
-<span class="cstat-no" title="statement not covered" >        return result;</span>
-    }, [count()]);
+  const someCalculation = <span class="cstat-no" title="statement not covered" >useMemo(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
+    const result = <span class="cstat-no" title="statement not covered" >count() * 2;</span>
+<span class="cstat-no" title="statement not covered" >    console.log("memo calculation triggered:", result);</span>
+<span class="cstat-no" title="statement not covered" >    return result;</span>
+  }, [count()]);
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    return html`</span>
-        &lt;button @click="${<span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >setCount(count() + 1)}</span>"&gt;
-            ${children}
-            ${count()}
-            ${someCalculation}
-        &lt;/button&gt;
-    `;
-}
+<span class="cstat-no" title="statement not covered" >  return html`</span>
+    &lt;button @click="${<span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >setCount(count() + 1)}</span>"&gt;
+      ${children} ${count()} ${someCalculation}
+    &lt;/button&gt;
+  `;
+};
 &nbsp;
-export default Button;</pre></td></tr></table></pre>
+export default Button;
+&nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
             </div><!-- /wrapper -->
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2024-10-18T19:01:42.591Z
+                at 2024-12-13T14:39:02.617Z
             </div>
         <script src="prettify.js"></script>
         <script>
