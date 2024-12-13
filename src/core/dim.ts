@@ -1,5 +1,7 @@
 import { LitElement } from "lit";
+import AsyncronousStateManager from "./async-manager";
 import { css, html, unsafeCSS } from "./mini-lit";
+import StorageManager from "./storage-manager";
 
 let currentInstance = null;
 
@@ -207,107 +209,16 @@ export function useRef() {
   return component.hooks[hookName];
 }
 
-class AsyncronousStateManager {
-  constructor() {
-    this.store = {};
-    this.eventListener = [];
-  }
-
-  generateListener(listener) {
-    const { listenerId, key, value } = listener;
-
-    // Remove existing event listeners if they exist
-    const existingListender = this.eventListener.find(
-      (listener) => listener.listenerId === listenerId
-    );
-
-    const listenerName = `${key}`;
-
-    if (existingListender) {
-      window.removeEventListener(listenerName, existingListender.listener);
-
-      this.eventListener = this.eventListener.filter(
-        (listener) => listener.listenerId !== listenerId
-      );
-    }
-
-    // Create a new event listener
-    const newListener = (event) => {
-      value[1](event.detail);
-
-      this.store = {
-        ...this.store,
-        [key]: event.detail,
-      };
-    };
-
-    window.addEventListener(listenerName, newListener);
-
-    this.eventListener.push({
-      listenerId,
-      listener: newListener,
-    });
-
-    const newSetter = (newValue) => {
-      window.dispatchEvent(
-        new CustomEvent(listenerName, {
-          detail: newValue,
-        })
-      );
-    };
-
-    const newState = this.store[key] || value[0];
-
-    return [newState, newSetter];
-  }
-
-  removeListeners(listenerId) {
-    const existingListender = this.eventListener.find(
-      (listener) => listener.listenerId === listenerId
-    );
-
-    if (existingListender) {
-      window.removeEventListener(
-        `${existingListender.key}`,
-        existingListender.listener
-      );
-
-      this.eventListener = this.eventListener.filter(
-        (listener) => listener.listenerId !== listenerId
-      );
-    }
-  }
-}
-
 const asyncronousStateManager = new AsyncronousStateManager();
-
-const createListeners = (store, listenerId) => {
-  const traverse = (obj, path) => {
-    Object.keys(obj).forEach((key) => {
-      if (typeof obj[key] === "object" && obj[key].length === undefined) {
-        traverse(obj[key], `${path}${key}.`);
-      } else {
-        const [asyncState, asyncSetState] =
-          asyncronousStateManager.generateListener({
-            listenerId,
-            key: `${path}${key}`,
-            value: obj[key],
-          });
-
-        obj[key] = [asyncState, asyncSetState].concat(obj[key]);
-      }
-    });
-  };
-
-  traverse(store, "");
-};
+const storageManager = new StorageManager();
 
 export const useStore = (store) => {
   const [randomId] = useState(crypto.getRandomValues(new Uint8Array(8)));
 
-  createListeners(store, randomId);
+  asyncronousStateManager.createListeners(store, randomId);
 
   useEffect(() => {
+    storageManager.loadFromDatabase(store);
     return () => {
       asyncronousStateManager.removeListeners(randomId);
     };

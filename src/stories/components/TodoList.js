@@ -1,10 +1,10 @@
 import {
-    useState,
     useEffect,
     useScope,
+    useState,
     useStore,
-} from "./dim.ts";
-import { html } from "./mini-lit.js";
+} from "../../core/dim.ts";
+import { html } from "../../core/mini-lit.js";
 
 import ListItem from "./ListItem.js";
 
