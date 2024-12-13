@@ -11,7 +11,7 @@ export default defineConfig(async () => ({
       filename: 'vite-remoteEntry.js',
       // Modules to expose
       exposes: {
-        './Dim': './src/stories/components/dim.ts',
+        './Dim': './src/core/dim.ts',
       },
       shared: ['react', 'react-dom']
   })

@@ -74,7 +74,7 @@ module.exports = {
             name: 'dim',
             filename: 'remoteEntry.js',
             exposes: {
-                '.': './src/stories/components/dim.ts',
+                '.': './src/core/dim.ts',
             },
             shared: { react: { singleton: true }, "react-dom": { singleton: true } }
         }),
