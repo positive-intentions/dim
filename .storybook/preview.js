@@ -32,7 +32,11 @@ const preview = {
       },
     },
     // add branch image
-
+    options: {
+      storySort: {
+        order: ['Getting Started', ['Tutorial', '*'], 'Hooks', 'Advanced', '*'],
+      },
+    },
   },
 };
 

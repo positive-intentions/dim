@@ -1,5 +1,6 @@
 import React from "react";
 import { html, css, define, useState, useScope, useStyle, useStore, useEffect, renderChildren } from "../../core/dim.ts";
+import { wrapLitHtmlStory } from "../../core/storybook-utils.js";
 import { 
   NestedTodoAppWithChildren, 
   TodoCategoryWithChildren, 
@@ -220,7 +221,7 @@ const TodoCategory = ({ category, todos, onToggleTodo, onDeleteTodo, children },
 };
 
 // Level 1: Main todo app
-const NestedTodoApp = (props, { useState, useScope, useStore, useEffect, html, css, useStyle }) => {
+const NestedTodoApp = ({ children }, { useState, useScope, useStore, useEffect, html, css, useStyle, renderChildren }) => {
   const store = useStore({
     todos: useState([
       { id: 1, text: 'Build nested component demo', category: 'Development', priority: 'high', completed: false },
@@ -239,7 +240,8 @@ const NestedTodoApp = (props, { useState, useScope, useStore, useEffect, html, c
   });
 
   useScope({
-    'todo-category': TodoCategory
+    'todo-category': TodoCategory,
+    'todo-item': TodoItem
   });
 
   useStyle(css`
@@ -430,16 +432,18 @@ const NestedTodoApp = (props, { useState, useScope, useStore, useEffect, html, c
         <button class="add-button" @click="${addTodo}">Add Task</button>
       </div>
 
-      ${store.stats.categories[0].map(category => html`
-        <todo-category 
-          .props="${{
-            category,
-            todos: store.todos[0],
-            onToggleTodo: toggleTodo,
-            onDeleteTodo: deleteTodo
-          }}"
-        ></todo-category>
-      `)}
+      ${children ? renderChildren(children) : 
+        store.stats.categories[0].map(category => html`
+          <todo-category 
+            .props="${{
+              category,
+              todos: store.todos[0],
+              onToggleTodo: toggleTodo,
+              onDeleteTodo: deleteTodo
+            }}"
+          ></todo-category>
+        `)
+      }
 
       <div class="component-tree">
         <strong>Component Hierarchy:</strong>
@@ -714,17 +718,61 @@ export const DynamicDashboard = {
 };
 
 export const ReactLikeNesting = {
-  render: () => html`
-    <nested-todo-app>
-      <todo-category category="Development">
-        <todo-item todo={{ id: 1, text: 'Learn React', completed: false }} />
-        <todo-item todo={{ id: 2, text: 'Build Components', completed: true }} />
-      </todo-category>
-      <todo-category category="Design">
-        <todo-item todo={{ id: 3, text: 'Create Mockups', completed: false }} />
-      </todo-category>
-    </nested-todo-app>
-  `,
+  render: () => {
+    // Use useEffect to render lit-html template after React mounts
+    const containerRef = React.useRef(null);
+    
+    React.useEffect(() => {
+      if (containerRef.current) {
+        // Import lit render function and render our template
+        import('lit').then(({ render }) => {
+          // Create simple toggle and delete handlers for demo
+          const handleToggle = (id) => {
+            console.log('Toggle todo:', id);
+          };
+          
+          const handleDelete = (id) => {
+            console.log('Delete todo:', id);
+          };
+          
+          const template = html`
+            <nested-todo-app>
+              <todo-category 
+                category="Development" 
+                onToggleTodo=${handleToggle} 
+                onDeleteTodo=${handleDelete}
+              >
+                <todo-item 
+                  todo={{ id: 1, text: 'Learn React', completed: false, priority: 'high' }}
+                  onToggle=${() => handleToggle(1)}
+                  onDelete=${() => handleDelete(1)}
+                />
+                <todo-item 
+                  todo={{ id: 2, text: 'Build Components', completed: true, priority: 'medium' }}
+                  onToggle=${() => handleToggle(2)}
+                  onDelete=${() => handleDelete(2)}
+                />
+              </todo-category>
+              <todo-category 
+                category="Design"
+                onToggleTodo=${handleToggle} 
+                onDeleteTodo=${handleDelete}
+              >
+                <todo-item 
+                  todo={{ id: 3, text: 'Create Mockups', completed: false, priority: 'low' }}
+                  onToggle=${() => handleToggle(3)}
+                  onDelete=${() => handleDelete(3)}
+                />
+              </todo-category>
+            </nested-todo-app>
+          `;
+          render(template, containerRef.current);
+        });
+      }
+    }, []);
+    
+    return React.createElement('div', { ref: containerRef });
+  },
   name: "React-like Nesting",
   parameters: {
     docs: {
@@ -736,7 +784,7 @@ export const ReactLikeNesting = {
 };
 
 export const NestedWidgets = {
-  render: () => html`
+  render: wrapLitHtmlStory(() => html`
     <nested-dashboard>
       <dashboard-widget type="metric" data={{ title: 'Active Users', value: '2,500' }}>
         <div class="trend-indicator">↑ 12%</div>
@@ -748,7 +796,7 @@ export const NestedWidgets = {
         </div>
       </dashboard-widget>
     </nested-dashboard>
-  `,
+  `),
   name: "Nested Widgets with Children",
   parameters: {
     docs: {
@@ -760,34 +808,16 @@ export const NestedWidgets = {
 };
 
 export const ComplexNesting = {
-  render: () => html`
-    <nested-todo-app>
-      <todo-category category="Frontend">
-        <todo-item todo={{ id: 1, text: 'Setup React', completed: true }}>
-          <div class="subtasks">
-            <span>Create project</span>
-            <span>Install dependencies</span>
-          </div>
-        </todo-item>
-        <todo-item todo={{ id: 2, text: 'Build Components', completed: false }}>
-          <div class="priority-badge">High Priority</div>
-        </todo-item>
-      </todo-category>
-      <todo-category category="Backend">
-        <todo-item todo={{ id: 3, text: 'API Development', completed: false }}>
-          <div class="tech-stack">
-            <span>Node.js</span>
-            <span>Express</span>
-          </div>
-        </todo-item>
-      </todo-category>
-    </nested-todo-app>
-  `,
+  render: wrapLitHtmlStory(() => {
+    return html`
+      <nested-todo-app></nested-todo-app>
+    `;
+  }),
   name: "Complex Component Nesting",
   parameters: {
     docs: {
       description: {
-        story: "Demonstrates complex nesting patterns with multiple levels of children and custom content."
+        story: "Demonstrates the full todo app with internal state management, allowing you to add, toggle, and delete tasks dynamically."
       }
     }
   }
