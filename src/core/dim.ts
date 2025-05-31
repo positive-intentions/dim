@@ -1,7 +1,28 @@
-import { LitElement } from "lit";
+import { LitElement, html as litHtml } from "lit";
 import AsyncronousStateManager from "./async-manager";
-import { css, html, unsafeCSS } from "./mini-lit";
+import { css, unsafeCSS } from "./mini-lit";
 import StorageManager from "./storage-manager";
+
+// Use lit-html's html function
+export const html = litHtml;
+
+// Helper to render children content
+export const renderChildren = (children) => {
+  if (!children) return litHtml``;
+  
+  // If children is a string (innerHTML), return it as unsafe HTML
+  if (typeof children === 'string') {
+    return litHtml`<slot>${children}</slot>`;
+  }
+  
+  // If children is an array of elements, render them
+  if (Array.isArray(children)) {
+    return litHtml`<slot>${children}</slot>`;
+  }
+  
+  // Default slot
+  return litHtml`<slot></slot>`;
+};
 
 let currentInstance = null;
 
@@ -63,11 +84,13 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         useScope,
         useStyle,
         useStore,
-        html,
+        html: litHtml,
         css,
+        unsafeCSS,
         useRef,
         querySelector,
         getRef,
+        renderChildren,
       };
 
       // Call the functional component
@@ -226,3 +249,6 @@ export const useStore = (store) => {
 
   return store;
 };
+
+// Re-export utilities from mini-lit
+export { css, unsafeCSS } from "./mini-lit";
