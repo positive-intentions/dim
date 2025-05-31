@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nested Component Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .demo-section {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+        }
+        h2 {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>Nested Component Rendering Demo</h1>
+    
+    <div class="demo-section">
+        <h2>Demo 1: Simple A→B→C Nesting</h2>
+        <div id="demo1"></div>
+    </div>
+
+    <div class="demo-section">
+        <h2>Demo 2: Deep Parent→Child→Grandchild with Props</h2>
+        <div id="demo2"></div>
+    </div>
+
+    <div class="demo-section">
+        <h2>Demo 3: Dynamic Inline Components</h2>
+        <div id="demo3"></div>
+    </div>
+
+    <script type="module">
+        import { define, useState, useEffect, useScope } from '../core/dim.js';
+        import { html, css } from '../core/mini-lit.js';
+
+        // Demo 1: Simple nested components defined inline
+        const ComponentA = ({ message }, { useState, useScope, html }) => {
+            const [aState, setAState] = useState('State from A');
+            
+            // Define B inside A
+            const ComponentB = ({ fromA, aState }, { useState, useScope, html }) => {
+                const [bState, setBState] = useState('State from B');
+                
+                // Define C inside B
+                const ComponentC = ({ fromA, fromB, aState, bState }, { useState, html }) => {
+                    const [cState, setCState] = useState('State from C');
+                    
+                    return html`
+                        <div style="border: 2px solid blue; padding: 10px; margin: 5px; background: #e3f2fd;">
+                            <h4>Component C</h4>
+                            <p>Props from A: ${fromA}</p>
+                            <p>Props from B: ${fromB}</p>
+                            <p>State A: ${aState}</p>
+                            <p>State B: ${bState}</p>
+                            <p>State C: ${cState}</p>
+                            <button @click="${() => setCState('C Updated: ' + Date.now())}">Update C</button>
+                        </div>
+                    `;
+                };
+                
+                useScope({ 'demo1-c': ComponentC });
+                
+                return html`
+                    <div style="border: 2px solid green; padding: 10px; margin: 5px; background: #e8f5e9;">
+                        <h3>Component B</h3>
+                        <p>Props from A: ${fromA}</p>
+                        <p>State A: ${aState}</p>
+                        <p>State B: ${bState}</p>
+                        <button @click="${() => setBState('B Updated: ' + Date.now())}">Update B</button>
+                        <demo1-c .props="${{ 
+                            fromA, 
+                            fromB: 'Hello from B',
+                            aState,
+                            bState 
+                        }}"></demo1-c>
+                    </div>
+                `;
+            };
+            
+            useScope({ 'demo1-b': ComponentB });
+            
+            return html`
+                <div style="border: 2px solid red; padding: 10px; margin: 5px; background: #ffebee;">
+                    <h2>Component A</h2>
+                    <p>Message: ${message}</p>
+                    <p>State A: ${aState}</p>
+                    <button @click="${() => setAState('A Updated: ' + Date.now())}">Update A</button>
+                    <demo1-b .props="${{ 
+                        fromA: 'Hello from A',
+                        aState 
+                    }}"></demo1-b>
+                </div>
+            `;
+        };
+
+        // Demo 2: Using the existing Deep components
+        import DeepParent from './components/DeepParent.js';
+        
+        // Demo 3: Dynamic component with list rendering
+        const DynamicDemo = (props, { useState, useScope, html }) => {
+            const [items, setItems] = useState([
+                { id: 1, type: 'info', text: 'Information item' },
+                { id: 2, type: 'warning', text: 'Warning item' },
+                { id: 3, type: 'success', text: 'Success item' }
+            ]);
+            
+            // Define different item components
+            const InfoItem = ({ item }, { html }) => html`
+                <div style="background: #e3f2fd; padding: 8px; margin: 4px; border-radius: 4px;">
+                    ℹ️ ${item.text}
+                </div>
+            `;
+            
+            const WarningItem = ({ item }, { html }) => html`
+                <div style="background: #fff3cd; padding: 8px; margin: 4px; border-radius: 4px;">
+                    ⚠️ ${item.text}
+                </div>
+            `;
+            
+            const SuccessItem = ({ item }, { html }) => html`
+                <div style="background: #d1e7dd; padding: 8px; margin: 4px; border-radius: 4px;">
+                    ✅ ${item.text}
+                </div>
+            `;
+            
+            useScope({
+                'info-item': InfoItem,
+                'warning-item': WarningItem,
+                'success-item': SuccessItem
+            });
+            
+            const addItem = (type) => {
+                const newItem = {
+                    id: Date.now(),
+                    type,
+                    text: `New ${type} item at ${new Date().toLocaleTimeString()}`
+                };
+                setItems([...items, newItem]);
+            };
+            
+            return html`
+                <div>
+                    <h3>Dynamic Component List</h3>
+                    <div style="margin-bottom: 10px;">
+                        <button @click="${() => addItem('info')}">Add Info</button>
+                        <button @click="${() => addItem('warning')}">Add Warning</button>
+                        <button @click="${() => addItem('success')}">Add Success</button>
+                    </div>
+                    <div>
+                        ${items.map(item => {
+                            if (item.type === 'info') {
+                                return html`<info-item .props="${{ item }}"></info-item>`;
+                            } else if (item.type === 'warning') {
+                                return html`<warning-item .props="${{ item }}"></warning-item>`;
+                            } else if (item.type === 'success') {
+                                return html`<success-item .props="${{ item }}"></success-item>`;
+                            }
+                        })}
+                    </div>
+                </div>
+            `;
+        };
+
+        // Register and mount components
+        define({ tag: 'demo1-a', component: ComponentA });
+        define({ tag: 'demo2-deep', component: DeepParent });
+        define({ tag: 'demo3-dynamic', component: DynamicDemo });
+
+        // Mount demo 1
+        const demo1 = document.createElement('demo1-a');
+        demo1.props = { message: 'Hello from Demo 1!' };
+        document.getElementById('demo1').appendChild(demo1);
+
+        // Mount demo 2
+        const demo2 = document.createElement('demo2-deep');
+        document.getElementById('demo2').appendChild(demo2);
+
+        // Mount demo 3
+        const demo3 = document.createElement('demo3-dynamic');
+        document.getElementById('demo3').appendChild(demo3);
+    </script>
+</body>
+</html>

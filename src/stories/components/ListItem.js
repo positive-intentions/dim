@@ -2,8 +2,8 @@ import {
     useEffect,
     useState,
     useStore,
-} from "../../core/dim.ts";
-import { html } from "../../core/mini-lit.js";
+} from "../../core/dim.js";
+import { html } from "../../core/dim.js";
 
 const ListItem = ({ todo, onRemove }) => {
     const {

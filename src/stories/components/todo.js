@@ -4,8 +4,8 @@ import {
     useScope,
     useState,
     useStore,
-} from "../../core/dim.ts";
-import { html } from "../../core/mini-lit.js";
+} from "../../core/dim.js";
+import { html } from "../../core/dim.js";
 
 import AddItemForm from "./AddItemForm.js";
 import TodoList from "./TodoList.js";

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dim Framework - Simple Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .demo-section {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        h1 { color: #333; }
+        h2 { color: #555; }
+    </style>
+</head>
+<body>
+    <h1>Dim Framework Demo - Nested Components</h1>
+    
+    <div class="demo-section">
+        <h2>Todo App</h2>
+        <todo-app></todo-app>
+    </div>
+
+    <div class="demo-section">
+        <h2>Nested Components Demo</h2>
+        <nested-example></nested-example>
+    </div>
+
+    <div class="demo-section">
+        <h2>Deep Parent-Child-Grandchild</h2>
+        <deep-parent></deep-parent>
+    </div>
+
+    <div class="demo-section">
+        <h2>Toggle Demo (useState with false)</h2>
+        <toggle-demo></toggle-demo>
+    </div>
+
+    <script type="module">
+        // Import the framework and components
+        import { define, useState, html } from '../core/dim.js';
+        import Todo from './components/todo.js';
+        import NestedExample from './components/NestedExample.js';
+        import DeepParent from './components/DeepParent.js';
+
+        // Toggle Demo Component - Tests useState with false values
+        const ToggleDemo = (props, { useState, html }) => {
+            const [isVisible, setIsVisible] = useState(false);
+            const [count, setCount] = useState(0);
+            const [isEnabled, setIsEnabled] = useState(true);
+            
+            return html`
+                <div style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
+                    <h3>Boolean Toggle Test</h3>
+                    <p>This tests that useState correctly handles false values.</p>
+                    
+                    <div style="margin: 20px 0;">
+                        <button @click="${() => setIsVisible(!isVisible)}" 
+                                style="padding: 10px 20px; font-size: 16px; cursor: pointer;">
+                            ${isVisible ? '🙈 Hide' : '👀 Show'} Content (isVisible: ${isVisible})
+                        </button>
+                        
+                        ${isVisible ? html`
+                            <div style="margin-top: 10px; padding: 15px; background: #e3f2fd; border-radius: 4px;">
+                                <h4>Visible Content!</h4>
+                                <p>This content is shown when isVisible is true.</p>
+                                <p>The button correctly toggles between true and false.</p>
+                            </div>
+                        ` : html`
+                            <div style="margin-top: 10px; padding: 15px; background: #ffebee; border-radius: 4px;">
+                                <h4>Hidden State</h4>
+                                <p>This content is shown when isVisible is false.</p>
+                            </div>
+                        `}
+                    </div>
+                    
+                    <div style="margin: 20px 0;">
+                        <h4>Counter starting at 0</h4>
+                        <p>Count: ${count}</p>
+                        <button @click="${() => setCount(count - 1)}">-</button>
+                        <button @click="${() => setCount(0)}">Reset to 0</button>
+                        <button @click="${() => setCount(count + 1)}">+</button>
+                    </div>
+                    
+                    <div style="margin: 20px 0;">
+                        <h4>Enable/Disable Toggle</h4>
+                        <button @click="${() => setIsEnabled(!isEnabled)}"
+                                style="padding: 8px 16px; background: ${isEnabled ? '#4caf50' : '#f44336'}; 
+                                       color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            ${isEnabled ? '✓ Enabled' : '✗ Disabled'}
+                        </button>
+                        <p>Status: ${isEnabled ? 'Feature is enabled' : 'Feature is disabled'}</p>
+                    </div>
+                </div>
+            `;
+        };
+
+        // Define all components
+        define({ tag: 'todo-app', component: Todo });
+        define({ tag: 'nested-example', component: NestedExample });
+        define({ tag: 'deep-parent', component: DeepParent });
+        define({ tag: 'toggle-demo', component: ToggleDemo });
+
+        // Log when components are ready
+        console.log('Dim Framework components loaded and ready!');
+        
+        // Debug: Check if components are registered
+        console.log('Todo component defined:', customElements.get('todo-app'));
+        console.log('NestedExample defined:', customElements.get('nested-example'));
+        console.log('DeepParent defined:', customElements.get('deep-parent'));
+        console.log('ToggleDemo defined:', customElements.get('toggle-demo'));
+        
+        // Debug: Check if elements exist in DOM
+        setTimeout(() => {
+            console.log('todo-app element:', document.querySelector('todo-app'));
+            console.log('nested-example element:', document.querySelector('nested-example'));
+            console.log('deep-parent element:', document.querySelector('deep-parent'));
+            console.log('toggle-demo element:', document.querySelector('toggle-demo'));
+        }, 100);
+    </script>
+</body>
+</html>

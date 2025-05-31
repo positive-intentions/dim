@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>useState Test - Falsy Values</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        .state-display {
+            background: #f5f5f5;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>useState Test - Falsy Values</h1>
+    
+    <div id="test-root"></div>
+
+    <script type="module">
+        import { define, useState, html } from '../core/dim.js';
+
+        // Test component for boolean state
+        const BooleanTest = (props, { useState, html }) => {
+            const [isVisible, setIsVisible] = useState(false);
+            const [count, setCount] = useState(0);
+            
+            return html`
+                <div class="test-section">
+                    <h2>Boolean State Test</h2>
+                    <div class="state-display">
+                        isVisible: ${isVisible}<br>
+                        typeof isVisible: ${typeof isVisible}
+                    </div>
+                    <button @click="${() => setIsVisible(!isVisible)}">
+                        Toggle (current: ${isVisible})
+                    </button>
+                    <button @click="${() => setIsVisible(true)}">Set True</button>
+                    <button @click="${() => setIsVisible(false)}">Set False</button>
+                    
+                    ${isVisible ? html`
+                        <div style="background: #d4edda; padding: 10px; margin: 10px 0;">
+                            This content is visible when isVisible is true
+                        </div>
+                    ` : html`
+                        <div style="background: #f8d7da; padding: 10px; margin: 10px 0;">
+                            This content is visible when isVisible is false
+                        </div>
+                    `}
+                    
+                    <h3>Counter Test (starts at 0)</h3>
+                    <div class="state-display">
+                        count: ${count}<br>
+                        typeof count: ${typeof count}
+                    </div>
+                    <button @click="${() => setCount(count - 1)}">-1</button>
+                    <button @click="${() => setCount(0)}">Reset to 0</button>
+                    <button @click="${() => setCount(count + 1)}">+1</button>
+                </div>
+            `;
+        };
+
+        // Test component for various falsy values
+        const FalsyValuesTest = (props, { useState, html }) => {
+            const [nullState, setNullState] = useState(null);
+            const [undefinedState, setUndefinedState] = useState(undefined);
+            const [emptyString, setEmptyString] = useState("");
+            const [falseState, setFalseState] = useState(false);
+            const [zeroState, setZeroState] = useState(0);
+            
+            return html`
+                <div class="test-section">
+                    <h2>All Falsy Values Test</h2>
+                    
+                    <h3>Null State</h3>
+                    <div class="state-display">
+                        value: ${nullState}<br>
+                        typeof: ${typeof nullState}<br>
+                        is null: ${nullState === null}
+                    </div>
+                    <button @click="${() => setNullState(null)}">Set null</button>
+                    <button @click="${() => setNullState("not null")}">Set "not null"</button>
+                    
+                    <h3>Undefined State</h3>
+                    <div class="state-display">
+                        value: ${undefinedState}<br>
+                        typeof: ${typeof undefinedState}<br>
+                        is undefined: ${undefinedState === undefined}
+                    </div>
+                    <button @click="${() => setUndefinedState(undefined)}">Set undefined</button>
+                    <button @click="${() => setUndefinedState("defined")}">Set "defined"</button>
+                    
+                    <h3>Empty String State</h3>
+                    <div class="state-display">
+                        value: "${emptyString}"<br>
+                        length: ${emptyString.length}<br>
+                        typeof: ${typeof emptyString}
+                    </div>
+                    <button @click="${() => setEmptyString("")}">Set ""</button>
+                    <button @click="${() => setEmptyString("hello")}">Set "hello"</button>
+                    
+                    <h3>False State</h3>
+                    <div class="state-display">
+                        value: ${falseState}<br>
+                        typeof: ${typeof falseState}
+                    </div>
+                    <button @click="${() => setFalseState(false)}">Set false</button>
+                    <button @click="${() => setFalseState(true)}">Set true</button>
+                    <button @click="${() => setFalseState(!falseState)}">Toggle</button>
+                    
+                    <h3>Zero State</h3>
+                    <div class="state-display">
+                        value: ${zeroState}<br>
+                        typeof: ${typeof zeroState}
+                    </div>
+                    <button @click="${() => setZeroState(0)}">Set 0</button>
+                    <button @click="${() => setZeroState(1)}">Set 1</button>
+                    <button @click="${() => setZeroState(zeroState + 1)}">Increment</button>
+                </div>
+            `;
+        };
+
+        // Register components
+        define({ tag: 'boolean-test', component: BooleanTest });
+        define({ tag: 'falsy-values-test', component: FalsyValuesTest });
+
+        // Mount components
+        const root = document.getElementById('test-root');
+        root.innerHTML = `
+            <boolean-test></boolean-test>
+            <falsy-values-test></falsy-values-test>
+        `;
+    </script>
+</body>
+</html>

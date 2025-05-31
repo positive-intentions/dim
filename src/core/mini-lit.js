@@ -71,22 +71,48 @@ export const css = (strings, ...values) => {
 };
 
 export const createHtmlElement = ({ strings, values }) => {
+    console.log('createHtmlElement called with:', { strings, values });
     // Create a template element for parsing and detaching later
     const template = document.createElement("template");
     const rawHTML = strings.reduce((acc, string, index) => {
-        // Check if the current value is an array
+        let value = values[index];
+        
+        // Handle different types of values
+        if (value !== undefined) {
+            if (Array.isArray(value)) {
+                // Handle arrays (like lists of components)
+                value = value
+                    .map((v) => {
+                        console.log('Processing array value:', v, 'type:', typeof v);
+                        if (v && v._$litType$ === 1) {
+                            // It's a template result, process it recursively
+                            const temp = document.createElement('div');
+                            const processed = createHtmlElement({ strings: v.strings, values: v.values });
+                            temp.appendChild(processed);
+                            return temp.innerHTML;
+                        } else if (v instanceof Node) {
+                            const temp = document.createElement('div');
+                            temp.appendChild(v);
+                            return temp.innerHTML;
+                        } else {
+                            return String(v);
+                        }
+                    })
+                    .join("");
+            } else if (typeof value === 'object' && value !== null && !value._$litType$) {
+                // It's a plain object (like props), convert to JSON for attribute binding
+                value = JSON.stringify(value);
+            } else if (value && value._$litType$ === 1) {
+                // It's a nested template
+                const temp = document.createElement('div');
+                const processed = createHtmlElement({ strings: value.strings, values: value.values });
+                temp.appendChild(processed);
+                value = temp.innerHTML;
+            }
+            // For strings, numbers, booleans, just use them as-is
+        }
 
-        const value = Array.isArray(values[index])
-            ? values[index]
-                .map((v) => {
-                    const div = document.createElement("div");
-                    div.appendChild(v);
-                    return div.innerHTML;
-                })
-                .join("")
-            : values[index];
-
-        return acc + string + (values[index] !== undefined ? value : "");
+        return acc + string + (value !== undefined ? value : "");
     }, "");
     template.innerHTML = rawHTML.trim();
 
@@ -231,3 +257,116 @@ function createDebouncedEventDispatcher(
   }
   
   export const debouncedDispatcher = createDebouncedEventDispatcher(10);
+
+// Basic LitElement implementation for browser compatibility
+export class LitElement extends HTMLElement {
+    static get properties() {
+        return {};
+    }
+
+    constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+        this._updatePromise = null;
+        this._hasRequestedUpdate = false;
+        this._propertiesEnabled = false;
+    }
+
+    connectedCallback() {
+        this._enableProperties();
+        // Perform initial render
+        this._performUpdate();
+    }
+
+    disconnectedCallback() {
+        // Override in subclasses if needed
+    }
+
+    _enableProperties() {
+        if (this._propertiesEnabled) {
+            return;
+        }
+        this._propertiesEnabled = true;
+        const props = this.constructor.properties;
+        for (const prop in props) {
+            this._createProperty(prop, props[prop]);
+        }
+    }
+
+    _createProperty(name, options) {
+        // Skip if property already exists
+        if (this.hasOwnProperty(name)) {
+            return;
+        }
+        
+        const descriptor = {
+            get() {
+                return this[`_${name}`];
+            },
+            set(value) {
+                const oldValue = this[`_${name}`];
+                if (oldValue !== value) {
+                    this[`_${name}`] = value;
+                    this.requestUpdate(name, oldValue);
+                }
+            },
+            enumerable: true,
+            configurable: true,
+        };
+        Object.defineProperty(this, name, descriptor);
+    }
+
+    requestUpdate(name, oldValue) {
+        if (!this._hasRequestedUpdate) {
+            this._hasRequestedUpdate = true;
+            this._enqueueUpdate();
+        }
+        return this.updateComplete;
+    }
+
+    async _enqueueUpdate() {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        this._performUpdate();
+    }
+
+    _performUpdate() {
+        this._hasRequestedUpdate = false;
+        this.update();
+    }
+
+    update() {
+        const result = this.render();
+        if (result && result._$litType$ === 1) {
+            this.shadowRoot.innerHTML = '';
+            const template = createHtmlElement({ strings: result.strings, values: result.values });
+            this.shadowRoot.appendChild(template);
+        }
+    }
+
+    render() {
+        // Override in subclasses
+        return html``;
+    }
+
+    get updateComplete() {
+        if (!this._updatePromise) {
+            this._updatePromise = new Promise((resolve) => {
+                requestAnimationFrame(() => {
+                    this._updatePromise = null;
+                    resolve(true);
+                });
+            });
+        }
+        return this._updatePromise;
+    }
+
+    addController(controller) {
+        // Basic controller support
+        if (controller.hostConnected) {
+            controller.hostConnected();
+        }
+        // Store controller for disconnect handling
+        this._controllers = this._controllers || [];
+        this._controllers.push(controller);
+    }
+}

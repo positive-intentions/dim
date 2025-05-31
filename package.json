@@ -1,7 +1,9 @@
 {
   "name": "dim",
   "version": "0.0.1",
-  "description": "",
+  "description": "A React-like framework using Web Components and Lit",
+  "main": "src/core/dim.js",
+  "type": "module",
   "scripts": {
     "start": "storybook dev -p 6006",
     "start:webpack": "webpack serve",
@@ -19,6 +21,7 @@
     "build:coverage": "jest --coverage && cp -r coverage/lcov-report ./Frontend/coverage-report",
     "serve:storybook": "serve storybook-static",
     "serve": "serve Frontend --cors",
+    "serve:demos": "npx serve src --cors -p 8080",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
@@ -35,8 +38,8 @@
     "@storybook/addon-onboarding": "^1.0.11",
     "@storybook/addon-themes": "^7.6.10",
     "@storybook/blocks": "^7.6.10",
-    "@storybook/react": "^7.6.10",
-    "@storybook/react-webpack5": "^7.6.10",
+    "@storybook/react": "^7.6.20",
+    "@storybook/react-webpack5": "^7.6.20",
     "@storybook/test": "^7.6.10",
     "@testing-library/jest-dom": "^6.3.0",
     "@testing-library/react": "^14.1.2",
@@ -53,7 +56,7 @@
     "prettier": "3.2.4",
     "react-test-renderer": "^18.2.0",
     "serve": "^14.2.1",
-    "storybook": "^7.6.10",
+    "storybook": "^7.6.20",
     "storybook-dark-mode": "^3.0.3",
     "vite": "^5.2.11",
     "webpack": "^5.90.0",
