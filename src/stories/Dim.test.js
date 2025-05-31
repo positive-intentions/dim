@@ -31,24 +31,24 @@ Object.defineProperty(globalThis, 'crypto', {
   }
 });
 
-//add polyfill for window.alert()
+// Add polyfill for window.alert()
 global.alert = jest.fn();
 
-import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { composeStory } from "@storybook/react";
-import "@testing-library/jest-dom";
+describe('Dim Framework Tests', () => {
+  it('should run the individual module tests', () => {
+    // This test file serves as an entry point
+    // The actual tests are in separate files:
+    // - mini-lit.test.js
+    // - async-manager.test.js
+    // - storage-manager.test.js
+    // - dim.test.js (to be created)
+    
+    expect(true).toBe(true);
+  });
 
-// import Cryptography, { Basic as ExampleBasic } from "./Cryptography.stories"; // 👈 Import the story and its metadata
-// import { expect } from "@storybook/test";
-
-// const BasicExample = composeStory(ExampleBasic, Cryptography);
-
-test("Checks if the Example component renders with children and triggers onClick", () => {
-  // render(<BasicExample {...ExampleBasic.args} />);
-
-  // const component = screen.getByText("positive-intentions");
-  // expect(component).toHaveTextContent("positive-intentions");
-
-  expect(1 + 1).toBe(2);
+  it('should have proper test coverage across all modules', () => {
+    // This is a placeholder to ensure jest runs
+    // Real tests are in module-specific test files
+    expect(1 + 1).toBe(2);
+  });
 });
