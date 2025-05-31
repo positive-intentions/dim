@@ -1,26 +1,134 @@
 import { LitElement, html as litHtml } from "lit";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import AsyncronousStateManager from "./async-manager";
 import { css, unsafeCSS } from "./mini-lit";
 import StorageManager from "./storage-manager";
 
-// Use lit-html's html function
-export const html = litHtml;
+// Enhanced html function that supports React-like syntax
+export const html = (strings, ...values) => {
+  // If this is a proper template literal, strings will have a 'raw' property
+  if (!strings || !strings.raw) {
+    // If called as a function instead of template literal, create proper structure
+    if (typeof strings === 'string') {
+      const templateStrings = [strings];
+      templateStrings.raw = [strings];
+      return litHtml(templateStrings, ...values);
+    }
+    return litHtml(strings, ...values);
+  }
+  
+  // Process templates to support object attributes like todo={{ ... }}
+  const processedTemplate = processReactLikeSyntax(strings, values);
+  
+  // Ensure the processed strings array has the raw property
+  if (processedTemplate.strings && !processedTemplate.strings.raw) {
+    processedTemplate.strings.raw = [...processedTemplate.strings];
+  }
+  
+  return litHtml(processedTemplate.strings, ...processedTemplate.values);
+};
+
+function processReactLikeSyntax(strings, values) {
+  // Join template to analyze, preserving the original structure
+  let fullTemplate = strings[0];
+  for (let i = 0; i < values.length; i++) {
+    fullTemplate += `__VALUE_${i}__` + strings[i + 1];
+  }
+  
+  // Look for object attribute patterns like todo={{ ... }}
+  const objectAttrRegex = /(\w+)=\{\{([^}]+)\}\}/g;
+  let hasReplacements = false;
+  
+  // Check if we have any object attributes to process
+  if (!objectAttrRegex.test(fullTemplate)) {
+    // No processing needed, return original
+    return { strings, values };
+  }
+  
+  // Reset regex
+  objectAttrRegex.lastIndex = 0;
+  let match;
+  let replacements = [];
+  
+  while ((match = objectAttrRegex.exec(fullTemplate)) !== null) {
+    const [fullMatch, attrName, attrValue] = match;
+    
+    // Try to parse the object literal
+    try {
+      const objValue = new Function('return {' + attrValue + '}')();
+      const jsonString = JSON.stringify(objValue);
+      
+      // Replace with JSON string
+      replacements.push({
+        from: fullMatch,
+        to: `${attrName}='${jsonString}'`
+      });
+      hasReplacements = true;
+    } catch (e) {
+      console.warn('Failed to parse object attribute:', attrValue);
+    }
+  }
+  
+  if (!hasReplacements) {
+    return { strings, values };
+  }
+  
+  // Apply replacements
+  let processedTemplate = fullTemplate;
+  replacements.forEach(replacement => {
+    processedTemplate = processedTemplate.replace(replacement.from, replacement.to);
+  });
+  
+  // Split back into strings and values arrays
+  const parts = processedTemplate.split(/__VALUE_(\d+)__/);
+  const newStrings = [];
+  const newValues = [];
+  
+  // Rebuild strings array
+  newStrings.push(parts[0]);
+  for (let i = 1; i < parts.length; i += 2) {
+    const valueIndex = parseInt(parts[i]);
+    if (valueIndex < values.length) {
+      newValues.push(values[valueIndex]);
+    }
+    newStrings.push(parts[i + 1] || '');
+  }
+  
+  // Ensure we have the right number of strings (should be values.length + 1)
+  while (newStrings.length < newValues.length + 1) {
+    newStrings.push('');
+  }
+  
+  // Add raw property to maintain template literal structure
+  newStrings.raw = [...newStrings];
+  
+  return {
+    strings: newStrings,
+    values: newValues
+  };
+}
 
 // Helper to render children content
 export const renderChildren = (children) => {
   if (!children) return litHtml``;
   
-  // If children is a string (innerHTML), return it as unsafe HTML
+  // If children is a string (innerHTML), check if it contains custom elements
   if (typeof children === 'string') {
-    return litHtml`<slot>${children}</slot>`;
+    // If the string contains custom elements (with hyphens), use slot rendering
+    // This allows the custom elements to be properly processed by lit-html
+    if (children.includes('-') && (children.includes('<') && children.includes('>'))) {
+      return litHtml`<slot></slot>`;
+    }
+    // For simple text content, use unsafeHTML
+    return litHtml`${unsafeHTML(children)}`;
   }
   
   // If children is an array of elements, render them
   if (Array.isArray(children)) {
-    return litHtml`<slot>${children}</slot>`;
+    return litHtml`<slot></slot>`;
   }
   
-  // Default slot
+  // Default slot for any other content
   return litHtml`<slot></slot>`;
 };
 
@@ -48,6 +156,19 @@ export function define({ tag, component: CustomFunctionalComponent }) {
       super();
       this.hookIndex = 0;
       this.hooks = {};
+      this._childNodes = [];
+      this._slotContent = null;
+      this._childNodesCaptured = false;
+    }
+
+    connectedCallback() {
+      super.connectedCallback();
+      // Capture child nodes before they're moved to shadow DOM
+      if (!this._childNodesCaptured) {
+        this._childNodes = Array.from(this.childNodes);
+        this._slotContent = this.innerHTML;
+        this._childNodesCaptured = true;
+      }
     }
 
     render() {
@@ -57,9 +178,20 @@ export function define({ tag, component: CustomFunctionalComponent }) {
       // Set the current instance context
       setCurrentInstance(this);
 
-      // Get all attributes as props
+      // Get all attributes as props, including parsing object attributes
       const attributes = Array.from(this.attributes).reduce((acc, attr) => {
-        acc[attr.name] = attr.value;
+        let value = attr.value;
+        
+        // Try to parse JSON-like object attributes
+        if (value && (value.startsWith('{') || value.startsWith('['))) {
+          try {
+            value = JSON.parse(value);
+          } catch (e) {
+            // If parsing fails, keep original string value
+          }
+        }
+        
+        acc[attr.name] = value;
         return acc;
       }, {});
 
@@ -93,12 +225,20 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         renderChildren,
       };
 
+      // Process children to make them available
+      const children = this._slotContent || '';
+      const childElements = this._childNodes.filter(node => 
+        node.nodeType === Node.ELEMENT_NODE || 
+        (node.nodeType === Node.TEXT_NODE && node.textContent.trim())
+      );
+
       // Call the functional component
       const result = CustomFunctionalComponent(
         {
           ...attributes,
           ...this.props,
-          children: this.innerHTML,
+          children,
+          childElements,
         },
         sharedDependencies
       );
