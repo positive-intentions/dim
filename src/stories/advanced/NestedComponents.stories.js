@@ -1,5 +1,6 @@
 import React from "react";
 import { html, css, define, useState, useScope, useStyle, useStore, useEffect, renderChildren } from "../../core/dim.ts";
+import { wrapLitHtmlStory } from "../../core/storybook-utils.js";
 import { 
   NestedTodoAppWithChildren, 
   TodoCategoryWithChildren, 
@@ -782,61 +783,43 @@ export const ReactLikeNesting = {
   }
 };
 
-// export const NestedWidgets = {
-//   render: () => html`
-//     <nested-dashboard>
-//       <dashboard-widget type="metric" data={{ title: 'Active Users', value: '2,500' }}>
-//         <div class="trend-indicator">↑ 12%</div>
-//       </dashboard-widget>
-//       <dashboard-widget type="chart" data={{ title: 'Monthly Stats', values: [30, 45, 60, 75, 90], labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'] }}>
-//         <div class="chart-legend">
-//           <span class="legend-item">2023</span>
-//           <span class="legend-item">2024</span>
-//         </div>
-//       </dashboard-widget>
-//     </nested-dashboard>
-//   `,
-//   name: "Nested Widgets with Children",
-//   parameters: {
-//     docs: {
-//       description: {
-//         story: "Shows how widgets can contain child elements for additional customization."
-//       }
-//     }
-//   }
-// };
+export const NestedWidgets = {
+  render: wrapLitHtmlStory(() => html`
+    <nested-dashboard>
+      <dashboard-widget type="metric" data={{ title: 'Active Users', value: '2,500' }}>
+        <div class="trend-indicator">↑ 12%</div>
+      </dashboard-widget>
+      <dashboard-widget type="chart" data={{ title: 'Monthly Stats', values: [30, 45, 60, 75, 90], labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'] }}>
+        <div class="chart-legend">
+          <span class="legend-item">2023</span>
+          <span class="legend-item">2024</span>
+        </div>
+      </dashboard-widget>
+    </nested-dashboard>
+  `),
+  name: "Nested Widgets with Children",
+  parameters: {
+    docs: {
+      description: {
+        story: "Shows how widgets can contain child elements for additional customization."
+      }
+    }
+  }
+};
 
-// export const ComplexNesting = {
-//   render: () => html`
-//     <nested-todo-app>
-//       <todo-category category="Frontend">
-//         <todo-item todo={{ id: 1, text: 'Setup React', completed: true }}>
-//           <div class="subtasks">
-//             <span>Create project</span>
-//             <span>Install dependencies</span>
-//           </div>
-//         </todo-item>
-//         <todo-item todo={{ id: 2, text: 'Build Components', completed: false }}>
-//           <div class="priority-badge">High Priority</div>
-//         </todo-item>
-//       </todo-category>
-//       <todo-category category="Backend">
-//         <todo-item todo={{ id: 3, text: 'API Development', completed: false }}>
-//           <div class="tech-stack">
-//             <span>Node.js</span>
-//             <span>Express</span>
-//           </div>
-//         </todo-item>
-//       </todo-category>
-//     </nested-todo-app>
-//   `,
-//   name: "Complex Component Nesting",
-//   parameters: {
-//     docs: {
-//       description: {
-//         story: "Demonstrates complex nesting patterns with multiple levels of children and custom content."
-//       }
-//     }
-//   }
-// };
+export const ComplexNesting = {
+  render: wrapLitHtmlStory(() => {
+    return html`
+      <nested-todo-app></nested-todo-app>
+    `;
+  }),
+  name: "Complex Component Nesting",
+  parameters: {
+    docs: {
+      description: {
+        story: "Demonstrates the full todo app with internal state management, allowing you to add, toggle, and delete tasks dynamically."
+      }
+    }
+  }
+};
 

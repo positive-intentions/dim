@@ -2,8 +2,8 @@ import {
     useEffect,
     useState,
     useStore,
+    html,
 } from "../../core/dim.ts";
-import { html } from "../../core/mini-lit.js";
 
 const ListItem = ({ todo, onRemove }) => {
     const {
