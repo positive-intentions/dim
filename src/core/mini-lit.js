@@ -200,13 +200,108 @@ export function expandSelfClosingTags(inputStrings, ...values) {
     return html(inputStrings, ...values); // Return the modified strings and values
 }
 
-export const html = (strings, ...values) => {
-    return ({
-        // This property needs to remain unminified.
-        ["_$litType$"]: 1,
-        strings,
-        values,
+// Process template to handle custom element attributes and children
+function processTemplate(strings, values) {
+    let processedStrings = [...strings];
+    let processedValues = [...values];
+    let newStrings = [];
+    let newValues = [];
+    
+    // Build the full HTML string to analyze
+    let fullHTML = strings[0];
+    for (let i = 0; i < values.length; i++) {
+        fullHTML += `__VALUE_${i}__` + strings[i + 1];
+    }
+    
+    // Parse custom elements with object attributes
+    const customElementRegex = /<(\w+-\w+)([^>]*?)(s*\/?>|>)/g;
+    const attributeRegex = /(\w+)=\{\{([^}]+)\}\}/g;
+    
+    let processedHTML = fullHTML;
+    let valueMapping = {};
+    let valueCounter = 0;
+    
+    // Replace object attributes with placeholders
+    processedHTML = processedHTML.replace(customElementRegex, (match, tagName, attributes, closing) => {
+        let processedAttrs = attributes;
+        
+        // Handle object attributes like todo={{ ... }}
+        processedAttrs = processedAttrs.replace(attributeRegex, (attrMatch, attrName, attrValue) => {
+            // Try to parse the attribute value
+            try {
+                // Create a temporary object from the string representation
+                const objStr = `{${attrValue}}`;
+                const key = `__ATTR_${valueCounter}__`;
+                valueMapping[key] = { type: 'object', name: attrName, value: objStr };
+                valueCounter++;
+                return `.${attrName}="${key}"`;
+            } catch (e) {
+                return attrMatch; // Keep original if parsing fails
+            }
+        });
+        
+        return `<${tagName}${processedAttrs}${closing}`;
     });
+    
+    // Split back into strings and values
+    const parts = processedHTML.split(/__VALUE_(\d+)__|__ATTR_(\d+)__/);
+    const placeholders = processedHTML.match(/__VALUE_(\d+)__|__ATTR_(\d+)__/g) || [];
+    
+    newStrings.push(parts[0]);
+    
+    for (let i = 0; i < placeholders.length; i++) {
+        const placeholder = placeholders[i];
+        if (placeholder.startsWith('__VALUE_')) {
+            const index = parseInt(placeholder.match(/\d+/)[0]);
+            newValues.push(values[index]);
+        } else if (placeholder.startsWith('__ATTR_')) {
+            const index = parseInt(placeholder.match(/\d+/)[0]);
+            const mapping = valueMapping[placeholder];
+            if (mapping) {
+                // Parse the object string to actual object
+                try {
+                    // Use Function constructor to safely evaluate object literal
+                    const objValue = new Function('return ' + mapping.value)();
+                    newValues.push(objValue);
+                } catch (e) {
+                    newValues.push({});
+                }
+            }
+        }
+        newStrings.push(parts[i + 1] || '');
+    }
+    
+    return { strings: newStrings, values: newValues };
+}
+
+// html function is now imported from lit-html in dim.ts
+
+// Helper to render children content
+// Note: This is a placeholder - renderChildren should be passed as a dependency
+export const renderChildren = (children) => {
+    // This function should be called with html available in context
+    // For now, return a basic template
+    if (!children) return null;
+    
+    // If children is a string (innerHTML), return it directly
+    if (typeof children === 'string') {
+        return children;
+    }
+    
+    // If children is an array of elements, join them
+    if (Array.isArray(children)) {
+        return children;
+    }
+    
+    // Default
+    return children;
+};
+
+// Helper to create unsafe HTML content
+export const unsafeHTML = (htmlString) => {
+    const template = document.createElement('template');
+    template.innerHTML = htmlString;
+    return template.content;
 };
 
 function createDebouncedEventDispatcher(

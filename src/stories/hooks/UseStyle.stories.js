@@ -1,5 +1,5 @@
 import React from "react";
-import { html, css, define, useState, useStyle } from "../../core/dim.ts";
+import { html, css, define, useState, useStyle, unsafeCSS } from "../../core/dim.ts";
 
 // Theme switcher component
 const ThemeSwitcher = (props, { useState, html, css, useStyle }) => {
@@ -390,14 +390,14 @@ const ResponsiveLayout = (props, { html, css, useStyle }) => {
 };
 
 // Multiple style injections
-const StyleLayering = (props, { useState, html, css, useStyle }) => {
+const StyleLayering = (props, { useState, html, css, useStyle, unsafeCSS }) => {
   const [baseColor, setBaseColor] = useState('#029cfd');
   
   // Base styles
   useStyle(css`
     .layered-container {
       padding: 2rem;
-      border: 2px solid ${baseColor};
+      border: 2px solid ${unsafeCSS(baseColor)};
       border-radius: 8px;
     }
 
@@ -424,19 +424,19 @@ const StyleLayering = (props, { useState, html, css, useStyle }) => {
     }
 
     .box-primary {
-      background-color: ${baseColor};
+      background-color: ${unsafeCSS(baseColor)};
     }
 
     .box-secondary {
-      background-color: color-mix(in srgb, ${baseColor} 80%, white);
+      background-color: color-mix(in srgb, ${unsafeCSS(baseColor)} 80%, white);
     }
 
     .box-tertiary {
-      background-color: color-mix(in srgb, ${baseColor} 60%, white);
+      background-color: color-mix(in srgb, ${unsafeCSS(baseColor)} 60%, white);
     }
 
     .box-quaternary {
-      background-color: color-mix(in srgb, ${baseColor} 40%, white);
+      background-color: color-mix(in srgb, ${unsafeCSS(baseColor)} 40%, white);
     }
   `);
 
