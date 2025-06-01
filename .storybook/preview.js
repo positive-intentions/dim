@@ -33,6 +33,7 @@ const preview = {
     },
     // add branch image
     options: {
+      showPanel: false,
       storySort: {
         order: ['Getting Started', ['Tutorial', '*'], 'Hooks', 'Advanced', '*'],
       },

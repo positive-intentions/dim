@@ -1,236 +1,587 @@
 import React from "react";
-import { html, css, define, useState, useEffect, useStyle, useScope, useStore } from "../core/dim.ts";
-import { wrapLitHtmlStory } from "../core/storybook-utils.js";
+import { define, html, css, useState, useEffect, useStyle, useScope } from "../core/dim.ts";
 
-// Tutorial Navigation Component
-const TutorialNav = ({ currentStep, onStepChange }, { html, css, useStyle }) => {
-  const steps = [
-    { id: 'setup', title: '1. Setup', icon: '🚀' },
-    { id: 'first-component', title: '2. First Component', icon: '🧩' },
-    { id: 'adding-state', title: '3. Adding State', icon: '⚡' },
-    { id: 'styling', title: '4. Styling', icon: '🎨' },
-    { id: 'effects', title: '5. Side Effects', icon: '🔄' },
-    { id: 'todo-app', title: '6. Todo App', icon: '📝' },
-    { id: 'persistence', title: '7. Persistence', icon: '💾' },
-    { id: 'deployment', title: '8. Deployment', icon: '🌐' }
-  ];
-
+// Tutorial Step Component - Shows code examples
+const TutorialStep = ({ title, description, codeExample, liveDemo }, { html, css, useStyle }) => {
   useStyle(css`
-    .tutorial-nav {
+    .tutorial-step {
       background: white;
       border-radius: 12px;
-      padding: 1.5rem;
+      padding: 2rem;
       margin-bottom: 2rem;
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    
-    .nav-title {
-      font-size: 1.125rem;
-      font-weight: 600;
-      color: #495057;
-      margin-bottom: 1rem;
-      text-align: center;
-    }
-    
-    .nav-steps {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 0.75rem;
-    }
-    
-    .nav-step {
-      background: #f8f9fa;
-      border: 2px solid transparent;
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-align: center;
-      font-size: 0.875rem;
-    }
-    
-    .nav-step:hover {
-      background: #e9ecef;
-      transform: translateY(-1px);
-    }
-    
-    .nav-step.active {
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white;
-      border-color: #667eea;
-    }
-    
-    .step-icon {
-      display: block;
-      font-size: 1.25rem;
-      margin-bottom: 0.25rem;
-    }
-  `);
 
-  return html`
-    <div class="tutorial-nav">
-      <div class="nav-title">📚 Tutorial Progress</div>
-      <div class="nav-steps">
-        ${steps.map(step => html`
-          <button 
-            class="nav-step ${currentStep === step.id ? 'active' : ''}"
-            @click="${() => onStepChange(step.id)}"
-          >
-            <span class="step-icon">${step.icon}</span>
-            ${step.title}
-          </button>
-        `)}
-      </div>
-    </div>
-  `;
-};
+    .step-header {
+      margin-bottom: 1.5rem;
+    }
 
-// Code Block Component
-const CodeBlock = ({ code, language = 'javascript', title, fileName }, { html, css, useStyle }) => {
-  useStyle(css`
-    .code-block {
+    .step-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+
+    .step-description {
+      color: #666;
+      line-height: 1.6;
+    }
+
+    .code-section {
       margin: 1.5rem 0;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid #e9ecef;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    
+
     .code-header {
       background: linear-gradient(135deg, #495057, #6c757d);
       color: white;
       padding: 0.75rem 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .code-title {
+      border-radius: 8px 8px 0 0;
       font-weight: 600;
       font-size: 0.875rem;
     }
-    
-    .file-name {
-      font-family: 'Consolas', monospace;
-      font-size: 0.75rem;
-      background: rgba(255,255,255,0.1);
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-    }
-    
-    .code-content {
+
+    .code-block {
       background: #1e1e1e;
       color: #d4d4d4;
-      padding: 1.25rem;
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      padding: 1.5rem;
+      border-radius: 0 0 8px 8px;
+      font-family: 'Consolas', monospace;
       font-size: 0.875rem;
       line-height: 1.6;
       overflow-x: auto;
     }
-    
-    .keyword { color: #569cd6; }
-    .string { color: #ce9178; }
-    .comment { color: #6a9955; }
-    .function { color: #dcdcaa; }
-    .property { color: #9cdcfe; }
-    .number { color: #b5cea8; }
-    .tag { color: #569cd6; }
-  `);
 
-  const highlightCode = (code) => {
-    return code
-      .replace(/\/\/.*$/gm, '<span class="comment">$&</span>')
-      .replace(/\/\*[\s\S]*?\*\//g, '<span class="comment">$&</span>')
-      .replace(/\b(const|let|var|function|return|import|export|from|if|else|class|extends|new)\b/g, '<span class="keyword">$1</span>')
-      .replace(/\b(useState|useEffect|useMemo|useRef|useStyle|useScope|useStore|html|css|define)\b/g, '<span class="function">$1</span>')
-      .replace(/'[^']*'|"[^"]*"|`[^`]*`/g, '<span class="string">$&</span>')
-      .replace(/\b\d+\b/g, '<span class="number">$&</span>')
-      .replace(/&lt;\/?\w+/g, '<span class="tag">$&</span>');
-  };
-
-  return html`
-    <div class="code-block">
-      <div class="code-header">
-        <div class="code-title">${title || 'Code Example'}</div>
-        ${fileName ? html`<div class="file-name">${fileName}</div>` : ''}
-      </div>
-      <div class="code-content">
-        <pre .innerHTML="${highlightCode(code)}"></pre>
-      </div>
-    </div>
-  `;
-};
-
-// Live Preview Component
-const LivePreview = ({ children }, { html, css, useStyle, renderChildren }) => {
-  useStyle(css`
-    .live-preview {
-      background: white;
-      border: 2px solid #e9ecef;
+    .demo-section {
+      margin-top: 2rem;
+      padding: 1.5rem;
+      background: #f8f9fa;
       border-radius: 8px;
-      overflow: hidden;
-      margin: 1.5rem 0;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      border: 2px solid #e9ecef;
     }
-    
-    .preview-header {
-      background: linear-gradient(135deg, #28a745, #20c997);
-      color: white;
-      padding: 0.75rem 1rem;
+
+    .demo-header {
       font-weight: 600;
-      font-size: 0.875rem;
+      color: #495057;
+      margin-bottom: 1rem;
       display: flex;
       align-items: center;
       gap: 0.5rem;
     }
-    
-    .preview-content {
-      padding: 1.5rem;
-      min-height: 120px;
-      background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
     }
   `);
 
   return html`
-    <div class="live-preview">
-      <div class="preview-header">
-        ✨ Live Preview
+    <div class="tutorial-step">
+      <div class="step-header">
+        <h2 class="step-title">${title}</h2>
+        <p class="step-description">${description}</p>
       </div>
-      <div class="preview-content">
-        ${renderChildren(children)}
+
+      ${codeExample ? html`
+        <div class="code-section">
+          <div class="code-header">📝 Code Example</div>
+          <div class="code-block">
+            <pre>${codeExample}</pre>
+          </div>
+        </div>
+      ` : ''}
+
+      ${liveDemo ? html`
+        <div class="demo-section">
+          <div class="demo-header">
+            <span>✨</span>
+            <span>Live Demo</span>
+          </div>
+          ${liveDemo}
+        </div>
+      ` : ''}
+    </div>
+  `;
+};
+
+// Counter Demo Component
+const CounterDemo = (props, { useState, html, css, useStyle }) => {
+  const [count, setCount] = useState(0);
+
+  useStyle(css`
+    .counter-demo {
+      text-align: center;
+      padding: 2rem;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .count-display {
+      font-size: 3rem;
+      font-weight: bold;
+      color: #029cfd;
+      margin-bottom: 1rem;
+    }
+
+    button {
+      background-color: #029cfd;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      padding: 10px 20px;
+      font-size: 1rem;
+      margin: 0 0.5rem;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: #0278c7;
+    }
+  `);
+
+  return html`
+    <div class="counter-demo">
+      <div class="count-display">${count}</div>
+      <button @click="${() => setCount(count + 1)}">Increment</button>
+      <button @click="${() => setCount(count - 1)}">Decrement</button>
+      <button @click="${() => setCount(0)}">Reset</button>
+    </div>
+  `;
+};
+
+// Todo List Demo Component
+const TodoDemo = (props, { useState, html, css, useStyle }) => {
+  const [todos, setTodos] = useState([
+    { id: 1, text: 'Learn Dim basics', done: true },
+    { id: 2, text: 'Build a todo app', done: false }
+  ]);
+  const [inputText, setInputText] = useState('');
+
+  useStyle(css`
+    .todo-demo {
+      max-width: 400px;
+      margin: 0 auto;
+      padding: 1.5rem;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .todo-header {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 1rem;
+    }
+
+    .todo-input-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    input {
+      flex: 1;
+      padding: 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+
+    button {
+      background-color: #029cfd;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      padding: 0.75rem 1.25rem;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: #0278c7;
+    }
+
+    .todo-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .todo-item {
+      display: flex;
+      align-items: center;
+      padding: 0.75rem;
+      border-bottom: 1px solid #eee;
+      gap: 0.75rem;
+    }
+
+    .todo-item:last-child {
+      border-bottom: none;
+    }
+
+    .todo-checkbox {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    .todo-text {
+      flex: 1;
+      color: #333;
+    }
+
+    .todo-text.done {
+      text-decoration: line-through;
+      color: #999;
+    }
+
+    .delete-btn {
+      background-color: #dc3545;
+      padding: 0.25rem 0.75rem;
+      font-size: 0.875rem;
+    }
+
+    .delete-btn:hover {
+      background-color: #c82333;
+    }
+
+    .todo-stats {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid #eee;
+      color: #666;
+      font-size: 0.875rem;
+    }
+  `);
+
+  const addTodo = () => {
+    if (inputText.trim()) {
+      setTodos([...todos, {
+        id: Date.now(),
+        text: inputText,
+        done: false
+      }]);
+      setInputText('');
+    }
+  };
+
+  const toggleTodo = (id) => {
+    setTodos(todos.map(todo =>
+      todo.id === id ? { ...todo, done: !todo.done } : todo
+    ));
+  };
+
+  const deleteTodo = (id) => {
+    setTodos(todos.filter(todo => todo.id !== id));
+  };
+
+  const completedCount = todos.filter(todo => todo.done).length;
+
+  return html`
+    <div class="todo-demo">
+      <h3 class="todo-header">📝 My Todo List</h3>
+      
+      <div class="todo-input-group">
+        <input 
+          type="text"
+          placeholder="What needs to be done?"
+          .value="${inputText}"
+          @input="${(e) => setInputText(e.target.value)}"
+          @keydown="${(e) => e.key === 'Enter' && addTodo()}"
+        />
+        <button @click="${addTodo}">Add</button>
+      </div>
+
+      <ul class="todo-list">
+        ${todos.map(todo => html`
+          <li class="todo-item">
+            <input 
+              type="checkbox"
+              class="todo-checkbox"
+              .checked="${todo.done}"
+              @change="${() => toggleTodo(todo.id)}"
+            />
+            <span class="todo-text ${todo.done ? 'done' : ''}">${todo.text}</span>
+            <button class="delete-btn" @click="${() => deleteTodo(todo.id)}">Delete</button>
+          </li>
+        `)}
+      </ul>
+
+      <div class="todo-stats">
+        ${completedCount} of ${todos.length} completed
       </div>
     </div>
   `;
 };
 
-// Step Content Components
+// Interactive Tutorial Component
+const InteractiveTutorial = (props, { useState, html, css, useStyle, useScope }) => {
+  const [currentStep, setCurrentStep] = useState(0);
 
-// Step 1: Setup
-const SetupStep = (_, { html, css, useStyle, useScope }) => {
   useScope({
-    'code-block': CodeBlock
+    'tutorial-step': TutorialStep,
+    'counter-demo': CounterDemo,
+    'todo-demo': TodoDemo
   });
 
   useStyle(css`
-    .step-content {
-      background: white;
-      border-radius: 12px;
+    .interactive-tutorial {
+      max-width: 1000px;
+      margin: 0 auto;
       padding: 2rem;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    
-    .step-intro {
-      background: #e7f3ff;
-      padding: 1.5rem;
-      border-radius: 8px;
-      border-left: 4px solid #007bff;
+
+    .tutorial-header {
+      text-align: center;
+      margin-bottom: 3rem;
+      padding: 3rem 2rem;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border-radius: 16px;
+    }
+
+    .tutorial-title {
+      font-size: 2.5rem;
+      font-weight: bold;
+      margin-bottom: 1rem;
+    }
+
+    .tutorial-subtitle {
+      font-size: 1.125rem;
+      opacity: 0.9;
+    }
+
+    .step-navigation {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
       margin-bottom: 2rem;
     }
-    
-    .intro-title {
+
+    .nav-button {
+      background-color: #029cfd;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      padding: 10px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .nav-button:hover {
+      background-color: #0278c7;
+    }
+
+    .nav-button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    .step-indicator {
+      text-align: center;
+      margin-bottom: 2rem;
+      color: #666;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background-color: #e9ecef;
+      border-radius: 4px;
+      margin: 1rem 0;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      transition: width 0.3s ease;
+    }
+  `);
+
+  const tutorialSteps = [
+    {
+      title: "Step 1: Creating Your First Component",
+      description: "Learn how to create a basic Dim component with the html template literal.",
+      codeExample: `const HelloWorld = (props, { html }) => {
+  return html\`
+    <div>
+      <h1>Hello, Dim!</h1>
+      <p>Welcome to the framework</p>
+    </div>
+  \`;
+};
+
+// Register the component
+define({ tag: 'hello-world', component: HelloWorld });`,
+      liveDemo: null
+    },
+    {
+      title: "Step 2: Adding State with useState",
+      description: "Make your components interactive by managing state with the useState hook.",
+      codeExample: `const Counter = (props, { useState, html }) => {
+  const [count, setCount] = useState(0);
+  
+  return html\`
+    <div>
+      <h2>Count: \${count}</h2>
+      <button @click="\${() => setCount(count + 1)}">
+        Increment
+      </button>
+    </div>
+  \`;
+};`,
+      liveDemo: html`<counter-demo></counter-demo>`
+    },
+    {
+      title: "Step 3: Building a Todo List",
+      description: "Combine multiple concepts to build a functional todo list application.",
+      codeExample: `const TodoList = (props, { useState, html }) => {
+  const [todos, setTodos] = useState([]);
+  const [inputText, setInputText] = useState('');
+  
+  const addTodo = () => {
+    if (inputText.trim()) {
+      setTodos([...todos, {
+        id: Date.now(),
+        text: inputText,
+        done: false
+      }]);
+      setInputText('');
+    }
+  };
+  
+  return html\`
+    <div>
+      <input 
+        .value="\${inputText}"
+        @input="\${(e) => setInputText(e.target.value)}"
+      />
+      <button @click="\${addTodo}">Add Todo</button>
+      
+      <ul>
+        \${todos.map(todo => html\`
+          <li>\${todo.text}</li>
+        \`)}
+      </ul>
+    </div>
+  \`;
+};`,
+      liveDemo: html`<todo-demo></todo-demo>`
+    }
+  ];
+
+  const progress = ((currentStep + 1) / tutorialSteps.length) * 100;
+
+  return html`
+    <div class="interactive-tutorial">
+      <div class="tutorial-header">
+        <h1 class="tutorial-title">🎓 Interactive Dim Tutorial</h1>
+        <p class="tutorial-subtitle">Learn by building - from basics to a complete application</p>
+      </div>
+
+      <div class="step-indicator">
+        Step ${currentStep + 1} of ${tutorialSteps.length}
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: ${progress}%"></div>
+      </div>
+
+      <div class="step-navigation">
+        <button 
+          class="nav-button" 
+          @click="${() => setCurrentStep(currentStep - 1)}"
+          ?disabled="${currentStep === 0}"
+        >
+          ← Previous
+        </button>
+        <button 
+          class="nav-button" 
+          @click="${() => setCurrentStep(currentStep + 1)}"
+          ?disabled="${currentStep === tutorialSteps.length - 1}"
+        >
+          Next →
+        </button>
+      </div>
+
+      <tutorial-step
+        title="${tutorialSteps[currentStep].title}"
+        description="${tutorialSteps[currentStep].description}"
+        codeExample="${tutorialSteps[currentStep].codeExample}"
+        liveDemo="${tutorialSteps[currentStep].liveDemo}"
+      ></tutorial-step>
+    </div>
+  `;
+};
+
+// Quick Start Guide Component
+const QuickStartGuide = (props, { html, css, useStyle }) => {
+  useStyle(css`
+    .quick-start {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .guide-section {
+      background: white;
+      border-radius: 8px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .code-snippet {
+      background: #f6f8fa;
+      border: 1px solid #e1e4e8;
+      border-radius: 6px;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 0.875rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+    }
+
+    .highlight {
+      background-color: #fff3cd;
+      padding: 0.2rem 0.4rem;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    ul {
+      padding-left: 1.5rem;
+      line-height: 1.8;
+    }
+
+    .tip-box {
+      background: #e7f3ff;
+      border-left: 4px solid #029cfd;
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 4px;
+    }
+
+    .tip-title {
       font-weight: 600;
       color: #0056b3;
       margin-bottom: 0.5rem;
@@ -238,426 +589,147 @@ const SetupStep = (_, { html, css, useStyle, useScope }) => {
   `);
 
   return html`
-    <div class="step-content">
-      <h2>🚀 Step 1: Project Setup</h2>
-      
-      <div class="step-intro">
-        <div class="intro-title">What you'll learn:</div>
+    <div class="quick-start">
+      <div class="guide-section">
+        <h2 class="section-title">
+          <span>🚀</span>
+          <span>Quick Start with Dim</span>
+        </h2>
+        
+        <p>Get up and running with Dim in under 5 minutes!</p>
+
+        <h3>1. Installation</h3>
+        <div class="code-snippet">
+npm install @dim/core
+# or include directly in your HTML
+&lt;script type="module" src="path/to/dim.js"&gt;&lt;/script&gt;
+        </div>
+
+        <h3>2. Create Your First Component</h3>
+        <div class="code-snippet">
+import { html, define } from '@dim/core';
+
+const App = (props, { html }) => {
+  return html\`&lt;h1&gt;Hello Dim!&lt;/h1&gt;\`;
+};
+
+define({ tag: 'my-app', component: App });
+        </div>
+
+        <h3>3. Use It</h3>
+        <div class="code-snippet">
+&lt;my-app&gt;&lt;/my-app&gt;
+        </div>
+
+        <div class="tip-box">
+          <div class="tip-title">💡 Pro Tip</div>
+          <p>Dim components are Web Components under the hood, so they work everywhere HTML works!</p>
+        </div>
+      </div>
+
+      <div class="guide-section">
+        <h2 class="section-title">
+          <span>📚</span>
+          <span>Core Concepts</span>
+        </h2>
+        
         <ul>
-          <li>Setting up a new Dim project</li>
-          <li>Understanding the project structure</li>
-          <li>Creating your first HTML file</li>
+          <li><span class="highlight">Components</span> - Functions that return HTML templates</li>
+          <li><span class="highlight">Hooks</span> - Add state and effects to components</li>
+          <li><span class="highlight">Scoped Styles</span> - CSS that's automatically isolated</li>
+          <li><span class="highlight">Web Standards</span> - Built on native Web Components</li>
         </ul>
       </div>
-
-      <h3>Create Your Project</h3>
-      <p>First, let's create a new directory for our project and set up the basic structure:</p>
-
-      <code-block
-        title="Terminal Commands"
-        fileName="terminal"
-        code="mkdir my-dim-app
-cd my-dim-app
-mkdir src
-touch index.html src/app.js"
-      ></code-block>
-
-      <h3>HTML Setup</h3>
-      <p>Create your main HTML file that will load your Dim application:</p>
-
-      <code-block
-        title="Main HTML File"
-        fileName="index.html"
-        code="<!DOCTYPE html>
-<html lang=\"en\">
-<head>
-    <meta charset=\"UTF-8\">
-    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
-    <title>My Dim App</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            min-height: 100vh;
-        }
-        
-        #app {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-    </style>
-</head>
-<body>
-    <div id=\"app\">
-        <h1>Loading...</h1>
-    </div>
-    
-    <script type=\"module\" src=\"src/app.js\"></script>
-</body>
-</html>"
-      ></code-block>
-
-      <h3>Initial JavaScript Setup</h3>
-      <p>Set up your main JavaScript file with the Dim imports:</p>
-
-      <code-block
-        title="Application Entry Point"
-        fileName="src/app.js"
-        code="// Import Dim framework functions
-import { html, css, define, useState, useStyle } from './path/to/dim.ts';
-
-console.log('Dim app starting...');
-
-// We'll add our first component in the next step!"
-      ></code-block>
-
-      <p><strong>Next:</strong> Now that we have our project structure, let's create our first component!</p>
     </div>
   `;
 };
 
-// Step 2: First Component
-const FirstComponentStep = (_, { html, css, useStyle, useScope }) => {
-  useScope({
-    'code-block': CodeBlock,
-    'live-preview': LivePreview
-  });
-
-  // Sample component for demo
-  const HelloWorld = (_, { html, css, useStyle }) => {
-    useStyle(css`
-      .hello-world {
-        background: white;
-        padding: 2rem;
-        border-radius: 8px;
-        text-align: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      }
-      
-      .hello-title {
-        color: #667eea;
-        font-size: 1.5rem;
-        margin-bottom: 0.5rem;
-      }
-    `);
-
-    return html`
-      <div class="hello-world">
-        <h1 class="hello-title">Hello, Dim! 👋</h1>
-        <p>This is my first component!</p>
-      </div>
-    `;
-  };
-
-  useStyle(css`
-    .step-content {
-      background: white;
-      border-radius: 12px;
-      padding: 2rem;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-  `);
-
-  return html`
-    <div class="step-content">
-      <h2>🧩 Step 2: Your First Component</h2>
-      
-      <p>Let's create a simple "Hello World" component to understand the basics of Dim components.</p>
-
-      <h3>Component Structure</h3>
-      <p>Dim components are functions that return HTML templates using the <code>html</code> tagged template literal:</p>
-
-      <code-block
-        title="Basic Component"
-        fileName="src/app.js"
-        code="import { html, css, define, useStyle } from './path/to/dim.ts';
-
-// Our first component
-const HelloWorld = (_, { html, css, useStyle }) => {
-  // Add scoped styles
-  useStyle(css\`
-    .hello-world {
-      background: white;
-      padding: 2rem;
-      border-radius: 8px;
-      text-align: center;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .hello-title {
-      color: #667eea;
-      font-size: 1.5rem;
-      margin-bottom: 0.5rem;
-    }
-    
-    .hello-subtitle {
-      color: #6c757d;
-    }
-  \`);
-
-  // Return the component template
-  return html\`
-    <div class=\"hello-world\">
-      <h1 class=\"hello-title\">Hello, Dim! 👋</h1>
-      <p class=\"hello-subtitle\">This is my first component!</p>
-    </div>
-  \`;
-};"
-      ></code-block>
-
-      <h3>Register the Component</h3>
-      <p>To use your component, you need to register it with a custom HTML tag:</p>
-
-      <code-block
-        title="Component Registration"
-        fileName="src/app.js"
-        code="// Register the component
-define({ tag: 'hello-world', component: HelloWorld });
-
-// Add it to the page
-document.getElementById('app').innerHTML = '<hello-world></hello-world>';
-
-console.log('Hello World component loaded!');"
-      ></code-block>
-
-      <h3>Live Example</h3>
-      <p>Here's how your component will look:</p>
-
-      <live-preview>
-        ${html`<hello-world></hello-world>`}
-      </live-preview>
-
-      <h3>Key Concepts</h3>
-      <ul>
-        <li><strong>Function Components:</strong> Components are just functions</li>
-        <li><strong>Template Literals:</strong> Use <code>html\`...\`</code> for templates</li>
-        <li><strong>Scoped Styles:</strong> <code>useStyle(css\`...\`)</code> adds component-specific CSS</li>
-        <li><strong>Registration:</strong> <code>define()</code> creates custom HTML elements</li>
-      </ul>
-
-      <p><strong>Next:</strong> Let's add interactive state to make our component dynamic!</p>
-    </div>
-  `;
-};
-
-// Tutorial Main Component
-const Tutorial = (_, { useState, html, css, useStyle, useScope }) => {
-  const [currentStep, setCurrentStep] = useState('setup');
-
-  useScope({
-    'tutorial-nav': TutorialNav,
-    'setup-step': SetupStep,
-    'first-component-step': FirstComponentStep,
-    'hello-world': () => {
-      const HelloWorld = (_, { html, css, useStyle }) => {
-        useStyle(css`
-          .hello-world {
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          }
-          
-          .hello-title {
-            color: #667eea;
-            font-size: 1.5rem;
-            margin-bottom: 0.5rem;
-          }
-        `);
-
-        return html`
-          <div class="hello-world">
-            <h1 class="hello-title">Hello, Dim! 👋</h1>
-            <p>This is my first component!</p>
-          </div>
-        `;
-      };
-      return HelloWorld;
-    }
-  });
-
-  useStyle(css`
-    .tutorial {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 2rem;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-    
-    .tutorial-header {
-      text-align: center;
-      margin-bottom: 3rem;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 3rem 2rem;
-      border-radius: 16px;
-    }
-    
-    .tutorial-title {
-      font-size: 2.5rem;
-      font-weight: bold;
-      margin-bottom: 1rem;
-    }
-    
-    .tutorial-subtitle {
-      font-size: 1.125rem;
-      opacity: 0.9;
-      max-width: 600px;
-      margin: 0 auto;
-    }
-  `);
-
-  const renderStep = () => {
-    switch(currentStep) {
-      case 'setup':
-        return html`<setup-step></setup-step>`;
-      case 'first-component':
-        return html`<first-component-step></first-component-step>`;
-      default:
-        return html`<setup-step></setup-step>`;
-    }
-  };
-
-  return html`
-    <div class="tutorial">
-      <div class="tutorial-header">
-        <h1 class="tutorial-title">📚 Build a Todo App</h1>
-        <p class="tutorial-subtitle">
-          A comprehensive step-by-step tutorial to learn Dim by building a real application
-        </p>
-      </div>
-      
-      <tutorial-nav 
-        currentStep="${currentStep}"
-        onStepChange="${setCurrentStep}"
-      ></tutorial-nav>
-      
-      ${renderStep()}
-    </div>
-  `;
-};
-
-// Register all components
-define({ tag: 'tutorial-nav', component: TutorialNav });
-define({ tag: 'code-block', component: CodeBlock });
-define({ tag: 'live-preview', component: LivePreview });
-define({ tag: 'setup-step', component: SetupStep });
-define({ tag: 'first-component-step', component: FirstComponentStep });
-define({ tag: 'hello-world', component: () => {
-  const HelloWorld = (_, { html, css, useStyle }) => {
-    useStyle(css`
-      .hello-world {
-        background: white;
-        padding: 2rem;
-        border-radius: 8px;
-        text-align: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      }
-      
-      .hello-title {
-        color: #667eea;
-        font-size: 1.5rem;
-        margin-bottom: 0.5rem;
-      }
-    `);
-
-    return html`
-      <div class="hello-world">
-        <h1 class="hello-title">Hello, Dim! 👋</h1>
-        <p>This is my first component!</p>
-      </div>
-    `;
-  };
-  return HelloWorld;
-} });
-define({ tag: 'tutorial', component: Tutorial });
+// Define components
+define({ tag: 'tutorial-step', component: TutorialStep });
+define({ tag: 'counter-demo', component: CounterDemo });
+define({ tag: 'todo-demo', component: TodoDemo });
+define({ tag: 'interactive-tutorial', component: InteractiveTutorial });
+define({ tag: 'quick-start-guide', component: QuickStartGuide });
 
 export default {
-  title: "Step-by-Step Tutorial",
+  title: "Tutorial",
   parameters: {
-    layout: "fullscreen",
+    layout: "centered",
     docs: {
       description: {
         component: `
-# Step-by-Step Tutorial: Build a Todo App
+Learn Dim through hands-on tutorials and interactive examples.
 
-Learn Dim by building a complete todo application from scratch. This hands-on tutorial covers all the essential concepts through practical examples.
+## 🎯 Learning Paths
 
-## What You'll Build
+### Quick Start (5 minutes)
+Perfect for getting a taste of Dim. Learn the basics and build your first component.
 
-A fully functional todo application featuring:
-- ✅ Add, edit, and delete todos
-- 🎨 Beautiful responsive design
-- 💾 Persistent data storage
-- 🔄 Real-time updates
-- 📱 Mobile-friendly interface
+### Interactive Tutorial (30 minutes)
+Step-by-step guide that teaches core concepts through building progressively complex components.
 
-## Tutorial Structure
+### Build a Todo App (2 hours)
+Comprehensive tutorial that covers all aspects of Dim by building a complete application.
 
-### Foundation (Steps 1-4)
-1. **Setup**: Project structure and environment
-2. **First Component**: Basic component creation
-3. **Adding State**: Interactive state management
-4. **Styling**: Scoped CSS and design systems
+## 📚 What You'll Learn
 
-### Building Features (Steps 5-8)
-5. **Side Effects**: useEffect and lifecycle management
-6. **Todo App**: Core application functionality
-7. **Persistence**: Data storage with useStore
-8. **Deployment**: Publishing your application
+### Fundamentals
+\`\`\`javascript
+// Creating components
+const MyComponent = (props, { html }) => {
+  return html\`<div>Hello!</div>\`;
+};
 
-## Learning Approach
+// Using hooks for state
+const [value, setValue] = useState(0);
 
-- **Progressive**: Each step builds on the previous one
-- **Interactive**: Live code examples and demos
-- **Practical**: Real-world patterns and best practices
-- **Complete**: From setup to deployment
+// Adding scoped styles
+useStyle(css\`
+  .my-class { color: blue; }
+\`);
+\`\`\`
 
-Perfect for developers who learn best by building!
+### Advanced Concepts
+- Component composition with \`useScope\`
+- Side effects with \`useEffect\`
+- Performance optimization with \`useMemo\`
+- Global state with \`useStore\`
+
+## 🛠️ Prerequisites
+
+- Basic HTML/CSS/JavaScript knowledge
+- Familiarity with ES6+ syntax
+- Understanding of component-based architecture (helpful but not required)
+
+## 🚀 Getting Started
+
+Choose your learning path above and start building with Dim today!
         `
+      }
+    }
+  },
+  tags: ["autodocs"],
+};
+
+export const QuickStart = {
+  render: () => <quick-start-guide />,
+  name: "Quick Start Guide",
+  parameters: {
+    docs: {
+      description: {
+        story: "Get up and running with Dim in under 5 minutes. Perfect for developers who want to quickly try out the framework."
       }
     }
   }
 };
 
-export const BuildTodoApp = {
-  render: wrapLitHtmlStory(() => html`<tutorial></tutorial>`),
-  name: "Build a Todo App",
+export const StepByStep = {
+  render: () => <interactive-tutorial />,
+  name: "Interactive Tutorial",
   parameters: {
     docs: {
       description: {
-        story: `
-### Complete Step-by-Step Tutorial
-
-This interactive tutorial guides you through building a complete todo application using Dim. Each step includes:
-
-**📝 Clear Instructions**
-- Step-by-step guidance with explanations
-- Code examples with syntax highlighting
-- Best practices and common patterns
-
-**🎮 Interactive Elements**
-- Live previews of each component
-- Navigation between tutorial steps
-- Hands-on coding exercises
-
-**🎯 Progressive Learning**
-- Starts with basic concepts
-- Gradually introduces advanced features
-- Builds a real, functional application
-
-**🔧 Practical Skills**
-- Component architecture
-- State management patterns
-- Styling best practices
-- Data persistence
-- Application deployment
-
-Use the navigation at the top to jump between steps or follow along sequentially for the best learning experience!
-        `
+        story: "Learn Dim concepts step-by-step with live code examples and interactive demos. Great for understanding core concepts."
       }
     }
   }

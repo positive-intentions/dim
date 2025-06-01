@@ -1,301 +1,375 @@
 import React from "react";
-import { html, css, define, useState, useEffect, useMemo, useRef, useStyle, useScope, useStore } from "../core/dim.ts";
-import { wrapLitHtmlStory } from "../core/storybook-utils.js";
+import { define, html, css, useState, useEffect, useStyle, useScope } from "../core/dim.ts";
 
-// Example Card Component
-const ExampleCard = ({ title, description, difficulty, tags, demoComponent, codeComponent }, { html, css, useStyle, useScope }) => {
-  useScope({
-    'demo-component': demoComponent,
-    'code-component': codeComponent
-  });
+// Counter Example Component
+const CounterExample = (props, { useState, html, css, useStyle }) => {
+  const [count, setCount] = useState(0);
+  const [step, setStep] = useState(1);
 
   useStyle(css`
-    .example-card {
+    .counter-example {
       background: white;
       border-radius: 12px;
-      overflow: hidden;
+      padding: 2rem;
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    .counter-display {
+      text-align: center;
       margin-bottom: 2rem;
-      transition: transform 0.2s;
     }
-    
-    .example-card:hover {
+
+    .count-value {
+      font-size: 4rem;
+      font-weight: bold;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 1rem 0;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    button {
+      background-color: #029cfd;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      padding: 12px 24px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    button:hover {
+      background-color: #0278c7;
       transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
     }
-    
-    .card-header {
-      padding: 1.5rem;
-      border-bottom: 1px solid #e9ecef;
+
+    button:active {
+      transform: translateY(0);
     }
-    
-    .card-title {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: #495057;
+
+    .reset-button {
+      background-color: #6c757d;
+    }
+
+    .reset-button:hover {
+      background-color: #5a6268;
+    }
+
+    .step-control {
+      background: #f8f9fa;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+    }
+
+    .step-label {
+      font-size: 0.875rem;
+      color: #6c757d;
       margin-bottom: 0.5rem;
     }
-    
-    .card-description {
-      color: #6c757d;
-      margin-bottom: 1rem;
-      line-height: 1.5;
+
+    .step-input {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 1rem;
     }
-    
-    .card-meta {
-      display: flex;
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
       gap: 1rem;
-      align-items: center;
+      margin-top: 2rem;
     }
-    
-    .difficulty {
-      padding: 0.25rem 0.75rem;
-      border-radius: 12px;
+
+    .stat-card {
+      background: #f8f9fa;
+      padding: 1rem;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-label {
       font-size: 0.75rem;
-      font-weight: 500;
+      color: #6c757d;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
-    
-    .difficulty.beginner {
-      background: #d4edda;
-      color: #155724;
+
+    .stat-value {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #333;
+      margin-top: 0.25rem;
     }
-    
-    .difficulty.intermediate {
-      background: #fff3cd;
-      color: #856404;
+  `);
+
+  return html`
+    <div class="counter-example">
+      <div class="counter-display">
+        <h3>Advanced Counter</h3>
+        <div class="count-value">${count}</div>
+      </div>
+
+      <div class="controls">
+        <button @click="${() => setCount(count - step)}">
+          <span>−</span>
+          <span>Decrease</span>
+        </button>
+        <button class="reset-button" @click="${() => setCount(0)}">
+          <span>⟲</span>
+          <span>Reset</span>
+        </button>
+        <button @click="${() => setCount(count + step)}">
+          <span>+</span>
+          <span>Increase</span>
+        </button>
+      </div>
+
+      <div class="step-control">
+        <div class="step-label">Step Size</div>
+        <input 
+          type="number"
+          class="step-input"
+          .value="${step}"
+          @input="${(e) => setStep(parseInt(e.target.value) || 1)}"
+          min="1"
+          max="100"
+        />
+      </div>
+
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-label">Current</div>
+          <div class="stat-value">${count}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Step</div>
+          <div class="stat-value">${step}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Next</div>
+          <div class="stat-value">${count + step}</div>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+// Todo List Example Component
+const TodoListExample = (props, { useState, useEffect, html, css, useStyle }) => {
+  const [todos, setTodos] = useState([
+    { id: 1, text: 'Learn Dim basics', completed: true },
+    { id: 2, text: 'Build a component', completed: false },
+    { id: 3, text: 'Master hooks', completed: false }
+  ]);
+  const [inputText, setInputText] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [stats, setStats] = useState({ total: 0, completed: 0, pending: 0 });
+
+  useEffect(() => {
+    const total = todos.length;
+    const completed = todos.filter(t => t.completed).length;
+    const pending = total - completed;
+    setStats({ total, completed, pending });
+  }, [todos]);
+
+  useStyle(css`
+    .todo-example {
+      background: white;
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      max-width: 600px;
+      margin: 0 auto;
     }
-    
-    .difficulty.advanced {
-      background: #f8d7da;
-      color: #721c24;
-    }
-    
-    .tags {
-      display: flex;
-      gap: 0.5rem;
-    }
-    
-    .tag {
-      background: #e7f3ff;
-      color: #0056b3;
-      padding: 0.2rem 0.5rem;
-      border-radius: 8px;
-      font-size: 0.75rem;
-    }
-    
-    .card-content {
-      padding: 1.5rem;
-    }
-    
-    .demo-section {
+
+    .todo-header {
       margin-bottom: 2rem;
     }
-    
-    .section-title {
-      font-weight: 600;
-      color: #495057;
+
+    .todo-title {
+      font-size: 1.5rem;
+      color: #333;
       margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 2px solid #667eea;
     }
-  `);
 
-  return html`
-    <div class="example-card">
-      <div class="card-header">
-        <h3 class="card-title">${title}</h3>
-        <p class="card-description">${description}</p>
-        <div class="card-meta">
-          <span class="difficulty ${difficulty}">${difficulty}</span>
-          <div class="tags">
-            ${tags.map(tag => html`<span class="tag">${tag}</span>`)}
-          </div>
-        </div>
-      </div>
-      <div class="card-content">
-        <div class="demo-section">
-          <h4 class="section-title">🎮 Interactive Demo</h4>
-          <demo-component></demo-component>
-        </div>
-        <div class="code-section">
-          <h4 class="section-title">💻 Source Code</h4>
-          <code-component></code-component>
-        </div>
-      </div>
-    </div>
-  `;
-};
-
-// Code Display Component
-const CodeDisplay = ({ code, fileName }, { html, css, useStyle }) => {
-  useStyle(css`
-    .code-display {
-      background: #1e1e1e;
-      color: #d4d4d4;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid #e9ecef;
+    .todo-stats {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
     }
-    
-    .code-header {
-      background: #2d2d30;
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid #3e3e42;
-      font-size: 0.875rem;
-      font-family: 'Consolas', monospace;
-    }
-    
-    .code-content {
-      padding: 1rem;
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-      font-size: 0.875rem;
-      line-height: 1.6;
-      overflow-x: auto;
-    }
-    
-    .keyword { color: #569cd6; }
-    .string { color: #ce9178; }
-    .comment { color: #6a9955; }
-    .function { color: #dcdcaa; }
-    .property { color: #9cdcfe; }
-    .number { color: #b5cea8; }
-  `);
 
-  const highlightCode = (code) => {
-    return code
-      .replace(/\/\/.*$/gm, '<span class="comment">$&</span>')
-      .replace(/\b(const|let|var|function|return|import|export|from)\b/g, '<span class="keyword">$1</span>')
-      .replace(/\b(useState|useEffect|useStyle|html|css)\b/g, '<span class="function">$1</span>')
-      .replace(/'[^']*'|"[^"]*"|`[^`]*`/g, '<span class="string">$&</span>')
-      .replace(/\b\d+\b/g, '<span class="number">$&</span>');
-  };
-
-  return html`
-    <div class="code-display">
-      <div class="code-header">${fileName}</div>
-      <div class="code-content">
-        <pre .innerHTML="${highlightCode(code)}"></pre>
-      </div>
-    </div>
-  `;
-};
-
-// Example 1: Interactive Counter
-const CounterDemo = (_, { useState, html, css, useStyle }) => {
-  const [count, setCount] = useState(0);
-
-  useStyle(css`
-    .counter-demo {
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white;
-      padding: 2rem;
+    .stat {
+      flex: 1;
+      padding: 0.75rem;
+      background: #f8f9fa;
       border-radius: 8px;
       text-align: center;
     }
-    
-    .count-display {
-      font-size: 3rem;
+
+    .stat-number {
+      font-size: 1.5rem;
       font-weight: bold;
-      margin: 1rem 0;
+      color: #029cfd;
     }
-    
-    .counter-btn {
-      background: rgba(255,255,255,0.2);
-      color: white;
-      border: 2px solid rgba(255,255,255,0.3);
-      padding: 0.75rem 1.5rem;
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: #6c757d;
+      text-transform: uppercase;
+    }
+
+    .todo-input-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .todo-input {
+      flex: 1;
+      padding: 0.75rem;
+      border: 2px solid #e9ecef;
       border-radius: 8px;
-      cursor: pointer;
-      margin: 0.5rem;
       font-size: 1rem;
-      transition: all 0.2s;
+      transition: border-color 0.2s;
     }
-    
-    .counter-btn:hover {
-      background: rgba(255,255,255,0.3);
-      transform: translateY(-1px);
+
+    .todo-input:focus {
+      outline: none;
+      border-color: #029cfd;
     }
-  `);
 
-  return html`
-    <div class="counter-demo">
-      <h3>Interactive Counter</h3>
-      <div class="count-display">${count}</div>
-      <button class="counter-btn" @click="${() => setCount(count - 1)}">-</button>
-      <button class="counter-btn" @click="${() => setCount(0)}">Reset</button>
-      <button class="counter-btn" @click="${() => setCount(count + 1)}">+</button>
-    </div>
-  `;
-};
-
-const CounterCode = (_, { useScope }) => {
-  useScope({ 'code-display': CodeDisplay });
-
-  return html`
-    <code-display
-      fileName="counter.js"
-      code="const Counter = (_, { useState, html, css, useStyle }) => {
-  const [count, setCount] = useState(0);
-
-  useStyle(css\`
-    .counter-demo {
-      background: linear-gradient(135deg, #667eea, #764ba2);
+    .add-button {
+      background: #029cfd;
       color: white;
-      padding: 2rem;
-      border-radius: 8px;
-      text-align: center;
-    }
-    
-    .count-display {
-      font-size: 3rem;
-      font-weight: bold;
-      margin: 1rem 0;
-    }
-    
-    .counter-btn {
-      background: rgba(255,255,255,0.2);
-      color: white;
-      border: 2px solid rgba(255,255,255,0.3);
+      border: none;
       padding: 0.75rem 1.5rem;
       border-radius: 8px;
       cursor: pointer;
-      margin: 0.5rem;
+      font-size: 1rem;
+      transition: background-color 0.2s;
+    }
+
+    .add-button:hover {
+      background: #0278c7;
+    }
+
+    .filter-buttons {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .filter-button {
+      flex: 1;
+      padding: 0.5rem;
+      border: 2px solid #e9ecef;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.875rem;
       transition: all 0.2s;
     }
-  \`);
 
-  return html\`
-    <div class=\"counter-demo\">
-      <h3>Interactive Counter</h3>
-      <div class=\"count-display\">\${count}</div>
-      <button class=\"counter-btn\" @click=\"\${() => setCount(count - 1)}\">-</button>
-      <button class=\"counter-btn\" @click=\"\${() => setCount(0)}\">Reset</button>
-      <button class=\"counter-btn\" @click=\"\${() => setCount(count + 1)}\">+</button>
-    </div>
-  \`;
-};"
-    ></code-display>
-  `;
-};
+    .filter-button.active {
+      background: #029cfd;
+      color: white;
+      border-color: #029cfd;
+    }
 
-// Example 2: Todo List
-const TodoDemo = (_, { useState, html, css, useStyle }) => {
-  const [todos, setTodos] = useState([
-    { id: 1, text: 'Learn Dim framework', completed: false },
-    { id: 2, text: 'Build a todo app', completed: true }
-  ]);
-  const [newTodo, setNewTodo] = useState('');
+    .todo-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .todo-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem;
+      background: #f8f9fa;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      transition: all 0.2s;
+    }
+
+    .todo-item:hover {
+      background: #e9ecef;
+    }
+
+    .todo-checkbox {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    .todo-text {
+      flex: 1;
+      color: #333;
+      transition: all 0.2s;
+    }
+
+    .todo-text.completed {
+      text-decoration: line-through;
+      color: #6c757d;
+    }
+
+    .delete-button {
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: all 0.2s;
+    }
+
+    .todo-item:hover .delete-button {
+      opacity: 1;
+    }
+
+    .delete-button:hover {
+      background: #c82333;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: #6c757d;
+    }
+
+    .empty-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+  `);
 
   const addTodo = () => {
-    if (newTodo.trim()) {
+    if (inputText.trim()) {
       setTodos([...todos, {
         id: Date.now(),
-        text: newTodo.trim(),
+        text: inputText.trim(),
         completed: false
       }]);
-      setNewTodo('');
+      setInputText('');
     }
   };
 
@@ -309,335 +383,360 @@ const TodoDemo = (_, { useState, html, css, useStyle }) => {
     setTodos(todos.filter(todo => todo.id !== id));
   };
 
-  useStyle(css`
-    .todo-demo {
-      background: white;
-      border-radius: 8px;
-      padding: 1.5rem;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .todo-input-row {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-    }
-    
-    .todo-input {
-      flex: 1;
-      padding: 0.75rem;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-    
-    .add-btn {
-      background: #28a745;
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    
-    .todo-item {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.75rem;
-      border: 1px solid #e9ecef;
-      border-radius: 4px;
-      margin-bottom: 0.5rem;
-    }
-    
-    .todo-text {
-      flex: 1;
-      transition: all 0.2s;
-    }
-    
-    .todo-text.completed {
-      text-decoration: line-through;
-      opacity: 0.6;
-    }
-    
-    .delete-btn {
-      background: #dc3545;
-      color: white;
-      border: none;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.75rem;
-    }
-  `);
-
-  return html`
-    <div class="todo-demo">
-      <h3>Todo List</h3>
-      <div class="todo-input-row">
-        <input 
-          class="todo-input"
-          .value="${newTodo}"
-          @input="${(e) => setNewTodo(e.target.value)}"
-          @keypress="${(e) => e.key === 'Enter' && addTodo()}"
-          placeholder="Add a new todo..."
-        />
-        <button class="add-btn" @click="${addTodo}">Add</button>
-      </div>
-      
-      ${todos.map(todo => html`
-        <div class="todo-item">
-          <input 
-            type="checkbox"
-            .checked="${todo.completed}"
-            @change="${() => toggleTodo(todo.id)}"
-          />
-          <span class="todo-text ${todo.completed ? 'completed' : ''}">${todo.text}</span>
-          <button class="delete-btn" @click="${() => deleteTodo(todo.id)}">Delete</button>
-        </div>
-      `)}
-    </div>
-  `;
-};
-
-const TodoCode = (_, { useScope }) => {
-  useScope({ 'code-display': CodeDisplay });
-
-  return html`
-    <code-display
-      fileName="todo-list.js"
-      code="const TodoList = (_, { useState, html, css, useStyle }) => {
-  const [todos, setTodos] = useState([
-    { id: 1, text: 'Learn Dim framework', completed: false }
-  ]);
-  const [newTodo, setNewTodo] = useState('');
-
-  const addTodo = () => {
-    if (newTodo.trim()) {
-      setTodos([...todos, {
-        id: Date.now(),
-        text: newTodo.trim(),
-        completed: false
-      }]);
-      setNewTodo('');
-    }
-  };
-
-  const toggleTodo = (id) => {
-    setTodos(todos.map(todo =>
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    ));
-  };
-
-  useStyle(css\`
-    .todo-demo {
-      background: white;
-      border-radius: 8px;
-      padding: 1.5rem;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .todo-input {
-      flex: 1;
-      padding: 0.75rem;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-    
-    .todo-item {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.75rem;
-      border: 1px solid #e9ecef;
-      border-radius: 4px;
-      margin-bottom: 0.5rem;
-    }
-  \`);
-
-  return html\`
-    <div class=\"todo-demo\">
-      <div class=\"todo-input-row\">
-        <input 
-          class=\"todo-input\"
-          .value=\"\${newTodo}\"
-          @input=\"\${(e) => setNewTodo(e.target.value)}\"
-          placeholder=\"Add a new todo...\"
-        />
-        <button @click=\"\${addTodo}\">Add</button>
-      </div>
-      
-      \${todos.map(todo => html\`
-        <div class=\"todo-item\">
-          <input 
-            type=\"checkbox\"
-            .checked=\"\${todo.completed}\"
-            @change=\"\${() => toggleTodo(todo.id)}\"
-          />
-          <span class=\"todo-text\">\${todo.text}</span>
-        </div>
-      \`)}
-    </div>
-  \`;
-};"
-    ></code-display>
-  `;
-};
-
-// Main Examples Component
-const Examples = (_, { html, css, useStyle, useScope }) => {
-  useScope({
-    'example-card': ExampleCard,
-    'counter-demo': CounterDemo,
-    'counter-code': CounterCode,
-    'todo-demo': TodoDemo,
-    'todo-code': TodoCode
+  const filteredTodos = todos.filter(todo => {
+    if (filter === 'active') return !todo.completed;
+    if (filter === 'completed') return todo.completed;
+    return true;
   });
 
-  useStyle(css`
-    .examples {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 2rem;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-    
-    .examples-header {
-      text-align: center;
-      margin-bottom: 3rem;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 3rem 2rem;
-      border-radius: 16px;
-    }
-    
-    .examples-title {
-      font-size: 2.5rem;
-      font-weight: bold;
-      margin-bottom: 1rem;
-    }
-    
-    .examples-subtitle {
-      font-size: 1.125rem;
-      opacity: 0.9;
-      max-width: 600px;
-      margin: 0 auto;
-    }
-  `);
-
   return html`
-    <div class="examples">
-      <div class="examples-header">
-        <h1 class="examples-title">🎯 Live Examples</h1>
-        <p class="examples-subtitle">
-          Interactive code examples showcasing real-world Dim patterns and techniques
-        </p>
+    <div class="todo-example">
+      <div class="todo-header">
+        <h3 class="todo-title">📝 Task Manager</h3>
+        
+        <div class="todo-stats">
+          <div class="stat">
+            <div class="stat-number">${stats.total}</div>
+            <div class="stat-label">Total</div>
+          </div>
+          <div class="stat">
+            <div class="stat-number">${stats.completed}</div>
+            <div class="stat-label">Done</div>
+          </div>
+          <div class="stat">
+            <div class="stat-number">${stats.pending}</div>
+            <div class="stat-label">Pending</div>
+          </div>
+        </div>
       </div>
-      
-      <example-card
-        title="Interactive Counter"
-        description="A simple counter demonstrating useState hook and event handling. Perfect for understanding reactive state management."
-        difficulty="beginner"
-        tags="${['useState', 'events', 'styling']}"
-        demoComponent="${CounterDemo}"
-        codeComponent="${CounterCode}"
-      ></example-card>
-      
-      <example-card
-        title="Todo List Application"
-        description="A fully functional todo list with add, toggle, and delete operations. Shows array state management and list rendering."
-        difficulty="intermediate"
-        tags="${['useState', 'arrays', 'forms', 'events']}"
-        demoComponent="${TodoDemo}"
-        codeComponent="${TodoCode}"
-      ></example-card>
+
+      <div class="todo-input-group">
+        <input 
+          type="text"
+          class="todo-input"
+          placeholder="What needs to be done?"
+          .value="${inputText}"
+          @input="${(e) => setInputText(e.target.value)}"
+          @keydown="${(e) => e.key === 'Enter' && addTodo()}"
+        />
+        <button class="add-button" @click="${addTodo}">Add Task</button>
+      </div>
+
+      <div class="filter-buttons">
+        <button 
+          class="filter-button ${filter === 'all' ? 'active' : ''}"
+          @click="${() => setFilter('all')}"
+        >
+          All (${todos.length})
+        </button>
+        <button 
+          class="filter-button ${filter === 'active' ? 'active' : ''}"
+          @click="${() => setFilter('active')}"
+        >
+          Active (${stats.pending})
+        </button>
+        <button 
+          class="filter-button ${filter === 'completed' ? 'active' : ''}"
+          @click="${() => setFilter('completed')}"
+        >
+          Completed (${stats.completed})
+        </button>
+      </div>
+
+      ${filteredTodos.length === 0 ? html`
+        <div class="empty-state">
+          <div class="empty-icon">📭</div>
+          <p>No tasks found</p>
+        </div>
+      ` : html`
+        <ul class="todo-list">
+          ${filteredTodos.map(todo => html`
+            <li class="todo-item">
+              <input 
+                type="checkbox"
+                class="todo-checkbox"
+                .checked="${todo.completed}"
+                @change="${() => toggleTodo(todo.id)}"
+              />
+              <span class="todo-text ${todo.completed ? 'completed' : ''}">${todo.text}</span>
+              <button class="delete-button" @click="${() => deleteTodo(todo.id)}">Delete</button>
+            </li>
+          `)}
+        </ul>
+      `}
     </div>
   `;
 };
 
-// Register components
-define({ tag: 'example-card', component: ExampleCard });
-define({ tag: 'code-display', component: CodeDisplay });
-define({ tag: 'counter-demo', component: CounterDemo });
-define({ tag: 'counter-code', component: CounterCode });
-define({ tag: 'todo-demo', component: TodoDemo });
-define({ tag: 'todo-code', component: TodoCode });
-define({ tag: 'examples', component: Examples });
+// Form Example Component
+const FormExample = (props, { useState, html, css, useStyle }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    message: ''
+  });
+  const [submitted, setSubmitted] = useState(false);
+
+  useStyle(css`
+    .form-example {
+      background: white;
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    .form-title {
+      font-size: 1.5rem;
+      color: #333;
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: #495057;
+      font-weight: 500;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #029cfd;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    .submit-button {
+      background: #029cfd;
+      color: white;
+      border: none;
+      padding: 0.75rem 2rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      width: 100%;
+    }
+
+    .submit-button:hover {
+      background: #0278c7;
+    }
+
+    .success-message {
+      background: #d4edda;
+      color: #155724;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+
+    .form-preview {
+      background: #f8f9fa;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+    }
+
+    .preview-title {
+      font-size: 0.875rem;
+      color: #6c757d;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+    }
+
+    .preview-content {
+      font-family: monospace;
+      font-size: 0.875rem;
+      white-space: pre-wrap;
+    }
+  `);
+
+  const handleInputChange = (field, value) => {
+    setFormData({ ...formData, [field]: value });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setSubmitted(true);
+    setTimeout(() => setSubmitted(false), 3000);
+  };
+
+  return html`
+    <div class="form-example">
+      <h3 class="form-title">📬 Contact Form</h3>
+      
+      ${submitted ? html`
+        <div class="success-message">
+          ✓ Form submitted successfully!
+        </div>
+      ` : ''}
+
+      <form @submit="${handleSubmit}">
+        <div class="form-group">
+          <label for="name">Name</label>
+          <input 
+            type="text"
+            id="name"
+            .value="${formData.name}"
+            @input="${(e) => handleInputChange('name', e.target.value)}"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input 
+            type="email"
+            id="email"
+            .value="${formData.email}"
+            @input="${(e) => handleInputChange('email', e.target.value)}"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="message">Message</label>
+          <textarea 
+            id="message"
+            .value="${formData.message}"
+            @input="${(e) => handleInputChange('message', e.target.value)}"
+            required
+          ></textarea>
+        </div>
+
+        <button type="submit" class="submit-button">Send Message</button>
+      </form>
+
+      <div class="form-preview">
+        <div class="preview-title">Form Data Preview</div>
+        <div class="preview-content">${JSON.stringify(formData, null, 2)}</div>
+      </div>
+    </div>
+  `;
+};
+
+// Define components
+define({ tag: 'counter-example', component: CounterExample });
+define({ tag: 'todo-list-example', component: TodoListExample });
+define({ tag: 'form-example', component: FormExample });
 
 export default {
   title: "Examples",
   parameters: {
-    layout: "fullscreen",
+    layout: "centered",
     docs: {
       description: {
         component: `
-# Live Examples
+Interactive examples demonstrating real-world Dim patterns and best practices.
 
-Explore real-world Dim patterns through interactive examples. Each example includes a live demo and complete source code.
+## 🎯 Example Categories
 
-## Example Categories
+### Basic Examples
+Learn fundamental concepts through simple, focused examples:
+- **Counter**: State management and event handling
+- **Forms**: Controlled inputs and form submission
+- **Toggle**: Conditional rendering patterns
 
-### 🟢 Beginner Examples
-- **Counter**: Basic state management and events
-- **Form Input**: Controlled components and user input
-- **Toggle Components**: Conditional rendering patterns
-
-### 🟡 Intermediate Examples  
-- **Todo List**: CRUD operations and array state
+### Intermediate Examples
+Build more complex interactions:
+- **Todo List**: CRUD operations with arrays
 - **Shopping Cart**: Complex state management
-- **Data Fetching**: API integration with useEffect
+- **Data Tables**: Sorting and filtering
 
-### 🔴 Advanced Examples
-- **Real-time Chat**: WebSocket integration
-- **Dashboard**: Complex component composition
-- **State Management**: Advanced patterns with useStore
+### Advanced Examples
+Master advanced patterns:
+- **Real-time Updates**: WebSocket integration
+- **State Persistence**: Using useStore
+- **Component Composition**: Building complex UIs
 
-## Learning Benefits
+## 💡 Learning Tips
 
-- **Interactive**: Try the code immediately
-- **Complete**: Full source code included
-- **Progressive**: Examples build in complexity
-- **Practical**: Real-world application patterns
+### For Each Example:
+1. **Try It**: Interact with the live demo
+2. **Read Code**: Study the implementation
+3. **Modify**: Try changing the code
+4. **Apply**: Use patterns in your projects
 
-Each example is self-contained and can be copied directly into your projects!
+### Code Patterns
+
+\`\`\`javascript
+// State Management
+const [value, setValue] = useState(initialValue);
+
+// Event Handling
+@click="\${() => handleClick()}"
+
+// Conditional Rendering
+\${condition ? html\`<div>True</div>\` : html\`<div>False</div>\`}
+
+// List Rendering
+\${items.map(item => html\`<li>\${item}</li>\`)}
+\`\`\`
+
+## 🚀 Best Practices
+
+1. **Keep State Local**: Only lift state when needed
+2. **Use Semantic HTML**: Accessibility matters
+3. **Optimize Renders**: Use keys in lists
+4. **Handle Edge Cases**: Empty states, loading, errors
+5. **Style Scoping**: Leverage Shadow DOM isolation
         `
+      }
+    }
+  },
+  tags: ["autodocs"],
+};
+
+export const Counter = {
+  render: () => <counter-example />,
+  name: "Counter with Step Control",
+  parameters: {
+    docs: {
+      description: {
+        story: "An advanced counter demonstrating state management, computed values, and dynamic step control."
       }
     }
   }
 };
 
-export const LiveDemos = {
-  render: wrapLitHtmlStory(() => html`<examples></examples>`),
-  name: "Interactive Demos",
+export const TodoList = {
+  render: () => <todo-list-example />,
+  name: "Todo List with Filters",
   parameters: {
     docs: {
       description: {
-        story: `
-### Interactive Code Examples
+        story: "A feature-rich todo list with add, toggle, delete, and filtering capabilities. Shows array state management and computed statistics."
+      }
+    }
+  }
+};
 
-Explore Dim through hands-on examples that you can interact with immediately. Each example demonstrates key concepts:
-
-**🎮 Live Interaction**
-- Try the examples directly in your browser
-- See how state changes affect the UI in real-time
-- Experiment with different inputs and interactions
-
-**💻 Complete Source Code**
-- Full, runnable code for each example
-- Syntax highlighting for better readability
-- Copy-paste ready for your own projects
-
-**📚 Progressive Learning**
-- Examples range from beginner to advanced
-- Each builds on concepts from previous examples
-- Clear categorization by difficulty level
-
-**🏷️ Organized by Concepts**
-- Tagged by the hooks and patterns they demonstrate
-- Easy to find examples for specific techniques
-- Perfect for reference during development
-
-Start with the Counter example to understand basic state management, then progress to the Todo List for more complex interactions!
-        `
+export const ContactForm = {
+  render: () => <form-example />,
+  name: "Controlled Form",
+  parameters: {
+    docs: {
+      description: {
+        story: "A contact form demonstrating controlled inputs, form submission, and real-time data preview."
       }
     }
   }
