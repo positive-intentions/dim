@@ -34,11 +34,21 @@ class StorageManager {
 
 
     async writeValue(id, value) {
+        // Wait for database to be ready
+        if (!db) {
+            await this.openDatabase();
+        }
+        
         return new Promise((resolve, reject) => {
+            if (!db) {
+                reject("Database not available");
+                return;
+            }
+            
             let transaction = db.transaction([objectStoreName], "readwrite");
             let objectStore = transaction.objectStore(objectStoreName);
 
-            const valueAsBase64 = btoa(JSON.stringify({ payload: value }));
+            const valueAsBase64 = btoa(unescape(encodeURIComponent(JSON.stringify({ payload: value }))));
             let request = objectStore.put({ id: id, value: valueAsBase64 });
 
             request.onsuccess = function (event) {
@@ -52,14 +62,24 @@ class StorageManager {
     }
 
     async readValue(id, newState) {
+        // Wait for database to be ready
+        if (!db) {
+            await this.openDatabase();
+        }
+        
         return new Promise((resolve, reject) => {
+            if (!db) {
+                resolve(null);
+                return;
+            }
+            
             let transaction = db.transaction([objectStoreName], "readonly");
             let objectStore = transaction.objectStore(objectStoreName);
             let request = objectStore.get(id);
 
             request.onsuccess = function (event) {
                 if (request.result) {
-                    const value = JSON.parse(atob(request.result.value)).payload;
+                    const value = JSON.parse(decodeURIComponent(escape(atob(request.result.value)))).payload;
                     resolve({ value, newState });
                 } else {
                     resolve(null);

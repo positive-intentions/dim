@@ -590,7 +590,7 @@ const FoundationDemo = (_, { useState, useEffect, html, css, useStyle, useScope 
           <div style="text-align: center; padding: 3rem; background: white; border-radius: 8px;">
             <h2>Welcome to TaskFlow!</h2>
             <p>This is our main application layout with header, navigation, and footer.</p>
-            <app-button variant="primary" @click="${() => setModalOpen(true)}">
+            <app-button variant="primary" onClick="${() => setModalOpen(true)}">
               Open Sample Modal
             </app-button>
           </div>
@@ -603,7 +603,7 @@ const FoundationDemo = (_, { useState, useEffect, html, css, useStyle, useScope 
         >
           <div style="text-align: center; padding: 2rem;">
             <p>This modal demonstrates our reusable UI components in action!</p>
-            <app-button variant="success" @click="${() => setModalOpen(false)}">
+            <app-button variant="success" onClick="${() => setModalOpen(false)}">
               Great, got it!
             </app-button>
           </div>
@@ -646,7 +646,7 @@ const FoundationDemo = (_, { useState, useEffect, html, css, useStyle, useScope 
           
           <div class="showcase-item">
             <div class="showcase-title">Interactive</div>
-            <app-button variant="primary" size="small" @click="${() => alert('Button clicked!')}">
+            <app-button variant="primary" size="small" onClick="${() => alert('Button clicked!')}">
               Click me!
             </app-button>
             <br><br>
@@ -725,9 +725,9 @@ const FoundationDemo = (_, { useState, useEffect, html, css, useStyle, useScope 
         <div class="nav-buttons">
           ${Object.keys(demos).map(key => html`
             <app-button 
-              variant="${demoStep === key ? 'primary' : 'outline'}" 
+              variant="${demoStep === key ? 'primary' : 'outline'}"
               size="small"
-              @click="${() => setDemoStep(key)}"
+              onClick="${() => setDemoStep(key)}"
             >
               ${demos[key].title}
             </app-button>

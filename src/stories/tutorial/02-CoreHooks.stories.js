@@ -8,6 +8,11 @@ const UseStateDemo = (_, { useState, html, css, useStyle }) => {
   const [name, setName] = useState('');
   const [isVisible, setIsVisible] = useState(true);
   
+  // Event handlers
+  const toggleVisibility = () => setIsVisible(!isVisible);
+  const showBox = () => setIsVisible(true);
+  const hideBox = () => setIsVisible(false);
+  
   useStyle(css`
     .usestate-demo {
       padding: 2rem;
@@ -82,13 +87,17 @@ const UseStateDemo = (_, { useState, html, css, useStyle }) => {
       justify-content: center;
       color: white;
       font-weight: bold;
-      transition: all 0.3s;
+      transition: all 0.3s ease;
       margin: 1rem 0;
+      opacity: 1;
+      transform: scale(1);
+      visibility: visible;
     }
     
     .animated-box.hidden {
       opacity: 0;
       transform: scale(0.8);
+      visibility: hidden;
     }
   `);
   
@@ -127,13 +136,13 @@ const UseStateDemo = (_, { useState, html, css, useStyle }) => {
         <h4>✨ Boolean State</h4>
         <p>Toggle visibility with boolean state</p>
         <div class="state-display">Visible: ${isVisible}</div>
-        <div class="animated-box ${isVisible ? '' : 'hidden'}">
-          ${isVisible ? 'Visible!' : 'Hidden'}
+        <div class="animated-box${isVisible ? '' : ' hidden'}">
+          Visible!
         </div>
         <div class="controls">
-          <button @click="${() => setIsVisible(!isVisible)}">Toggle Visibility</button>
-          <button class="secondary" @click="${() => setIsVisible(true)}">Show</button>
-          <button class="secondary" @click="${() => setIsVisible(false)}">Hide</button>
+          <button @click="${toggleVisibility}">Toggle Visibility</button>
+          <button class="secondary" @click="${showBox}">Show</button>
+          <button class="secondary" @click="${hideBox}">Hide</button>
         </div>
       </div>
     </div>
