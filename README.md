@@ -53,18 +53,18 @@ Dim is a lightweight framework that brings React's component model and hooks to 
 ### Quick Example
 
 ```javascript
-import { html, css, define, useState, useStyle } from '@dim/core';
+import { html, css, define, useState, useStyle } from "@dim/core";
 
 // Create a component
 const Counter = (props, { useState, html, css, useStyle }) => {
   const [count, setCount] = useState(0);
-  
+
   useStyle(css`
     .counter {
       padding: 2rem;
       text-align: center;
     }
-    
+
     button {
       background: #029cfd;
       color: white;
@@ -74,19 +74,17 @@ const Counter = (props, { useState, html, css, useStyle }) => {
       cursor: pointer;
     }
   `);
-  
+
   return html`
     <div class="counter">
       <h2>Count: ${count}</h2>
-      <button @click="${() => setCount(count + 1)}">
-        Increment
-      </button>
+      <button @click="${() => setCount(count + 1)}">Increment</button>
     </div>
   `;
 };
 
 // Register as custom element
-define({ tag: 'my-counter', component: Counter });
+define({ tag: "my-counter", component: Counter });
 
 // Use it
 // <my-counter></my-counter>
@@ -99,11 +97,13 @@ define({ tag: 'my-counter', component: Counter });
 Dim provides React-like hooks for managing component logic:
 
 #### `useState` - Local State Management
+
 ```javascript
 const [value, setValue] = useState(initialValue);
 ```
 
 #### `useEffect` - Side Effects
+
 ```javascript
 useEffect(() => {
   // Effect logic
@@ -114,6 +114,7 @@ useEffect(() => {
 ```
 
 #### `useStyle` - Scoped CSS
+
 ```javascript
 useStyle(css`
   .my-class {
@@ -123,13 +124,15 @@ useStyle(css`
 ```
 
 #### `useScope` - Component Composition
+
 ```javascript
 useScope({
-  'child-component': ChildComponent
+  "child-component": ChildComponent,
 });
 ```
 
 #### `useMemo` - Memoized Values
+
 ```javascript
 const expensive = useMemo(() => {
   return computeExpensive(value);
@@ -137,57 +140,67 @@ const expensive = useMemo(() => {
 ```
 
 #### `useRef` - DOM References
+
 ```javascript
 const inputRef = useRef();
 // Access via inputRef.current
 ```
 
 #### `useStore` - Global State
+
 ```javascript
-const { user: [user, setUser] } = useStore({
-  user: { name: 'John' }
+const {
+  user: [user, setUser],
+} = useStore({
+  user: { name: "John" },
 });
 ```
 
 ## 💡 Examples
 
 ### Todo List
+
 ```javascript
 const TodoList = (props, { useState, html, css, useStyle }) => {
   const [todos, setTodos] = useState([]);
-  const [input, setInput] = useState('');
-  
+  const [input, setInput] = useState("");
+
   const addTodo = () => {
     if (input.trim()) {
-      setTodos([...todos, { 
-        id: Date.now(), 
-        text: input, 
-        done: false 
-      }]);
-      setInput('');
+      setTodos([
+        ...todos,
+        {
+          id: Date.now(),
+          text: input,
+          done: false,
+        },
+      ]);
+      setInput("");
     }
   };
-  
+
   return html`
     <div>
-      <input 
+      <input
         .value="${input}"
         @input="${(e) => setInput(e.target.value)}"
-        @keydown="${(e) => e.key === 'Enter' && addTodo()}"
+        @keydown="${(e) => e.key === "Enter" && addTodo()}"
       />
       <button @click="${addTodo}">Add</button>
-      
+
       <ul>
-        ${todos.map(todo => html`
-          <li class="${todo.done ? 'done' : ''}">
-            <input 
-              type="checkbox"
-              .checked="${todo.done}"
-              @change="${() => toggleTodo(todo.id)}"
-            />
-            ${todo.text}
-          </li>
-        `)}
+        ${todos.map(
+          (todo) => html`
+            <li class="${todo.done ? "done" : ""}">
+              <input
+                type="checkbox"
+                .checked="${todo.done}"
+                @change="${() => toggleTodo(todo.id)}"
+              />
+              ${todo.text}
+            </li>
+          `
+        )}
       </ul>
     </div>
   `;
@@ -219,6 +232,7 @@ Visit the [live documentation](https://dim.positive-intentions.com) for interact
 ## 🛠️ Development
 
 ### Setup
+
 ```bash
 # Clone the repository
 git clone https://github.com/positive-intentions/dim.git
@@ -234,6 +248,7 @@ npm run build
 ```
 
 ### Project Structure
+
 ```
 dim/
 ├── src/

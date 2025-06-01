@@ -4,23 +4,6 @@ import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
 import '@fontsource/material-icons';
 
-// import { CssBaseline, ThemeProvider } from '@mui/material';
-// import { withThemeFromJSXProvider } from '@storybook/addon-themes';
-// import { lightTheme, darkTheme } from '../src/themes.js';
-
-// /* snipped for brevity */
-
-// export const decorators = [
-//   withThemeFromJSXProvider({
-//   themes: {
-//     light: lightTheme,
-//     dark: darkTheme,
-//   },
-//   defaultTheme: 'light',
-//   Provider: ThemeProvider,
-//   GlobalStyles: CssBaseline,
-// })];
-
 /** @type { import('@storybook/react').Preview } */
 const preview = {
   parameters: {
@@ -31,11 +14,10 @@ const preview = {
         date: /Date$/i,
       },
     },
-    // add branch image
     options: {
       showPanel: false,
       storySort: {
-        order: ['Getting Started', ['Tutorial', '*'], 'Hooks', 'Advanced', '*'],
+        order: ['Getting Started', 'API Reference', '*'],
       },
     },
   },
