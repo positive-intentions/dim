@@ -1,0 +1,112 @@
+import { Meta } from '@storybook/addon-docs';
+
+<Meta title="Introduction" />
+
+<p align="center">
+  <img src="/dim.png" alt="Dim Framework Logo" width="200" />
+</p>
+
+<h1 align="center">Dim Framework</h1>
+
+<p align="center">
+  <strong>A React-inspired functional web components framework</strong>
+</p>
+
+<p align="center">
+  Build modern web applications with familiar React-like syntax, powered by native Web Components
+</p>
+
+<div align="center">
+  <a href="https://dim.positive-intentions.com">Live Demo & Documentation</a> | <a href="?path=/story/getting-started--page">Getting Started</a> | <a href="?path=/story/examples--page">Examples</a> | <a href="?path=/story/api-reference--page">API Reference</a>
+</div>
+
+<div align="center">
+  <img src="https://img.shields.io/github/stars/positive-intentions/dim?style=social" alt="GitHub stars" />
+  <img src="https://img.shields.io/github/forks/positive-intentions/dim?style=social" alt="GitHub forks" />
+  <img src="https://img.shields.io/github/issues/positive-intentions/dim" alt="GitHub issues" />
+  <img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License" />
+  <img src="https://github.com/positive-intentions/dim/actions/workflows/main_workflow.yaml/badge.svg" alt="Staging" />
+  <img src="https://github.com/positive-intentions/dim/actions/workflows/pages/pages-build-deployment/badge.svg" alt="gh-pages-build-deployment" />
+  <img src="https://github.com/positive-intentions/dim/actions/workflows/codeql.yml/badge.svg" alt="CodeQL" />
+  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome" />
+</div>
+
+---
+
+## 🌟 Overview
+
+Dim is a lightweight framework that brings React's component model and hooks to native Web Components. Write familiar functional components with hooks while leveraging the power of web standards.
+
+> **⚠️ Experimental**: This framework is in early development and is not production-ready. It's provided for educational and experimental purposes.
+
+## ✨ Features
+
+- 🎯 **React-like DX** - Familiar hooks API (`useState`, `useEffect`, `useMemo`, etc.)
+- 🔧 **Web Standards** - Built on native Web Components and Shadow DOM
+- 🎨 **Scoped Styling** - CSS-in-JS with automatic style isolation
+- 📦 **Zero Dependencies** - Pure JavaScript, no build step required
+- 🚀 **Lightweight** - Minimal overhead on top of native APIs
+- 💾 **State Persistence** - Built-in global state management with `useStore`
+
+## 🚀 Quick Example
+
+```javascript
+import { html, css, define, useState, useStyle } from '@dim/core';
+
+// Create a component
+const Counter = (props, { useState, html, css, useStyle }) => {
+  const [count, setCount] = useState(0);
+  
+  useStyle(css`
+    .counter {
+      padding: 2rem;
+      text-align: center;
+    }
+    
+    button {
+      background: #029cfd;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+  `);
+  
+  return html`
+    <div class="counter">
+      <h2>Count: ${count}</h2>
+      <button @click="${() => setCount(count + 1)}">
+        Increment
+      </button>
+    </div>
+  `;
+};
+
+// Register as custom element
+define({ tag: 'my-counter', component: Counter });
+```
+
+## 📚 Core Concepts
+
+### Hooks
+
+Dim provides React-like hooks for managing component logic:
+
+- **State Management**: `useState`, `useStore`
+- **Effects & Lifecycle**: `useEffect`, `useRef`
+- **Performance**: `useMemo`
+- **Styling**: `useStyle`
+- **Composition**: `useScope`
+
+Visit our detailed documentation sections to learn more about each feature.
+
+## ⚖️ License
+
+This project is licensed under the GNU General Public License v3.0 (GPL-3.0) - see the [LICENSE](https://github.com/positive-intentions/dim/blob/main/LICENSE) file for details. This means you are free to use, modify, and distribute this software, but any derivative works must also be licensed under GPL-3.0.
+
+---
+
+<p align="center">
+  Dim is brought to you by <a href="https://positive-intentions.com">positive-intentions</a>. Built with positivity.
+</p>

@@ -1,2221 +1,975 @@
 import React from "react";
-import { html, css, define, useState, useEffect, useStyle, useScope } from "../core/dim.ts";
-import { wrapLitHtmlStory } from "../core/storybook-utils.js";
+import { define, html, css, useState, useEffect, useStyle, useScope, useMemo, useRef, useStore, unsafeCSS } from "../core/dim.ts";
 
-// Hero Section Component
-const HeroSection = (_, { html, css, useStyle }) => {
-  useStyle(css`
-    .hero {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 4rem 2rem;
-      text-align: center;
-      border-radius: 16px;
-      margin-bottom: 3rem;
+// Shopping Basket Tutorial - Complete Implementation
+const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope, useMemo, useRef, useStore, html, css }) => {
+  // Global store for shopping app
+  const store = useStore({
+    cart: useState([]),
+    theme: useState('light'),
+    user: useState({ name: 'Guest', preferences: { currency: 'USD' } })
+  });
+
+  const [cart, setCart] = store.cart;
+  const [theme, setTheme] = store.theme;
+  const [user, setUser] = store.user;
+
+  // Sample products data
+  const products = [
+    { id: 1, name: 'Wireless Headphones', price: 199.99, image: '🎧', category: 'Electronics' },
+    { id: 2, name: 'Coffee Mug', price: 24.99, image: '☕', category: 'Home' },
+    { id: 3, name: 'Running Shoes', price: 129.99, image: '👟', category: 'Sports' },
+    { id: 4, name: 'Laptop Stand', price: 79.99, image: '💻', category: 'Electronics' },
+    { id: 5, name: 'Plant Pot', price: 19.99, image: '🪴', category: 'Home' },
+    { id: 6, name: 'Yoga Mat', price: 49.99, image: '🧘', category: 'Sports' }
+  ];
+
+  // Product Card Component - Demonstrates useStyle with props
+  const ProductCard = ({ product, theme, cart, setCart }, { useState, useStyle, useEffect, html, css }) => {
+    const [isHovered, setIsHovered] = useState(false);
+    
+    // Provide defaults if not passed
+    if (!product) {
+      return html`<div>No product data</div>`;
     }
     
-    .hero-title {
-      font-size: 3rem;
+    useStyle(css`
+      .product-card {
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: transform 0.2s, box-shadow 0.2s, background 0.3s, border-color 0.3s;
+        cursor: pointer;
+      }
+
+      .product-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+      }
+
+      .product-image {
+        font-size: 3rem;
+        text-align: center;
+        margin-bottom: 1rem;
+      }
+
+      .product-name {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        transition: color 0.3s;
+      }
+
+      .product-category {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-bottom: 0.75rem;
+      }
+
+      .product-price {
+        font-size: 1.25rem;
+        font-weight: bold;
+        color: #029cfd;
+        margin-bottom: 1rem;
+      }
+
+      .add-button {
+        width: 100%;
+        color: white;
+        border: none;
+        padding: 0.75rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      .add-button:hover {
+        background: #0278c7 !important;
+      }
+    `);
+
+    const addToCart = () => {
+      const existingItem = cart.find(item => item.id === product.id);
+      if (existingItem) {
+        setCart(cart.map(item => 
+          item.id === product.id 
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        ));
+      } else {
+        setCart([...cart, { ...product, quantity: 1 }]);
+      }
+    };
+
+    return html`
+      <div 
+        class="product-card"
+        style="background: ${theme === 'light' ? 'white' : '#2a2a2a'}; border: 1px solid ${theme === 'light' ? '#e9ecef' : '#404040'};"
+        @mouseenter="${() => setIsHovered(true)}"
+        @mouseleave="${() => setIsHovered(false)}"
+      >
+        <div class="product-image">${product.image}</div>
+        <div class="product-name" style="color: ${theme === 'light' ? '#333' : '#fff'};">${product.name}</div>
+        <div class="product-category">${product.category}</div>
+        <div class="product-price">$${product.price}</div>
+        <button class="add-button" style="background: ${isHovered ? '#0278c7' : '#029cfd'};" @click="${addToCart}">
+          Add to Cart
+        </button>
+      </div>
+    `;
+  };
+
+  // Cart Item Component - Demonstrates useRef for DOM access
+  const CartItem = ({ item, theme, cart, setCart }, { useState, useRef, useStyle, useEffect, html, css }) => {
+    const quantityRef = useRef();
+    
+    // Provide defaults if not passed
+    if (!item) {
+      return html`<div>No item data</div>`;
+    }
+    
+    useStyle(css`
+      .cart-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+        transition: background 0.3s;
+      }
+
+      .item-image {
+        font-size: 2rem;
+      }
+
+      .item-details {
+        flex: 1;
+      }
+
+      .item-name {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+        transition: color 0.3s;
+      }
+
+      .item-price {
+        color: #029cfd;
+        font-weight: 500;
+      }
+
+      .quantity-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .quantity-btn {
+        background: #029cfd;
+        color: white;
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .quantity-input {
+        width: 60px;
+        text-align: center;
+        padding: 0.25rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        transition: background 0.3s, color 0.3s;
+      }
+
+      .remove-btn {
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        margin-left: 1rem;
+      }
+    `);
+
+    const updateQuantity = (newQuantity) => {
+      if (newQuantity <= 0) {
+        removeItem();
+        return;
+      }
+      setCart(cart.map(cartItem => 
+        cartItem.id === item.id 
+          ? { ...cartItem, quantity: newQuantity }
+          : cartItem
+      ));
+    };
+
+    const removeItem = () => {
+      setCart(cart.filter(cartItem => cartItem.id !== item.id));
+    };
+
+    const focusQuantityInput = () => {
+      quantityRef.current?.focus();
+      quantityRef.current?.select();
+    };
+
+    return html`
+      <div class="cart-item" style="background: ${theme === 'light' ? '#f8f9fa' : '#353535'};">
+        <div class="item-image">${item.image}</div>
+        <div class="item-details">
+          <div class="item-name" style="color: ${theme === 'light' ? '#333' : '#fff'};">${item.name}</div>
+          <div class="item-price">$${item.price} each</div>
+        </div>
+        <div class="quantity-controls">
+          <button class="quantity-btn" @click="${() => updateQuantity(item.quantity - 1)}">-</button>
+          <input 
+            ref="${quantityRef}"
+            class="quantity-input" 
+            type="number" 
+            .value="${item.quantity}"
+            style="background: ${theme === 'light' ? 'white' : '#2a2a2a'}; color: ${theme === 'light' ? '#333' : '#fff'};"
+            @change="${(e) => updateQuantity(parseInt(e.target.value) || 1)}"
+            @dblclick="${focusQuantityInput}"
+          />
+          <button class="quantity-btn" @click="${() => updateQuantity(item.quantity + 1)}">+</button>
+        </div>
+        <button class="remove-btn" @click="${removeItem}">Remove</button>
+      </div>
+    `;
+  };
+
+  // Shopping Cart Component - Demonstrates useMemo for calculations
+  const ShoppingCart = ({ theme, cart, setCart }, { useMemo, useStyle, useScope, useEffect, html, css }) => {
+    // Create wrapper for CartItem to pass props
+    const CartItemWrapper = (props, context) => {
+      return CartItem({ ...props, theme, cart, setCart }, context);
+    };
+    
+    useScope({
+      'cart-item': CartItemWrapper
+    });
+
+    // Memoized calculations for performance
+    const cartSummary = useMemo(() => {
+      const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const tax = subtotal * 0.08; // 8% tax
+      const shipping = subtotal > 50 ? 0 : 9.99; // Free shipping over $50
+      const total = subtotal + tax + shipping;
+      
+      return {
+        subtotal: subtotal.toFixed(2),
+        tax: tax.toFixed(2),
+        shipping: shipping.toFixed(2),
+        total: total.toFixed(2),
+        itemCount: cart.reduce((sum, item) => sum + item.quantity, 0)
+      };
+    }, [cart]);
+
+    useStyle(css`
+      .shopping-cart {
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: background 0.3s, border-color 0.3s;
+      }
+
+      .cart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #029cfd;
+      }
+
+      .cart-title {
+        font-size: 1.5rem;
+        font-weight: bold;
+        transition: color 0.3s;
+      }
+
+      .item-count {
+        background: #029cfd;
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+      }
+
+      .cart-items {
+        margin-bottom: 1.5rem;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .empty-cart {
+        text-align: center;
+        color: #6c757d;
+        padding: 2rem;
+        font-style: italic;
+      }
+
+      .cart-summary {
+        padding-top: 1rem;
+        transition: border-color 0.3s;
+      }
+
+      .summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        transition: color 0.3s;
+      }
+
+      .summary-row.total {
+        font-size: 1.25rem;
+        font-weight: bold;
+        padding-top: 0.5rem;
+        color: #029cfd;
+        transition: border-color 0.3s;
+      }
+
+      .checkout-btn {
+        width: 100%;
+        background: #28a745;
+        color: white;
+        border: none;
+        padding: 1rem;
+        border-radius: 8px;
+        font-size: 1.125rem;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 1rem;
+        transition: background 0.2s;
+      }
+
+      .checkout-btn:hover {
+        background: #218838;
+      }
+
+      .checkout-btn:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+      }
+    `);
+
+    return html`
+      <div class="shopping-cart" style="background: ${theme === 'light' ? 'white' : '#2a2a2a'}; border: 1px solid ${theme === 'light' ? '#e9ecef' : '#404040'};">
+        <div class="cart-header">
+          <h3 class="cart-title" style="color: ${theme === 'light' ? '#333' : '#fff'};">Shopping Cart</h3>
+          <span class="item-count">${cartSummary.itemCount} items</span>
+        </div>
+
+        <div class="cart-items">
+          ${cart.length === 0 ? html`
+            <div class="empty-cart">
+              🛒 Your cart is empty<br>
+              <small>Add some products to get started!</small>
+            </div>
+          ` : html`
+            ${cart.map(item => html`
+              <cart-item 
+                .item="${item}"
+                .theme="${theme}"
+                .cart="${cart}"
+                .setCart="${setCart}"
+              ></cart-item>
+            `)}
+          `}
+        </div>
+
+        ${cart.length > 0 ? html`
+          <div class="cart-summary" style="border-top: 1px solid ${theme === 'light' ? '#e9ecef' : '#404040'};">
+            <div class="summary-row" style="color: ${theme === 'light' ? '#333' : '#fff'};">
+              <span>Subtotal:</span>
+              <span>$${cartSummary.subtotal}</span>
+            </div>
+            <div class="summary-row" style="color: ${theme === 'light' ? '#333' : '#fff'};">
+              <span>Tax:</span>
+              <span>$${cartSummary.tax}</span>
+            </div>
+            <div class="summary-row" style="color: ${theme === 'light' ? '#333' : '#fff'};">
+              <span>Shipping:</span>
+              <span>${cartSummary.shipping === '0.00' ? 'Free' : '$' + cartSummary.shipping}</span>
+            </div>
+            <div class="summary-row total" style="border-top: 1px solid ${theme === 'light' ? '#e9ecef' : '#404040'};">
+              <span>Total:</span>
+              <span>$${cartSummary.total}</span>
+            </div>
+            <button class="checkout-btn">
+              Proceed to Checkout
+            </button>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  };
+
+  // User Controls - Demonstrates theme switching and useStore
+  const UserControls = ({ theme, setTheme, user, cart, setCart }, { useStyle, useEffect, html, css }) => {
+    useStyle(css`
+      .user-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: background 0.3s, border-color 0.3s;
+      }
+
+      .user-info {
+        font-weight: 600;
+        transition: color 0.3s;
+      }
+
+      .controls {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+      }
+
+      .theme-toggle {
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      .clear-cart {
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+
+      @media (max-width: 768px) {
+        .user-controls {
+          flex-direction: column;
+          gap: 1rem;
+          text-align: center;
+        }
+      }
+    `);
+
+    return html`
+      <div class="user-controls" style="background: ${theme === 'light' ? 'white' : '#2a2a2a'}; border: 1px solid ${theme === 'light' ? '#e9ecef' : '#404040'};">
+        <div class="user-info" style="color: ${theme === 'light' ? '#333' : '#fff'};">
+          Welcome, ${user.name}! 👋
+        </div>
+        <div class="controls">
+          <button class="theme-toggle" style="background: ${theme === 'light' ? '#6c757d' : '#029cfd'};" @click="${() => setTheme(theme === 'light' ? 'dark' : 'light')}">
+            ${theme === 'light' ? '🌙 Dark' : '☀️ Light'} Mode
+          </button>
+          ${cart.length > 0 ? html`
+            <button class="clear-cart" @click="${() => setCart([])}">
+              Clear Cart
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  };
+
+  // Product Grid - Demonstrates useScope for component composition
+  const ProductGrid = ({ theme, cart, setCart, products }, { useScope, useStyle, useEffect, html, css }) => {
+    // Create individual product card wrappers for each product
+    const createProductCardWrapper = (product) => {
+      return (props, context) => {
+        return ProductCard({ ...props, product, theme, cart, setCart }, context);
+      };
+    };
+    
+    // Register a unique component for each product
+    const scopeMap = {};
+    products.forEach((product, index) => {
+      scopeMap[`product-card-${index}`] = createProductCardWrapper(product);
+    });
+    
+    useScope({
+      ...scopeMap,
+      'product-card-example': createProductCardWrapper(products[0]), // Default card
+      'product-card': ProductCard
+    
+    });
+
+    useStyle(css`
+      .product-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+      }
+
+      .products-header {
+        margin-bottom: 1.5rem;
+      }
+
+      .products-title {
+        font-size: 1.75rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+        transition: color 0.3s;
+      }
+
+      .products-subtitle {
+        color: #6c757d;
+      }
+
+      @media (max-width: 768px) {
+        .product-grid {
+          grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+          gap: 1rem;
+        }
+      }
+    `);
+
+    console.log({ products })
+
+    return html`
+      <div>
+        <div class="products-header">
+          <h2 class="products-title" style="color: ${theme === 'light' ? '#333' : '#fff'};">Our Products</h2>
+          <p class="products-subtitle">Discover amazing products at great prices</p>
+        </div>
+        <div class="product-grid">
+          ${products.map((product, index) => html`
+            <product-card-${index}></product-card-${index}>
+          `)}
+        </div>
+        <div class="product-grid">
+          ${products.map((product, index) => html`
+            <product-card .props="${{product}}"></product-card-example>
+          `)}
+        </div>
+      </div>
+    `;
+  };
+
+  // Create wrappers for all components to pass props
+  const UserControlsWrapper = (props, context) => {
+    return UserControls({ ...props, theme, setTheme, user, cart, setCart }, context);
+  };
+  
+  const ProductGridWrapper = (props, context) => {
+    return ProductGrid({ ...props, theme, cart, setCart, products }, context);
+  };
+  
+  const ShoppingCartWrapper = (props, context) => {
+    return ShoppingCart({ ...props, theme, cart, setCart }, context);
+  };
+  
+  // Register all components in scope
+  useScope({
+    'user-controls': UserControlsWrapper,
+    'product-grid': ProductGridWrapper,
+    'shopping-cart': ShoppingCartWrapper
+  });
+
+  // Main container styles
+  useStyle(css`
+    .shopping-app {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+      min-height: 100vh;
+      transition: background 0.3s ease;
+    }
+
+    .app-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .app-title {
+      font-size: 2.5rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      transition: color 0.3s;
+    }
+
+    .app-subtitle {
+      font-size: 1.125rem;
+      color: #6c757d;
+      margin-bottom: 2rem;
+    }
+
+    .main-content {
+      display: grid;
+      grid-template-columns: 1fr 350px;
+      gap: 2rem;
+      align-items: start;
+    }
+
+    @media (max-width: 1024px) {
+      .main-content {
+        grid-template-columns: 1fr;
+      }
+      
+      .shopping-app {
+        padding: 1rem;
+      }
+    }
+
+    .features-showcase {
+      margin-top: 3rem;
+      padding: 2rem;
+      border-radius: 12px;
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .features-title {
+      font-size: 1.5rem;
       font-weight: bold;
       margin-bottom: 1rem;
-      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+      text-align: center;
+      transition: color 0.3s;
     }
-    
-    .hero-subtitle {
-      font-size: 1.25rem;
-      opacity: 0.9;
-      margin-bottom: 2rem;
-      max-width: 600px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    
-    .hero-features {
+
+    .features-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin-top: 2rem;
+      gap: 1.5rem;
     }
-    
-    .feature-card {
-      background: rgba(255,255,255,0.1);
-      padding: 1.5rem;
-      border-radius: 8px;
-      backdrop-filter: blur(10px);
+
+    .feature-item {
+      text-align: center;
+      padding: 1rem;
     }
-    
+
     .feature-icon {
       font-size: 2rem;
       margin-bottom: 0.5rem;
     }
-    
-    .feature-title {
+
+    .feature-name {
       font-weight: 600;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.25rem;
+      transition: color 0.3s;
     }
-    
+
     .feature-desc {
-      font-size: 0.9rem;
-      opacity: 0.8;
-    }
-  `);
-
-  return html`
-    <div class="hero">
-      <h1 class="hero-title">🔥 Dim Framework</h1>
-      <p class="hero-subtitle">
-        A thin wrapper around lit-elements to create functional web components with React-like hooks and syntax
-      </p>
-      
-      <div class="hero-features">
-        <div class="feature-card">
-          <div class="feature-icon">⚡</div>
-          <div class="feature-title">React-like Hooks</div>
-          <div class="feature-desc">useState, useEffect, useMemo, useRef and more</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">🧩</div>
-          <div class="feature-title">Web Components</div>
-          <div class="feature-desc">Native browser support, framework agnostic</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">🎨</div>
-          <div class="feature-title">Scoped Styling</div>
-          <div class="feature-desc">CSS-in-JS with automatic scoping via Shadow DOM</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">💾</div>
-          <div class="feature-title">Built-in Persistence</div>
-          <div class="feature-desc">Automatic IndexedDB storage with useStore</div>
-        </div>
-      </div>
-    </div>
-  `;
-};
-
-// Quick Start Code Component
-const QuickStartCode = (_, { html, css, useStyle }) => {
-  useStyle(css`
-    .quick-start {
-      background: white;
-      border-radius: 12px;
-      padding: 2rem;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      margin-bottom: 2rem;
-    }
-    
-    .section-title {
-      font-size: 1.5rem;
-      color: #495057;
-      margin-bottom: 1rem;
-      border-bottom: 2px solid #667eea;
-      padding-bottom: 0.5rem;
-    }
-    
-    .code-block {
-      background: #1e1e1e;
-      color: #d4d4d4;
-      padding: 1.5rem;
-      border-radius: 8px;
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-      font-size: 0.9rem;
-      line-height: 1.6;
-      overflow-x: auto;
-      margin: 1rem 0;
-    }
-    
-    .keyword { color: #569cd6; }
-    .string { color: #ce9178; }
-    .comment { color: #6a9955; }
-    .function { color: #dcdcaa; }
-    .property { color: #9cdcfe; }
-    
-    .install-steps {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.5rem;
-      margin: 2rem 0;
-    }
-    
-    .step-card {
-      background: #f8f9fa;
-      padding: 1.5rem;
-      border-radius: 8px;
-      border-left: 4px solid #667eea;
-    }
-    
-    .step-number {
-      background: #667eea;
-      color: white;
-      width: 2rem;
-      height: 2rem;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      margin-bottom: 1rem;
-    }
-    
-    .step-title {
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-      color: #495057;
-    }
-  `);
-
-  return html`
-    <div class="quick-start">
-      <h2 class="section-title">🚀 Quick Start</h2>
-      
-      <div class="install-steps">
-        <div class="step-card">
-          <div class="step-number">1</div>
-          <div class="step-title">Installation</div>
-          <p>Clone or download the Dim framework</p>
-          <div class="code-block">
-<span class="comment"># Clone the repository</span>
-<span class="keyword">git clone</span> https://github.com/positive-intentions/dim.git
-<span class="keyword">cd</span> dim
-<span class="keyword">npm install</span>
-          </div>
-        </div>
-        
-        <div class="step-card">
-          <div class="step-number">2</div>
-          <div class="step-title">Create Component</div>
-          <p>Write your first functional component</p>
-          <div class="code-block">
-<span class="keyword">import</span> { <span class="property">html</span>, <span class="property">css</span>, <span class="property">useState</span> } <span class="keyword">from</span> <span class="string">'./dim.ts'</span>;
-
-<span class="keyword">const</span> <span class="function">MyComponent</span> = <span class="keyword">function</span>() {
-  <span class="keyword">const</span> [<span class="property">count</span>, <span class="property">setCount</span>] = <span class="function">useState</span>(<span class="number">0</span>);
-  
-  <span class="keyword">return</span> <span class="property">html</span><span class="template-literal">\`
-    &lt;button @click="\${() => setCount(count + 1)}"&gt;
-      Count: \${count}
-    &lt;/button&gt;
-  \`</span>;
-};
-          </div>
-        </div>
-        
-        <div class="step-card">
-          <div class="step-number">3</div>
-          <div class="step-title">Register & Use</div>
-          <p>Register and use your component</p>
-          <div class="code-block">
-<span class="keyword">import</span> { <span class="property">define</span> } <span class="keyword">from</span> <span class="string">'./dim.ts'</span>;
-
-<span class="comment">// Register component</span>
-<span class="function">define</span>({ 
-  <span class="property">tag</span>: <span class="string">'my-component'</span>, 
-  <span class="property">component</span>: MyComponent 
-});
-
-<span class="comment">// Use in HTML</span>
-<span class="string">'&lt;my-component&gt;&lt;/my-component&gt;'</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-};
-
-// Code Examples Component
-const CodeExamples = (_, { useState, html, css, useStyle, useScope }) => {
-  const [selectedExample, setSelectedExample] = useState('counter');
-  
-  useScope({
-    'example-preview': ExamplePreview
-  });
-
-  const examples = {
-    counter: {
-      title: '🔢 Interactive Counter',
-      description: 'Basic state management with useState',
-      code: `import { html, css, useState, useStyle, define } from './dim.ts';
-
-const Counter = (_, { html, css, useState, useStyle }) => {
-  const [count, setCount] = useState(0);
-  const [step, setStep] = useState(1);
-
-  useStyle(css\`
-    .counter {
-      text-align: center;
-      padding: 2rem;
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white;
-      border-radius: 8px;
-    }
-    
-    .count-display {
-      font-size: 3rem;
-      font-weight: bold;
-      margin: 1rem 0;
-    }
-    
-    .controls {
-      display: flex;
-      gap: 1rem;
-      justify-content: center;
-      align-items: center;
-    }
-    
-    .btn {
-      padding: 0.75rem 1.5rem;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: transform 0.2s;
-    }
-    
-    .btn:hover {
-      transform: translateY(-2px);
-    }
-  \`);
-
-  return html\`
-    <div class="counter">
-      <div class="count-display">\${count}</div>
-      <div class="controls">
-        <button class="btn" @click="\${() => setCount(count - step)}">
-          -\${step}
-        </button>
-        <input 
-          type="number" 
-          .value="\${step}"
-          @input="\${(e) => setStep(parseInt(e.target.value) || 1)}"
-          style="width: 60px; text-align: center;"
-        />
-        <button class="btn" @click="\${() => setCount(count + step)}">
-          +\${step}
-        </button>
-        <button class="btn" @click="\${() => setCount(0)}">
-          Reset
-        </button>
-      </div>
-    </div>
-  \`;
-};
-
-define({ tag: 'my-counter', component: Counter });`
-    },
-    todo: {
-      title: '📝 Todo List',
-      description: 'Array state management and form handling',
-      code: `import { html, css, useState, useStyle, define } from './dim.ts';
-
-const TodoList = (_, { html, css, useState, useStyle }) => {
-  const [todos, setTodos] = useState([
-    { id: 1, text: 'Learn Dim framework', completed: false },
-    { id: 2, text: 'Build awesome components', completed: false }
-  ]);
-  const [newTodo, setNewTodo] = useState('');
-
-  const addTodo = () => {
-    if (newTodo.trim()) {
-      setTodos([...todos, {
-        id: Date.now(),
-        text: newTodo.trim(),
-        completed: false
-      }]);
-      setNewTodo('');
-    }
-  };
-
-  const toggleTodo = (id) => {
-    setTodos(todos.map(todo =>
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    ));
-  };
-
-  const deleteTodo = (id) => {
-    setTodos(todos.filter(todo => todo.id !== id));
-  };
-
-  useStyle(css\`
-    .todo-app {
-      max-width: 400px;
-      margin: 0 auto;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      overflow: hidden;
-    }
-    
-    .todo-header {
-      background: #667eea;
-      color: white;
-      padding: 1.5rem;
-      text-align: center;
-    }
-    
-    .todo-form {
-      padding: 1rem;
-      display: flex;
-      gap: 0.5rem;
-    }
-    
-    .todo-input {
-      flex: 1;
-      padding: 0.75rem;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-    
-    .add-btn {
-      background: #28a745;
-      color: white;
-      border: none;
-      padding: 0.75rem 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    
-    .todo-item {
-      display: flex;
-      align-items: center;
-      padding: 1rem;
-      border-bottom: 1px solid #eee;
-    }
-    
-    .todo-item.completed {
-      opacity: 0.6;
-      text-decoration: line-through;
-    }
-    
-    .todo-text {
-      flex: 1;
-      margin-left: 0.5rem;
-    }
-    
-    .delete-btn {
-      background: #dc3545;
-      color: white;
-      border: none;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-  \`);
-
-  return html\`
-    <div class="todo-app">
-      <div class="todo-header">
-        <h2>My Todo List</h2>
-        <p>\${todos.filter(t => !t.completed).length} of \${todos.length} remaining</p>
-      </div>
-      
-      <div class="todo-form">
-        <input 
-          class="todo-input"
-          .value="\${newTodo}"
-          @input="\${(e) => setNewTodo(e.target.value)}"
-          @keypress="\${(e) => e.key === 'Enter' && addTodo()}"
-          placeholder="Add a new todo..."
-        />
-        <button class="add-btn" @click="\${addTodo}">Add</button>
-      </div>
-      
-      \${todos.map(todo => html\`
-        <div class="todo-item \${todo.completed ? 'completed' : ''}">
-          <input 
-            type="checkbox"
-            .checked="\${todo.completed}"
-            @change="\${() => toggleTodo(todo.id)}"
-          />
-          <span class="todo-text">\${todo.text}</span>
-          <button class="delete-btn" @click="\${() => deleteTodo(todo.id)}">
-            Delete
-          </button>
-        </div>
-      \`)}
-    </div>
-  \`;
-};
-
-define({ tag: 'todo-list', component: TodoList });`
-    },
-    form: {
-      title: '📋 Contact Form',
-      description: 'Form validation and controlled inputs',
-      code: `import { html, css, useState, useStyle, define } from './dim.ts';
-
-const ContactForm = (_, { html, css, useState, useStyle }) => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    message: '',
-    subscribe: false
-  });
-  const [errors, setErrors] = useState({});
-  const [submitted, setSubmitted] = useState(false);
-
-  const updateField = (field, value) => {
-    setFormData({ ...formData, [field]: value });
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors({ ...errors, [field]: '' });
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    }
-    
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\\S+@\\S+\\.\\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email';
-    }
-    
-    if (!formData.message.trim()) {
-      newErrors.message = 'Message is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (validateForm()) {
-      setSubmitted(true);
-      console.log('Form submitted:', formData);
-    }
-  };
-
-  useStyle(css\`
-    .contact-form {
-      max-width: 500px;
-      margin: 0 auto;
-      background: white;
-      padding: 2rem;
-      border-radius: 8px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    
-    .form-group {
-      margin-bottom: 1.5rem;
-    }
-    
-    .form-label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-weight: 600;
-      color: #495057;
-    }
-    
-    .form-input, .form-textarea {
-      width: 100%;
-      padding: 0.75rem;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 1rem;
-    }
-    
-    .form-input.error, .form-textarea.error {
-      border-color: #dc3545;
-    }
-    
-    .error-message {
-      color: #dc3545;
       font-size: 0.875rem;
-      margin-top: 0.25rem;
+      color: #6c757d;
     }
-    
-    .checkbox-group {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    
-    .submit-btn {
-      background: #667eea;
-      color: white;
-      border: none;
-      padding: 1rem 2rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 1rem;
-      width: 100%;
-    }
-    
-    .submit-btn:hover {
-      background: #5a6fd8;
-    }
-    
-    .success-message {
-      background: #d4edda;
-      color: #155724;
-      padding: 1rem;
-      border-radius: 4px;
-      text-align: center;
-    }
-  \`);
+  `);
 
-  if (submitted) {
-    return html\`
-      <div class="contact-form">
-        <div class="success-message">
-          <h3>Thank you, \${formData.name}!</h3>
-          <p>Your message has been sent successfully.</p>
-          <button 
-            class="submit-btn" 
-            @click="\${() => { setSubmitted(false); setFormData({ name: '', email: '', message: '', subscribe: false }); }}"
-          >
-            Send Another Message
-          </button>
-        </div>
-      </div>
-    \`;
-  }
-
-  return html\`
-    <div class="contact-form">
-      <h2>Contact Us</h2>
-      <form @submit="\${handleSubmit}">
-        <div class="form-group">
-          <label class="form-label">Name *</label>
-          <input 
-            class="form-input \${errors.name ? 'error' : ''}"
-            type="text"
-            .value="\${formData.name}"
-            @input="\${(e) => updateField('name', e.target.value)}"
-            placeholder="Your full name"
-          />
-          \${errors.name ? html\`<div class="error-message">\${errors.name}</div>\` : ''}
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Email *</label>
-          <input 
-            class="form-input \${errors.email ? 'error' : ''}"
-            type="email"
-            .value="\${formData.email}"
-            @input="\${(e) => updateField('email', e.target.value)}"
-            placeholder="your.email@example.com"
-          />
-          \${errors.email ? html\`<div class="error-message">\${errors.email}</div>\` : ''}
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Message *</label>
-          <textarea 
-            class="form-textarea \${errors.message ? 'error' : ''}"
-            .value="\${formData.message}"
-            @input="\${(e) => updateField('message', e.target.value)}"
-            rows="4"
-            placeholder="Tell us how we can help you..."
-          ></textarea>
-          \${errors.message ? html\`<div class="error-message">\${errors.message}</div>\` : ''}
-        </div>
-
-        <div class="form-group">
-          <div class="checkbox-group">
-            <input 
-              type="checkbox"
-              .checked="\${formData.subscribe}"
-              @change="\${(e) => updateField('subscribe', e.target.checked)}"
-            />
-            <label>Subscribe to our newsletter</label>
-          </div>
-        </div>
-
-        <button type="submit" class="submit-btn">
-          Send Message
-        </button>
-      </form>
-    </div>
-  \`;
-};
-
-define({ tag: 'contact-form', component: ContactForm });`
-    },
-    theme: {
-      title: '🎨 Theme Switcher',
-      description: 'Dynamic styling and useEffect examples',
-      code: `import { html, css, useState, useEffect, useStyle, define } from './dim.ts';
-
-const ThemeSwitcher = (_, { html, css, useState, useEffect, useStyle }) => {
-  const [theme, setTheme] = useState('light');
-  const [fontSize, setFontSize] = useState('medium');
-  const [animation, setAnimation] = useState(true);
-
-  const themes = {
-    light: {
-      background: '#ffffff',
-      color: '#333333',
-      cardBg: '#f8f9fa',
-      primary: '#667eea'
-    },
-    dark: {
-      background: '#1a1a1a',
-      color: '#ffffff',
-      cardBg: '#2d2d2d',
-      primary: '#764ba2'
-    },
-    ocean: {
-      background: '#0c4a6e',
-      color: '#e0f2fe',
-      cardBg: '#075985',
-      primary: '#38bdf8'
-    },
-    forest: {
-      background: '#14532d',
-      color: '#dcfce7',
-      cardBg: '#166534',
-      primary: '#4ade80'
-    }
-  };
-
-  const fontSizes = {
-    small: '14px',
-    medium: '16px',
-    large: '18px',
-    xlarge: '20px'
-  };
-
-  // Save preferences to localStorage
+  // Effect to demonstrate lifecycle
   useEffect(() => {
-    localStorage.setItem('theme-preferences', JSON.stringify({
-      theme,
-      fontSize,
-      animation
-    }));
-  }, [theme, fontSize, animation]);
-
-  // Load preferences on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('theme-preferences');
-    if (saved) {
-      const prefs = JSON.parse(saved);
-      setTheme(prefs.theme || 'light');
-      setFontSize(prefs.fontSize || 'medium');
-      setAnimation(prefs.animation !== false);
-    }
+    console.log(`Shopping app mounted with ${cart.length} items in cart`);
+    
+    return () => {
+      console.log('Shopping app unmounted');
+    };
   }, []);
 
-  const currentTheme = themes[theme];
+  return html`
+    <div class="shopping-app" style="background: ${theme === 'light' ? '#f8f9fa' : '#1a1a1a'};">
+      <div class="app-header">
+        <h1 class="app-title" style="color: ${theme === 'light' ? '#333' : '#fff'};">🛍️ Dim Shopping</h1>
+        <p class="app-subtitle">A complete shopping experience built with Dim Framework</p>
+      </div>
 
-  useStyle(css\`
-    .theme-app {
-      background: \${currentTheme.background};
-      color: \${currentTheme.color};
-      min-height: 400px;
-      padding: 2rem;
-      border-radius: 8px;
-      font-size: \${fontSizes[fontSize]};
-      transition: \${animation ? 'all 0.3s ease' : 'none'};
-    }
-    
-    .theme-header {
-      text-align: center;
-      margin-bottom: 2rem;
-    }
-    
-    .theme-title {
-      font-size: 2rem;
-      margin-bottom: 0.5rem;
-      background: linear-gradient(45deg, \${currentTheme.primary}, \${currentTheme.color});
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    
-    .controls-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
-    
-    .control-group {
-      background: \${currentTheme.cardBg};
+      <user-controls></user-controls>
+
+      <div class="main-content">
+        <div class="products-section">
+          <product-grid></product-grid>
+        </div>
+        <div class="cart-section">
+          <shopping-cart></shopping-cart>
+        </div>
+      </div>
+
+      <div class="features-showcase" style="background: ${theme === 'light' ? 'white' : '#2a2a2a'}; border: 1px solid ${theme === 'light' ? '#e9ecef' : '#404040'};">
+        <h3 class="features-title" style="color: ${theme === 'light' ? '#333' : '#fff'};">🚀 Dim Features Demonstrated</h3>
+        <div class="features-grid">
+          <div class="feature-item">
+            <div class="feature-icon">🎯</div>
+            <div class="feature-name" style="color: ${theme === 'light' ? '#333' : '#fff'};">useState</div>
+            <div class="feature-desc">Cart items, theme, hover states</div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">⚡</div>
+            <div class="feature-name" style="color: ${theme === 'light' ? '#333' : '#fff'};">useEffect</div>
+            <div class="feature-desc">Component lifecycle, style updates</div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">🎨</div>
+            <div class="feature-name" style="color: ${theme === 'light' ? '#333' : '#fff'};">useStyle</div>
+            <div class="feature-desc">Dynamic theming, responsive design</div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">🧩</div>
+            <div class="feature-name" style="color: ${theme === 'light' ? '#333' : '#fff'};">useScope</div>
+            <div class="feature-desc">Component composition</div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">🧠</div>
+            <div class="feature-name" style="color: ${theme === 'light' ? '#333' : '#fff'};">useMemo</div>
+            <div class="feature-desc">Cart calculations, performance</div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">📍</div>
+            <div class="feature-name" style="color: ${theme === 'light' ? '#333' : '#fff'};">useRef</div>
+            <div class="feature-desc">Input focus, DOM manipulation</div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">💾</div>
+            <div class="feature-name" style="color: ${theme === 'light' ? '#333' : '#fff'};">useStore</div>
+            <div class="feature-desc">Global state, persistence</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+// Small example components for the tutorial
+const ProductCardExample = (props, { useState, useStyle, html, css }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  
+  useStyle(css`
+    .product-card {
       padding: 1.5rem;
-      border-radius: 8px;
-      transition: \${animation ? 'transform 0.2s' : 'none'};
-    }
-    
-    .control-group:hover {
-      transform: \${animation ? 'translateY(-2px)' : 'none'};
-    }
-    
-    .control-label {
-      display: block;
-      font-weight: 600;
-      margin-bottom: 1rem;
-      color: \${currentTheme.primary};
-    }
-    
-    .control-select, .control-button {
-      width: 100%;
-      padding: 0.75rem;
-      border: 1px solid \${currentTheme.primary};
-      border-radius: 4px;
-      background: \${currentTheme.background};
-      color: \${currentTheme.color};
+      border-radius: 12px;
+      background: white;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
       cursor: pointer;
-    }
-    
-    .control-button {
-      background: \${currentTheme.primary};
-      color: white;
-      border: none;
-      margin-top: 0.5rem;
-    }
-    
-    .control-button:hover {
-      opacity: 0.9;
-    }
-    
-    .demo-content {
-      background: \${currentTheme.cardBg};
-      padding: 2rem;
-      border-radius: 8px;
-      text-align: center;
-    }
-    
-    .demo-card {
-      background: \${currentTheme.primary};
-      color: white;
-      padding: 1.5rem;
-      border-radius: 8px;
-      margin: 1rem auto;
+      border: 1px solid #e9ecef;
       max-width: 300px;
-      transform: \${animation ? 'scale(1)' : 'none'};
-      transition: \${animation ? 'transform 0.2s' : 'none'};
+      margin: 0 auto;
     }
     
-    .demo-card:hover {
-      transform: \${animation ? 'scale(1.05)' : 'none'};
+    .product-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
     }
-    
-    .checkbox-control {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-top: 1rem;
-    }
-  \`);
 
-  return html\`
-    <div class="theme-app">
-      <div class="theme-header">
-        <h1 class="theme-title">Theme Switcher Demo</h1>
-        <p>Customize the appearance and save your preferences!</p>
-      </div>
-
-      <div class="controls-grid">
-        <div class="control-group">
-          <label class="control-label">🎨 Theme</label>
-          <select 
-            class="control-select"
-            .value="\${theme}"
-            @change="\${(e) => setTheme(e.target.value)}"
-          >
-            <option value="light">☀️ Light</option>
-            <option value="dark">🌙 Dark</option>
-            <option value="ocean">🌊 Ocean</option>
-            <option value="forest">🌲 Forest</option>
-          </select>
-        </div>
-
-        <div class="control-group">
-          <label class="control-label">📏 Font Size</label>
-          <select 
-            class="control-select"
-            .value="\${fontSize}"
-            @change="\${(e) => setFontSize(e.target.value)}"
-          >
-            <option value="small">Small</option>
-            <option value="medium">Medium</option>
-            <option value="large">Large</option>
-            <option value="xlarge">Extra Large</option>
-          </select>
-        </div>
-
-        <div class="control-group">
-          <label class="control-label">✨ Settings</label>
-          <div class="checkbox-control">
-            <input 
-              type="checkbox"
-              .checked="\${animation}"
-              @change="\${(e) => setAnimation(e.target.checked)}"
-            />
-            <span>Enable animations</span>
-          </div>
-          <button 
-            class="control-button"
-            @click="\${() => {
-              setTheme('light');
-              setFontSize('medium');
-              setAnimation(true);
-            }}"
-          >
-            Reset to defaults
-          </button>
-        </div>
-      </div>
-
-      <div class="demo-content">
-        <div class="demo-card">
-          <h3>Sample Content</h3>
-          <p>This card adapts to your theme selection!</p>
-          <p>Current theme: <strong>\${theme}</strong></p>
-          <p>Font size: <strong>\${fontSize}</strong></p>
-        </div>
-        <p>Your preferences are automatically saved to localStorage!</p>
-      </div>
-    </div>
-  \`;
-};
-
-define({ tag: 'theme-switcher', component: ThemeSwitcher });`
-    }
-  };
-
-  useStyle(css`
-    .code-examples {
-      background: white;
-      border-radius: 12px;
-      padding: 2rem;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      margin-bottom: 2rem;
-    }
-    
-    .section-title {
-      font-size: 1.5rem;
-      color: #495057;
-      margin-bottom: 1rem;
-      border-bottom: 2px solid #667eea;
-      padding-bottom: 0.5rem;
-    }
-    
-    .example-tabs {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 2rem;
-      border-bottom: 1px solid #e9ecef;
-      padding-bottom: 1rem;
-    }
-    
-    .tab-button {
-      background: #f8f9fa;
-      border: 1px solid #e9ecef;
-      padding: 0.75rem 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s;
-      font-size: 0.875rem;
-    }
-    
-    .tab-button.active {
-      background: #667eea;
-      color: white;
-      border-color: #667eea;
-    }
-    
-    .tab-button:hover:not(.active) {
-      background: #e9ecef;
-    }
-    
-    .example-content {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-    }
-    
-    @media (max-width: 768px) {
-      .example-content {
-        grid-template-columns: 1fr;
-      }
-    }
-    
-    .code-section {
-      background: #1e1e1e;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    
-    .code-header {
-      background: #333;
-      color: white;
-      padding: 1rem;
-      font-weight: 600;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .copy-btn {
-      background: #667eea;
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.75rem;
-    }
-    
-    .copy-btn:hover {
-      background: #5a6fd8;
-    }
-    
-    .code-content {
-      padding: 1.5rem;
-      color: #d4d4d4;
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-      font-size: 0.875rem;
-      line-height: 1.6;
-      overflow-x: auto;
-      max-height: 500px;
-      overflow-y: auto;
-    }
-    
-    .keyword { color: #569cd6; }
-    .string { color: #ce9178; }
-    .comment { color: #6a9955; }
-    .function { color: #dcdcaa; }
-    .property { color: #9cdcfe; }
-    .number { color: #b5cea8; }
-    
-    .preview-section {
-      background: #f8f9fa;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    
-    .preview-header {
-      background: #28a745;
-      color: white;
-      padding: 1rem;
-      font-weight: 600;
-    }
-    
-    .preview-content {
-      padding: 1.5rem;
-      min-height: 300px;
-    }
-    
-    .example-description {
-      background: #e7f3ff;
-      padding: 1rem;
-      border-radius: 4px;
-      margin-bottom: 1.5rem;
-      color: #0056b3;
-    }
-  `);
-
-  const highlightCode = (code) => {
-    return code
-      .replace(/\/\/.*$/gm, '<span class="comment">$&</span>')
-      .replace(/\/\*[\s\S]*?\*\//g, '<span class="comment">$&</span>')
-      .replace(/\b(const|let|var|function|return|import|export|from|if|else|class|extends|new)\b/g, '<span class="keyword">$1</span>')
-      .replace(/\b(useState|useEffect|useMemo|useRef|useStyle|useScope|useStore|html|css|define)\b/g, '<span class="function">$1</span>')
-      .replace(/'[^']*'|"[^"]*"|`[^`]*`/g, '<span class="string">$&</span>')
-      .replace(/\b\d+\b/g, '<span class="number">$&</span>');
-  };
-
-  const copyToClipboard = async (code) => {
-    try {
-      await navigator.clipboard.writeText(code);
-      // Could add a toast notification here
-    } catch (err) {
-      console.error('Failed to copy code:', err);
-    }
-  };
-
-  const currentExample = examples[selectedExample];
-
-  return html`
-    <div class="code-examples">
-      <h2 class="section-title">💻 Complete Code Examples</h2>
-      <p>Explore these full-featured components to understand Dim patterns and best practices!</p>
-      
-      <div class="example-tabs">
-        ${Object.entries(examples).map(([key, example]) => html`
-          <button 
-            class="tab-button ${selectedExample === key ? 'active' : ''}"
-            @click="${() => setSelectedExample(key)}"
-          >
-            ${example.title}
-          </button>
-        `)}
-      </div>
-      
-      <div class="example-description">
-        <strong>${currentExample.title}:</strong> ${currentExample.description}
-      </div>
-      
-      <div class="example-content">
-        <div class="code-section">
-          <div class="code-header">
-            <span>📝 Source Code</span>
-            <button class="copy-btn" @click="${() => copyToClipboard(currentExample.code)}">
-              Copy Code
-            </button>
-          </div>
-          <div class="code-content">
-            <pre .innerHTML="${highlightCode(currentExample.code)}"></pre>
-          </div>
-        </div>
-        
-        <div class="preview-section">
-          <div class="preview-header">
-            <span>🎮 Live Preview</span>
-          </div>
-          <div class="preview-content">
-            <example-preview exampleType="${selectedExample}"></example-preview>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-};
-
-// Example Preview Component
-const ExamplePreview = ({ exampleType }, { html, useScope }) => {
-  useScope({
-    'counter-example': CounterExample,
-    'todo-example': TodoExample,
-    'form-example': FormExample,
-    'theme-example': ThemeExample
-  });
-
-  const renderPreview = () => {
-    switch(exampleType) {
-      case 'counter':
-        return html`<counter-example></counter-example>`;
-      case 'todo':
-        return html`<todo-example></todo-example>`;
-      case 'form':
-        return html`<form-example></form-example>`;
-      case 'theme':
-        return html`<theme-example></theme-example>`;
-      default:
-        return html`<p>Select an example to see the preview</p>`;
-    }
-  };
-
-  return html`
-    <div class="example-preview">
-      ${renderPreview()}
-    </div>
-  `;
-};
-
-// Preview implementations (simplified versions)
-const CounterExample = (_, { useState, html, css, useStyle }) => {
-  const [count, setCount] = useState(0);
-  const [step, setStep] = useState(1);
-
-  useStyle(css`
-    .counter-preview {
+    .product-image {
+      font-size: 3rem;
       text-align: center;
-      padding: 1.5rem;
-      background: linear-gradient(135deg, #667eea, #764ba2);
+      margin-bottom: 1rem;
+    }
+
+    .product-name {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .product-price {
+      font-size: 1.125rem;
+      color: #029cfd;
+      margin-bottom: 1rem;
+    }
+    
+    .add-button {
       color: white;
-      border-radius: 8px;
-    }
-    
-    .count-display {
-      font-size: 2.5rem;
-      font-weight: bold;
-      margin: 1rem 0;
-    }
-    
-    .controls {
-      display: flex;
-      gap: 0.5rem;
-      justify-content: center;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    
-    .btn {
-      padding: 0.5rem 1rem;
       border: none;
-      border-radius: 4px;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
       cursor: pointer;
-      font-weight: bold;
-      background: rgba(255,255,255,0.2);
-      color: white;
+      width: 100%;
+      font-weight: 600;
       transition: background 0.2s;
     }
     
-    .btn:hover {
-      background: rgba(255,255,255,0.3);
-    }
-    
-    .step-input {
-      width: 50px;
-      text-align: center;
-      padding: 0.5rem;
-      border: none;
-      border-radius: 4px;
+    .add-button:hover {
+      background: #0278c7 !important;
     }
   `);
 
   return html`
-    <div class="counter-preview">
-      <div class="count-display">${count}</div>
-      <div class="controls">
-        <button class="btn" @click="${() => setCount(count - step)}">-${step}</button>
-        <input 
-          class="step-input"
-          type="number" 
-          .value="${step}"
-          @input="${(e) => setStep(parseInt(e.target.value) || 1)}"
-        />
-        <button class="btn" @click="${() => setCount(count + step)}">+${step}</button>
-        <button class="btn" @click="${() => setCount(0)}">Reset</button>
-      </div>
+    <div 
+      class="product-card"
+      @mouseenter="${() => setIsHovered(true)}"
+      @mouseleave="${() => setIsHovered(false)}"
+    >
+      <div class="product-image">☕</div>
+      <div class="product-name">Coffee Mug</div>
+      <div class="product-price">$24.99</div>
+      <button class="add-button" style="background: ${isHovered ? '#0278c7' : '#029cfd'};">Add to Cart</button>
     </div>
   `;
 };
 
-const TodoExample = (_, { useState, html, css, useStyle }) => {
-  const [todos, setTodos] = useState([
-    { id: 1, text: 'Learn Dim framework', completed: false },
-    { id: 2, text: 'Build awesome components', completed: false }
-  ]);
-  const [newTodo, setNewTodo] = useState('');
+const CartSummaryExample = (props, { useMemo, useStyle, html, css }) => {
+  // Sample cart data
+  const cart = [
+    { id: 1, name: 'Coffee Mug', price: 24.99, quantity: 2 },
+    { id: 2, name: 'Laptop Stand', price: 79.99, quantity: 1 }
+  ];
 
-  const addTodo = () => {
-    if (newTodo.trim()) {
-      setTodos([...todos, {
-        id: Date.now(),
-        text: newTodo.trim(),
-        completed: false
-      }]);
-      setNewTodo('');
-    }
-  };
-
-  const toggleTodo = (id) => {
-    setTodos(todos.map(todo =>
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    ));
-  };
-
-  const deleteTodo = (id) => {
-    setTodos(todos.filter(todo => todo.id !== id));
-  };
+  const cartSummary = useMemo(() => {
+    console.log('Calculating cart totals...'); // Shows memoization
+    
+    const subtotal = cart.reduce((sum, item) => 
+      sum + (item.price * item.quantity), 0);
+    const tax = subtotal * 0.08;
+    const shipping = subtotal > 50 ? 0 : 9.99;
+    const total = subtotal + tax + shipping;
+    
+    return {
+      subtotal: subtotal.toFixed(2),
+      tax: tax.toFixed(2),
+      shipping: shipping.toFixed(2),
+      total: total.toFixed(2),
+      itemCount: cart.reduce((sum, item) => sum + item.quantity, 0)
+    };
+  }, [cart]);
 
   useStyle(css`
-    .todo-preview {
-      max-width: 350px;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      overflow: hidden;
-    }
-    
-    .todo-header {
-      background: #667eea;
-      color: white;
-      padding: 1rem;
-      text-align: center;
-    }
-    
-    .todo-form {
-      padding: 1rem;
-      display: flex;
-      gap: 0.5rem;
-    }
-    
-    .todo-input {
-      flex: 1;
-      padding: 0.5rem;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-    
-    .add-btn {
-      background: #28a745;
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    
-    .todo-item {
-      display: flex;
-      align-items: center;
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid #eee;
-    }
-    
-    .todo-item.completed {
-      opacity: 0.6;
-      text-decoration: line-through;
-    }
-    
-    .todo-text {
-      flex: 1;
-      margin-left: 0.5rem;
-    }
-    
-    .delete-btn {
-      background: #dc3545;
-      color: white;
-      border: none;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.75rem;
-    }
-  `);
-
-  return html`
-    <div class="todo-preview">
-      <div class="todo-header">
-        <h3>My Todo List</h3>
-        <p>${todos.filter(t => !t.completed).length} of ${todos.length} remaining</p>
-      </div>
-      
-      <div class="todo-form">
-        <input 
-          class="todo-input"
-          .value="${newTodo}"
-          @input="${(e) => setNewTodo(e.target.value)}"
-          @keypress="${(e) => e.key === 'Enter' && addTodo()}"
-          placeholder="Add a new todo..."
-        />
-        <button class="add-btn" @click="${addTodo}">Add</button>
-      </div>
-      
-      ${todos.map(todo => html`
-        <div class="todo-item ${todo.completed ? 'completed' : ''}">
-          <input 
-            type="checkbox"
-            .checked="${todo.completed}"
-            @change="${() => toggleTodo(todo.id)}"
-          />
-          <span class="todo-text">${todo.text}</span>
-          <button class="delete-btn" @click="${() => deleteTodo(todo.id)}">
-            ✕
-          </button>
-        </div>
-      `)}
-    </div>
-  `;
-};
-
-const FormExample = (_, { useState, html, css, useStyle }) => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    message: ''
-  });
-  const [submitted, setSubmitted] = useState(false);
-
-  const updateField = (field, value) => {
-    setFormData({ ...formData, [field]: value });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      setFormData({ name: '', email: '', message: '' });
-    }, 2000);
-  };
-
-  useStyle(css`
-    .form-preview {
-      max-width: 350px;
-      background: white;
-      padding: 1.5rem;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .form-group {
-      margin-bottom: 1rem;
-    }
-    
-    .form-label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-weight: 600;
-      color: #495057;
-    }
-    
-    .form-input, .form-textarea {
-      width: 100%;
-      padding: 0.5rem;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 0.9rem;
-    }
-    
-    .submit-btn {
-      background: #667eea;
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 4px;
-      cursor: pointer;
-      width: 100%;
-    }
-    
-    .success-message {
-      background: #d4edda;
-      color: #155724;
-      padding: 1rem;
-      border-radius: 4px;
-      text-align: center;
-    }
-  `);
-
-  if (submitted) {
-    return html`
-      <div class="form-preview">
-        <div class="success-message">
-          <h3>Thank you!</h3>
-          <p>Message sent successfully.</p>
-        </div>
-      </div>
-    `;
-  }
-
-  return html`
-    <div class="form-preview">
-      <h3>Contact Form</h3>
-      <form @submit="${handleSubmit}">
-        <div class="form-group">
-          <label class="form-label">Name</label>
-          <input 
-            class="form-input"
-            type="text"
-            .value="${formData.name}"
-            @input="${(e) => updateField('name', e.target.value)}"
-            placeholder="Your name"
-            required
-          />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Email</label>
-          <input 
-            class="form-input"
-            type="email"
-            .value="${formData.email}"
-            @input="${(e) => updateField('email', e.target.value)}"
-            placeholder="your@email.com"
-            required
-          />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Message</label>
-          <textarea 
-            class="form-textarea"
-            .value="${formData.message}"
-            @input="${(e) => updateField('message', e.target.value)}"
-            rows="3"
-            placeholder="Your message..."
-            required
-          ></textarea>
-        </div>
-
-        <button type="submit" class="submit-btn">
-          Send Message
-        </button>
-      </form>
-    </div>
-  `;
-};
-
-const ThemeExample = (_, { useState, html, css, useStyle }) => {
-  const [theme, setTheme] = useState('blue');
-  const [size, setSize] = useState('medium');
-
-  const themes = {
-    blue: { bg: '#667eea', color: '#764ba2' },
-    green: { bg: '#28a745', color: '#20c997' },
-    purple: { bg: '#6f42c1', color: '#e83e8c' }
-  };
-
-  const sizes = {
-    small: '0.875rem',
-    medium: '1rem', 
-    large: '1.125rem'
-  };
-
-  useStyle(css`
-    .theme-preview {
-      text-align: center;
-      padding: 1rem;
-      border-radius: 8px;
-    }
-    
-    .demo-box {
-      background: linear-gradient(135deg, ${themes[theme].bg}, ${themes[theme].color});
-      color: white;
-      padding: 1rem;
-      border-radius: 8px;
-      margin: 1rem 0;
-      font-size: ${sizes[size]};
-      transition: all 0.3s ease;
-    }
-    
-    .controls {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-      margin-top: 1rem;
-    }
-    
-    .control-select {
-      padding: 0.5rem;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      background: white;
-    }
-  `);
-
-  return html`
-    <div class="theme-preview">
-      <div class="demo-box">
-        Dynamic Theme Demo
-      </div>
-      
-      <div class="controls">
-        <select class="control-select" .value="${theme}" @change="${(e) => setTheme(e.target.value)}">
-          <option value="blue">Blue</option>
-          <option value="green">Green</option>
-          <option value="purple">Purple</option>
-        </select>
-        
-        <select class="control-select" .value="${size}" @change="${(e) => setSize(e.target.value)}">
-          <option value="small">Small</option>
-          <option value="medium">Medium</option>
-          <option value="large">Large</option>
-        </select>
-      </div>
-    </div>
-  `;
-};
-
-// Interactive Hook Demos Component
-const InteractiveDemos = (_, { useState, useEffect, html, css, useStyle, useScope }) => {
-  useScope({
-    'counter-demo': CounterDemo,
-    'todo-demo': TodoMiniDemo,
-    'timer-demo': TimerDemo,
-    'theme-demo': ThemeDemo
-  });
-
-  useStyle(css`
-    .interactive-demos {
-      background: white;
-      border-radius: 12px;
-      padding: 2rem;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      margin-bottom: 2rem;
-    }
-    
-    .section-title {
-      font-size: 1.5rem;
-      color: #495057;
-      margin-bottom: 1rem;
-      border-bottom: 2px solid #667eea;
-      padding-bottom: 0.5rem;
-    }
-    
-    .demos-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.5rem;
-      margin-top: 2rem;
-    }
-    
-    .demo-card {
+    .cart-summary {
       background: #f8f9fa;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid #e9ecef;
-    }
-    
-    .demo-header {
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white;
-      padding: 1rem;
-      font-weight: 600;
-    }
-    
-    .demo-content {
       padding: 1.5rem;
+      border-radius: 8px;
+      max-width: 300px;
+      margin: 0 auto;
     }
-    
-    .demo-description {
-      color: #6c757d;
-      margin-bottom: 1rem;
-      font-size: 0.9rem;
-    }
-  `);
 
-  return html`
-    <div class="interactive-demos">
-      <h2 class="section-title">🎮 Interactive Hook Demos</h2>
-      <p>Try these hands-on examples to understand how Dim hooks work in practice!</p>
-      
-      <div class="demos-grid">
-        <div class="demo-card">
-          <div class="demo-header">🔢 useState Demo</div>
-          <div class="demo-content">
-            <div class="demo-description">
-              Interactive counter showing useState hook with multiple state variables
-            </div>
-            <counter-demo></counter-demo>
-          </div>
-        </div>
-        
-        <div class="demo-card">
-          <div class="demo-header">📝 Mini Todo List</div>
-          <div class="demo-content">
-            <div class="demo-description">
-              Add and remove items to see array state management in action
-            </div>
-            <todo-demo></todo-demo>
-          </div>
-        </div>
-        
-        <div class="demo-card">
-          <div class="demo-header">⏱️ useEffect Timer</div>
-          <div class="demo-content">
-            <div class="demo-description">
-              Watch useEffect manage side effects with automatic cleanup
-            </div>
-            <timer-demo></timer-demo>
-          </div>
-        </div>
-        
-        <div class="demo-card">
-          <div class="demo-header">🎨 Dynamic Styling</div>
-          <div class="demo-content">
-            <div class="demo-description">
-              See how useStyle creates scoped CSS that changes dynamically
-            </div>
-            <theme-demo></theme-demo>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-};
-
-// Counter Demo
-const CounterDemo = (_, { useState, html, css, useStyle }) => {
-  const [count, setCount] = useState(0);
-  const [step, setStep] = useState(1);
-
-  useStyle(css`
-    .counter-demo {
-      text-align: center;
-    }
-    
-    .count-display {
-      font-size: 2rem;
-      font-weight: bold;
-      color: #667eea;
-      margin: 1rem 0;
-    }
-    
-    .step-control {
-      margin: 1rem 0;
-    }
-    
-    .step-input {
-      width: 60px;
-      padding: 0.5rem;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      text-align: center;
-      margin: 0 0.5rem;
-    }
-    
-    .demo-btn {
-      background: #667eea;
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-      margin: 0.25rem;
-      transition: background 0.2s;
-    }
-    
-    .demo-btn:hover {
-      background: #5a6fd8;
-    }
-    
-    .demo-btn.reset {
-      background: #dc3545;
-    }
-    
-    .demo-btn.reset:hover {
-      background: #c82333;
-    }
-  `);
-
-  return html`
-    <div class="counter-demo">
-      <div class="count-display">${count}</div>
-      
-      <div class="step-control">
-        Step: 
-        <input 
-          class="step-input"
-          type="number" 
-          .value="${step}"
-          @input="${(e) => setStep(parseInt(e.target.value) || 1)}"
-        />
-      </div>
-      
-      <button class="demo-btn" @click="${() => setCount(count - step)}">-${step}</button>
-      <button class="demo-btn reset" @click="${() => setCount(0)}">Reset</button>
-      <button class="demo-btn" @click="${() => setCount(count + step)}">+${step}</button>
-    </div>
-  `;
-};
-
-// Mini Todo Demo
-const TodoMiniDemo = (_, { useState, html, css, useStyle }) => {
-  const [todos, setTodos] = useState(['Learn Dim', 'Build something cool']);
-  const [newTodo, setNewTodo] = useState('');
-
-  const addTodo = () => {
-    if (newTodo.trim()) {
-      setTodos([...todos, newTodo.trim()]);
-      setNewTodo('');
-    }
-  };
-
-  const removeTodo = (index) => {
-    setTodos(todos.filter((_, i) => i !== index));
-  };
-
-  useStyle(css`
-    .todo-demo {
-      max-height: 250px;
-      overflow-y: auto;
-    }
-    
-    .todo-input-row {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-    }
-    
-    .todo-input {
-      flex: 1;
-      padding: 0.5rem;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-    
-    .add-btn {
-      background: #28a745;
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    
-    .add-btn:hover {
-      background: #218838;
-    }
-    
-    .todo-item {
+    .summary-row {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      background: white;
-      padding: 0.5rem;
       margin-bottom: 0.5rem;
-      border-radius: 4px;
-      border: 1px solid #e9ecef;
     }
-    
-    .remove-btn {
-      background: #dc3545;
-      color: white;
-      border: none;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.75rem;
-    }
-    
-    .remove-btn:hover {
-      background: #c82333;
-    }
-    
-    .todo-count {
-      text-align: center;
-      color: #6c757d;
-      font-size: 0.875rem;
-      margin-top: 0.5rem;
+
+    .summary-row.total {
+      font-weight: bold;
+      font-size: 1.125rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid #dee2e6;
+      color: #029cfd;
     }
   `);
 
   return html`
-    <div class="todo-demo">
-      <div class="todo-input-row">
-        <input 
-          class="todo-input"
-          .value="${newTodo}"
-          @input="${(e) => setNewTodo(e.target.value)}"
-          @keypress="${(e) => e.key === 'Enter' && addTodo()}"
-          placeholder="Add new item..."
-        />
-        <button class="add-btn" @click="${addTodo}">Add</button>
+    <div class="cart-summary">
+      <h4>Cart Summary (${cartSummary.itemCount} items)</h4>
+      <div class="summary-row">
+        <span>Subtotal:</span>
+        <span>$${cartSummary.subtotal}</span>
       </div>
-      
-      ${todos.map((todo, index) => html`
-        <div class="todo-item">
-          <span>${todo}</span>
-          <button class="remove-btn" @click="${() => removeTodo(index)}">✕</button>
-        </div>
-      `)}
-      
-      <div class="todo-count">${todos.length} items</div>
+      <div class="summary-row">
+        <span>Tax:</span>
+        <span>$${cartSummary.tax}</span>
+      </div>
+      <div class="summary-row">
+        <span>Shipping:</span>
+        <span>${cartSummary.shipping === '0.00' ? 'Free' : '$' + cartSummary.shipping}</span>
+      </div>
+      <div class="summary-row total">
+        <span>Total:</span>
+        <span>$${cartSummary.total}</span>
+      </div>
     </div>
   `;
 };
 
-// Timer Demo
-const TimerDemo = (_, { useState, useEffect, html, css, useStyle }) => {
-  const [seconds, setSeconds] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
+const InputFocusExample = (props, { useRef, useStyle, html, css }) => {
+  const inputRef = useRef();
+
+  useStyle(css`
+    .input-demo {
+      max-width: 300px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    input {
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+
+    button {
+      background: #029cfd;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+  `);
+
+  const focusAndSelect = () => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  };
+
+  return html`
+    <div class="input-demo">
+      <input 
+        ref="${inputRef}"
+        type="text" 
+        value="Double-click to select"
+        @dblclick="${focusAndSelect}"
+      />
+      <button @click="${focusAndSelect}">Focus & Select</button>
+    </div>
+  `;
+};
+
+const ThemeToggleExample = (props, { useState, useEffect, useStyle, html, css }) => {
+  const [theme, setTheme] = useState('light');
 
   useEffect(() => {
-    let interval = null;
-    if (isRunning) {
-      interval = setInterval(() => {
-        setSeconds(s => s + 1);
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isRunning]);
+    useStyle(css`
+      .theme-demo {
+        padding: 2rem;
+        background: ${unsafeCSS(theme === 'light' ? '#f8f9fa' : '#2a2a2a')};
+        color: ${unsafeCSS(theme === 'light' ? '#333' : '#fff')};
+        border-radius: 12px;
+        text-align: center;
+        transition: all 0.3s ease;
+        max-width: 400px;
+        margin: 0 auto;
+      }
 
-  useStyle(css`
-    .timer-demo {
-      text-align: center;
-    }
-    
-    .timer-display {
-      font-size: 2rem;
-      font-weight: bold;
-      color: ${isRunning ? '#28a745' : '#6c757d'};
-      margin: 1rem 0;
-      font-family: monospace;
-    }
-    
-    .timer-btn {
-      background: ${isRunning ? '#dc3545' : '#28a745'};
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 4px;
-      cursor: pointer;
-      margin: 0.25rem;
-      transition: background 0.2s;
-    }
-    
-    .timer-btn:hover {
-      opacity: 0.9;
-    }
-    
-    .reset-btn {
-      background: #6c757d;
-    }
-    
-    .timer-status {
-      color: #6c757d;
-      font-size: 0.875rem;
-      margin-top: 0.5rem;
-    }
-  `);
-
-  const formatTime = (totalSeconds) => {
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  return html`
-    <div class="timer-demo">
-      <div class="timer-display">${formatTime(seconds)}</div>
-      
-      <button class="timer-btn" @click="${() => setIsRunning(!isRunning)}">
-        ${isRunning ? 'Stop' : 'Start'}
-      </button>
-      <button class="timer-btn reset-btn" @click="${() => setSeconds(0)}">
-        Reset
-      </button>
-      
-      <div class="timer-status">
-        Timer is ${isRunning ? 'running' : 'stopped'}
-      </div>
-    </div>
-  `;
-};
-
-// Theme Demo
-const ThemeDemo = (_, { useState, html, css, useStyle }) => {
-  const [theme, setTheme] = useState('blue');
-  const [size, setSize] = useState('medium');
-
-  const themes = {
-    blue: { primary: '#667eea', secondary: '#764ba2' },
-    green: { primary: '#28a745', secondary: '#20c997' },
-    purple: { primary: '#6f42c1', secondary: '#e83e8c' },
-    orange: { primary: '#fd7e14', secondary: '#ffc107' }
-  };
-
-  const sizes = {
-    small: { padding: '0.5rem 1rem', fontSize: '0.875rem' },
-    medium: { padding: '0.75rem 1.5rem', fontSize: '1rem' },
-    large: { padding: '1rem 2rem', fontSize: '1.125rem' }
-  };
-
-  useStyle(css`
-    .theme-demo {
-      text-align: center;
-    }
-    
-    .demo-box {
-      background: linear-gradient(135deg, ${themes[theme].primary}, ${themes[theme].secondary});
-      color: white;
-      padding: ${sizes[size].padding};
-      font-size: ${sizes[size].fontSize};
-      border-radius: 8px;
-      margin: 1rem 0;
-      transition: all 0.3s ease;
-    }
-    
-    .controls {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-      margin-top: 1rem;
-    }
-    
-    .control-group {
-      text-align: left;
-    }
-    
-    .control-label {
-      display: block;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-      color: #495057;
-    }
-    
-    .control-select {
-      width: 100%;
-      padding: 0.5rem;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      background: white;
-    }
-  `);
+      button {
+        background: ${unsafeCSS(theme === 'light' ? '#6c757d' : '#029cfd')};
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 1rem;
+      }
+    `);
+  }, [theme]);
 
   return html`
     <div class="theme-demo">
-      <div class="demo-box">
-        Dynamic Styling Demo
-      </div>
-      
-      <div class="controls">
-        <div class="control-group">
-          <label class="control-label">Theme:</label>
-          <select class="control-select" .value="${theme}" @change="${(e) => setTheme(e.target.value)}">
-            <option value="blue">Blue</option>
-            <option value="green">Green</option>
-            <option value="purple">Purple</option>
-            <option value="orange">Orange</option>
-          </select>
-        </div>
-        
-        <div class="control-group">
-          <label class="control-label">Size:</label>
-          <select class="control-select" .value="${size}" @change="${(e) => setSize(e.target.value)}">
-            <option value="small">Small</option>
-            <option value="medium">Medium</option>
-            <option value="large">Large</option>
-          </select>
-        </div>
-      </div>
+      <h3>Dynamic Theme Demo</h3>
+      <p>Current theme: ${theme}</p>
+      <button @click="${() => setTheme(theme === 'light' ? 'dark' : 'light')}">
+        ${theme === 'light' ? '🌙 Dark' : '☀️ Light'} Mode
+      </button>
     </div>
   `;
 };
 
-// Live Example Component (simplified to focus on basics)
-const LiveExample = (_, { useState, html, css, useStyle }) => {
-  const [name, setName] = useState('');
-  const [count, setCount] = useState(0);
-
-  useStyle(css`
-    .live-example {
-      background: white;
-      border-radius: 12px;
-      padding: 2rem;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      margin-bottom: 2rem;
-    }
-    
-    .section-title {
-      font-size: 1.5rem;
-      color: #495057;
-      margin-bottom: 1rem;
-      border-bottom: 2px solid #667eea;
-      padding-bottom: 0.5rem;
-    }
-    
-    .demo-container {
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      padding: 2rem;
-      border-radius: 8px;
-      text-align: center;
-      margin: 1rem 0;
-    }
-    
-    .demo-input {
-      padding: 0.75rem;
-      border: 2px solid #e9ecef;
-      border-radius: 8px;
-      margin: 0.5rem;
-      font-size: 1rem;
-      width: 200px;
-    }
-    
-    .demo-input:focus {
-      outline: none;
-      border-color: #667eea;
-    }
-    
-    .demo-button {
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 1rem;
-      margin: 0.5rem;
-      transition: transform 0.2s;
-    }
-    
-    .demo-button:hover {
-      transform: translateY(-2px);
-    }
-    
-    .demo-output {
-      background: white;
-      padding: 1rem;
-      border-radius: 8px;
-      margin: 1rem 0;
-      font-size: 1.125rem;
-      color: #495057;
-    }
-  `);
-
-  return html`
-    <div class="live-example">
-      <h2 class="section-title">✨ Your First Dim Component</h2>
-      <p>This simple example shows the core concepts of Dim in action!</p>
-      
-      <div class="demo-container">
-        <input 
-          type="text" 
-          class="demo-input"
-          placeholder="Enter your name"
-          .value="${name}"
-          @input="${(e) => setName(e.target.value)}"
-        />
-        <br>
-        <button class="demo-button" @click="${() => setCount(count + 1)}">
-          Click Me! (${count})
-        </button>
-        <button class="demo-button" @click="${() => setCount(0)}">
-          Reset
-        </button>
-        
-        <div class="demo-output">
-          ${name ? html`Hello, ${name}! ` : 'Hello, stranger! '}
-          You've clicked ${count} times.
-        </div>
-      </div>
-      
-      <p><strong>What's happening:</strong></p>
-      <ul>
-        <li>🔄 <code>useState</code> manages reactive state</li>
-        <li>📝 Input binding with <code>@input</code> event handler</li>
-        <li>🎨 Scoped CSS with <code>useStyle</code></li>
-        <li>⚡ Automatic re-rendering on state changes</li>
-      </ul>
-    </div>
-  `;
-};
-
-// Navigation Component
-const NavigationSection = (_, { html, css, useStyle }) => {
-  useStyle(css`
-    .navigation {
-      background: white;
-      border-radius: 12px;
-      padding: 2rem;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    
-    .section-title {
-      font-size: 1.5rem;
-      color: #495057;
-      margin-bottom: 1rem;
-      border-bottom: 2px solid #667eea;
-      padding-bottom: 0.5rem;
-    }
-    
-    .nav-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-      margin-top: 2rem;
-    }
-    
-    .nav-card {
-      background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-      padding: 1.5rem;
-      border-radius: 8px;
-      text-decoration: none;
-      color: inherit;
-      transition: transform 0.2s;
-      border: 1px solid #e9ecef;
-    }
-    
-    .nav-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-    }
-    
-    .nav-icon {
-      font-size: 2rem;
-      margin-bottom: 1rem;
-    }
-    
-    .nav-title {
-      font-size: 1.125rem;
-      font-weight: 600;
-      color: #495057;
-      margin-bottom: 0.5rem;
-    }
-    
-    .nav-desc {
-      color: #6c757d;
-      font-size: 0.9rem;
-    }
-  `);
-
-  return html`
-    <div class="navigation">
-      <h2 class="section-title">📚 Continue Learning</h2>
-      <p>Choose your learning path based on your experience level:</p>
-      
-      <div class="nav-grid">
-        <div class="nav-card">
-          <div class="nav-icon">🎓</div>
-          <div class="nav-title">Core Concepts</div>
-          <div class="nav-desc">Learn about hooks, components, and fundamental patterns</div>
-        </div>
-        
-        <div class="nav-card">
-          <div class="nav-icon">🛠️</div>
-          <div class="nav-title">Step-by-Step Tutorial</div>
-          <div class="nav-desc">Build a complete todo app from scratch</div>
-        </div>
-        
-        <div class="nav-card">
-          <div class="nav-icon">📖</div>
-          <div class="nav-title">API Reference</div>
-          <div class="nav-desc">Complete documentation of all hooks and functions</div>
-        </div>
-        
-        <div class="nav-card">
-          <div class="nav-icon">🎯</div>
-          <div class="nav-title">Examples</div>
-          <div class="nav-desc">Live demos and code examples for common patterns</div>
-        </div>
-      </div>
-    </div>
-  `;
-};
-
-// Main Getting Started Component
-const GettingStarted = (_, { html, css, useStyle, useScope }) => {
-  useScope({
-    'hero-section': HeroSection,
-    'quick-start-code': QuickStartCode,
-    'live-example': LiveExample,
-    'code-examples': CodeExamples,
-    'interactive-demos': InteractiveDemos,
-    'navigation-section': NavigationSection
-  });
-
-  useStyle(css`
-    .getting-started {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 2rem;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-  `);
-
-  return html`
-    <div class="getting-started">
-      <hero-section></hero-section>
-      <quick-start-code></quick-start-code>
-      <live-example></live-example>
-      <code-examples></code-examples>
-      <interactive-demos></interactive-demos>
-      <navigation-section></navigation-section>
-    </div>
-  `;
-};
-
-// Register components
-define({ tag: 'hero-section', component: HeroSection });
-define({ tag: 'quick-start-code', component: QuickStartCode });
-define({ tag: 'live-example', component: LiveExample });
-define({ tag: 'code-examples', component: CodeExamples });
-define({ tag: 'example-preview', component: ExamplePreview });
-define({ tag: 'counter-example', component: CounterExample });
-define({ tag: 'todo-example', component: TodoExample });
-define({ tag: 'form-example', component: FormExample });
-define({ tag: 'theme-example', component: ThemeExample });
-define({ tag: 'interactive-demos', component: InteractiveDemos });
-define({ tag: 'counter-demo', component: CounterDemo });
-define({ tag: 'todo-demo', component: TodoMiniDemo });
-define({ tag: 'timer-demo', component: TimerDemo });
-define({ tag: 'theme-demo', component: ThemeDemo });
-define({ tag: 'navigation-section', component: NavigationSection });
-define({ tag: 'getting-started', component: GettingStarted });
+// Define components
+define({ tag: 'shopping-basket-tutorial', component: ShoppingBasketTutorial });
+define({ tag: 'product-card-example', component: ProductCardExample });
+define({ tag: 'cart-summary-example', component: CartSummaryExample });
+define({ tag: 'input-focus-example', component: InputFocusExample });
+define({ tag: 'theme-toggle-example', component: ThemeToggleExample });
 
 export default {
   title: "Getting Started",
@@ -2224,78 +978,482 @@ export default {
     docs: {
       description: {
         component: `
-# Welcome to Dim Framework
+# 🛍️ Complete Shopping Basket Tutorial
 
-Dim is a thin wrapper around lit-elements that brings React-like functional programming patterns to web components. It provides familiar hooks like useState, useEffect, and more, while leveraging the power of native web components.
+Learn Dim Framework by building a real-world shopping application that demonstrates every feature.
 
-## Why Dim?
+## 🎯 What You'll Build
 
-- **Familiar API**: If you know React hooks, you know Dim
-- **Web Standards**: Built on native web components for maximum compatibility
-- **Lightweight**: Minimal footprint with powerful features
-- **Scoped Styling**: CSS-in-JS with automatic scoping via Shadow DOM
-- **Built-in Persistence**: Automatic state persistence with IndexedDB
+A complete shopping experience featuring:
+- **Product catalog** with interactive cards
+- **Shopping cart** with quantity controls
+- **Real-time calculations** with tax and shipping
+- **Dark/light theme** switching
+- **Persistent state** that survives page reloads
+- **Responsive design** that works on all devices
 
-## Quick Example
+## 🚀 Features Covered
+
+### Core Hooks
+- **useState** - Local component state for UI interactions
+- **useEffect** - Component lifecycle and side effects
+- **useStyle** - Dynamic CSS-in-JS with theming
+- **useScope** - Component composition and organization
+- **useMemo** - Performance optimization for calculations
+- **useRef** - DOM access and manipulation
+- **useStore** - Global state management with persistence
+
+### Real-World Patterns
+- **State Management** - Cart data, user preferences, theme
+- **Component Architecture** - Modular, reusable components
+- **Performance** - Memoized calculations, efficient re-renders
+- **User Experience** - Smooth interactions, responsive design
+- **Data Persistence** - Automatic localStorage integration
+
+## 📚 Learning Path
+
+1. **Live Demo** - Interact with the completed application
+2. **Step-by-Step Tutorial** - Build it yourself with guided steps
+3. **Code Examples** - Copy-paste ready code snippets
+4. **Best Practices** - Learn professional patterns and techniques
+
+## 🔥 Why This Tutorial?
+
+Unlike simple examples, this tutorial shows you:
+- How to structure a real application
+- How different hooks work together
+- Performance considerations at scale
+- Production-ready patterns and practices
+
+Perfect for developers wanting to learn modern web component development with a React-like API!
+        `
+      }
+    }
+  },
+  tags: ["autodocs"],
+};
+
+export const LiveDemo = {
+  render: () => <shopping-basket-tutorial />,
+  name: "Live Demo",
+  parameters: {
+    docs: {
+      description: {
+        story: "A fully interactive shopping basket showcasing all Dim Framework features. Add products, manage cart, switch themes, and see persistence in action!"
+      }
+    }
+  }
+};
+
+export const StepByStep = {
+  render: () => null,
+  name: "📚 Step-by-Step Tutorial",
+  parameters: {
+    docs: {
+      source: { code: null },
+      description: {
+        story: `
+# 🎓 Building a Shopping Basket - Complete Tutorial
+
+Learn every Dim feature by building a real shopping application step by step. Each section below demonstrates a specific hook with live examples and complete code.
+
+## Step 1: Project Setup & Installation
+
+Start by setting up a new project with Dim Framework.
+
+### Install Dim
+
+\`\`\`bash
+npm install @dim/core
+# or with yarn
+yarn add @dim/core
+
+# or include via CDN
+<script type="module" src="https://unpkg.com/@dim/core"></script>
+\`\`\`
+
+### Basic HTML Structure
+
+\`\`\`html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Shopping Basket with Dim</title>
+</head>
+<body>
+    <div id="app">
+        <shopping-basket></shopping-basket>
+    </div>
+    <script type="module" src="./shopping-basket.js"></script>
+</body>
+</html>
+\`\`\`
+
+> 💡 **Tip:** Dim works without any build tools! You can develop directly in the browser with ES modules.
+
+## Step 2: Global State with useStore
+
+Create a global store for cart data that persists across page reloads.
 
 \`\`\`javascript
-import { html, css, useState, useStyle, define } from './dim.ts';
+import { useState, useStore, define } from '@dim/core';
 
-const Counter = () => {
-  const [count, setCount] = useState(0);
+const ShoppingBasket = (props, { useStore, useState, html }) => {
+  // Global persistent store
+  const store = useStore({
+    cart: useState([]),
+    theme: useState('light'),
+    user: useState({ name: 'Guest' })
+  });
+
+  const [cart, setCart] = store.cart;
+  const [theme, setTheme] = store.theme;
+  const [user, setUser] = store.user;
+
+  return html\`
+    <div>
+      <h1>Shopping Cart (\${cart.length} items)</h1>
+      <p>Theme: \${theme}</p>
+    </div>
+  \`;
+};
+
+define({ tag: 'shopping-basket', component: ShoppingBasket });
+\`\`\`
+
+> 🔥 **Key Feature:** useStore automatically persists data to localStorage, so your cart survives page reloads!
+
+## Step 3: Product Catalog with useState
+
+Build interactive product cards with local state for hover effects.
+
+\`\`\`javascript
+const ProductCard = ({ product }, { useState, useStyle, html, css }) => {
+  const [isHovered, setIsHovered] = useState(false);
   
   useStyle(css\`
-    button {
-      background: #667eea;
+    .product-card {
+      padding: 1rem;
+      border-radius: 8px;
+      background: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+      cursor: pointer;
+    }
+    
+    .product-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+    
+    .add-button {
+      background: \${isHovered ? '#0278c7' : '#029cfd'};
       color: white;
       border: none;
-      padding: 1rem 2rem;
-      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
       cursor: pointer;
+      width: 100%;
     }
   \`);
 
   return html\`
-    <button @click="\${() => setCount(count + 1)}">
-      Count: \${count}
-    </button>
+    <div 
+      class="product-card"
+      @mouseenter="\${() => setIsHovered(true)}"
+      @mouseleave="\${() => setIsHovered(false)}"
+    >
+      <h3>\${product.name}</h3>
+      <p>$\${product.price}</p>
+      <button class="add-button">Add to Cart</button>
+    </div>
+  \`;
+};
+\`\`\`
+
+> ⚠️ **Important:** Each component gets its own isolated state. Hover states are independent per card!
+
+## Step 4: Component Composition with useScope
+
+Organize your app by composing smaller components together.
+
+\`\`\`javascript
+const ProductGrid = (props, { useScope, html }) => {
+  // Register child components in this scope
+  useScope({
+    'product-card': ProductCard
+  });
+
+  const products = [
+    { id: 1, name: 'Headphones', price: 199.99 },
+    { id: 2, name: 'Coffee Mug', price: 24.99 },
+    // ... more products
+  ];
+
+  return html\`
+    <div class="product-grid">
+      \${products.map(product => html\`
+        <product-card .product="\${product}"></product-card>
+      \`)}
+    </div>
   \`;
 };
 
-define({ tag: 'my-counter', component: Counter });
+// In your main component
+const ShoppingBasket = (props, { useScope, html }) => {
+  useScope({
+    'product-grid': ProductGrid,
+    'shopping-cart': ShoppingCart,
+    'user-controls': UserControls
+  });
+
+  return html\`
+    <div>
+      <user-controls></user-controls>
+      <product-grid></product-grid>
+      <shopping-cart></shopping-cart>
+    </div>
+  \`;
+};
 \`\`\`
 
-Get started by exploring the sections below!
+> 🧩 **Component Architecture:** useScope lets you build modular, reusable components without global registration conflicts.
+
+## Step 5: Performance with useMemo
+
+Optimize expensive calculations with memoization.
+
+\`\`\`javascript
+const ShoppingCart = (props, { useMemo, html }) => {
+  // Expensive calculations memoized
+  const cartSummary = useMemo(() => {
+    console.log('Calculating cart totals...'); // Only runs when cart changes
+    
+    const subtotal = cart.reduce((sum, item) => 
+      sum + (item.price * item.quantity), 0);
+    const tax = subtotal * 0.08;
+    const shipping = subtotal > 50 ? 0 : 9.99;
+    const total = subtotal + tax + shipping;
+    
+    return {
+      subtotal: subtotal.toFixed(2),
+      tax: tax.toFixed(2),
+      shipping: shipping.toFixed(2),
+      total: total.toFixed(2),
+      itemCount: cart.reduce((sum, item) => sum + item.quantity, 0)
+    };
+  }, [cart]); // Only recalculate when cart changes
+
+  return html\`
+    <div>
+      <h3>Cart (\${cartSummary.itemCount} items)</h3>
+      <p>Subtotal: $\${cartSummary.subtotal}</p>
+      <p>Tax: $\${cartSummary.tax}</p>
+      <p>Shipping: $\${cartSummary.shipping}</p>
+      <p><strong>Total: $\${cartSummary.total}</strong></p>
+    </div>
+  \`;
+};
+\`\`\`
+
+> ⚡ **Performance:** useMemo prevents expensive recalculations on every render. Check the console to see it in action!
+
+## Step 6: DOM Access with useRef
+
+Direct DOM manipulation for focus management and input handling.
+
+\`\`\`javascript
+const CartItem = ({ item }, { useRef, html }) => {
+  const quantityRef = useRef();
+
+  const focusQuantityInput = () => {
+    quantityRef.current?.focus();
+    quantityRef.current?.select(); // Select all text
+  };
+
+  const updateQuantity = (newQuantity) => {
+    if (newQuantity <= 0) {
+      removeItem();
+      return;
+    }
+    setCart(cart.map(cartItem => 
+      cartItem.id === item.id 
+        ? { ...cartItem, quantity: newQuantity }
+        : cartItem
+    ));
+  };
+
+  return html\`
+    <div class="cart-item">
+      <span>\${item.name}</span>
+      <input 
+        ref="\${quantityRef}"
+        type="number" 
+        .value="\${item.quantity}"
+        @change="\${(e) => updateQuantity(parseInt(e.target.value))}"
+        @dblclick="\${focusQuantityInput}"
+      />
+      <button @click="\${() => updateQuantity(item.quantity + 1)}">+</button>
+      <button @click="\${() => updateQuantity(item.quantity - 1)}">-</button>
+    </div>
+  \`;
+};
+\`\`\`
+
+> 📍 **DOM Control:** useRef gives you direct access to DOM elements for focus, scrolling, measurements, and more.
+
+## Step 7: Dynamic Theming with useStyle
+
+Create responsive, themeable components with CSS-in-JS.
+
+\`\`\`javascript
+const ShoppingApp = (props, { useStyle, useEffect, css }) => {
+  // Re-apply styles when theme changes
+  useEffect(() => {
+    useStyle(css\`
+      .shopping-app {
+        background: \${theme === 'light' ? '#f8f9fa' : '#1a1a1a'};
+        color: \${theme === 'light' ? '#333' : '#fff'};
+        transition: all 0.3s ease;
+        min-height: 100vh;
+        padding: 2rem;
+      }
+
+      .product-card {
+        background: \${theme === 'light' ? 'white' : '#2a2a2a'};
+        border: 1px solid \${theme === 'light' ? '#e9ecef' : '#404040'};
+      }
+
+      @media (max-width: 768px) {
+        .shopping-app {
+          padding: 1rem;
+        }
+        
+        .main-content {
+          grid-template-columns: 1fr; /* Stack on mobile */
+        }
+      }
+    \`);
+  }, [theme]);
+
+  return html\`
+    <div class="shopping-app">
+      <button @click="\${() => setTheme(theme === 'light' ? 'dark' : 'light')}">
+        \${theme === 'light' ? '🌙 Dark' : '☀️ Light'} Mode
+      </button>
+      <!-- rest of app -->
+    </div>
+  \`;
+};
+\`\`\`
+
+> 🎨 **Responsive Design:** Combine CSS-in-JS with media queries for truly dynamic, responsive components.
+
+## Step 8: Side Effects with useEffect
+
+Handle component lifecycle, API calls, and cleanup.
+
+\`\`\`javascript
+const ShoppingBasket = (props, { useEffect, html }) => {
+  // Component lifecycle
+  useEffect(() => {
+    console.log('Shopping basket mounted');
+    
+    // Cleanup function
+    return () => {
+      console.log('Shopping basket unmounted');
+    };
+  }, []); // Empty deps = run once on mount/unmount
+
+  // React to cart changes
+  useEffect(() => {
+    console.log(\`Cart updated: \${cart.length} items\`);
+    
+    // Update document title
+    document.title = \`Shopping Cart (\${cart.length})\`;
+    
+    // Save to analytics (example)
+    if (cart.length > 0) {
+      analytics.track('cart_updated', {
+        itemCount: cart.length,
+        total: calculateTotal(cart)
+      });
+    }
+  }, [cart]); // Run when cart changes
+
+  // Auto-save draft cart
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      localStorage.setItem('cart_draft', JSON.stringify(cart));
+    }, 1000); // Debounce saves
+
+    return () => clearTimeout(timer);
+  }, [cart]);
+
+  return html\`<div>Your shopping basket</div>\`;
+};
+\`\`\`
+
+> 🧹 **Cleanup:** Always clean up timers, subscriptions, and event listeners in the cleanup function to prevent memory leaks.
+
+## 🎉 Congratulations!
+
+You've now learned all the core Dim hooks by building a complete shopping basket application. You can see the full implementation in the **Live Demo** story above.
+
+### Next Steps
+
+1. Try modifying the live demo to add new features
+2. Explore the **API Reference** for detailed hook documentation
+3. Build your own application using these patterns!
         `
       }
     }
   }
 };
 
-export const Overview = {
-  render: wrapLitHtmlStory(() => html`<getting-started></getting-started>`),
-  name: "Overview & Installation",
+export const ProductCatalogDemo = {
+  render: () => <product-card-example />,
+  name: "useState - Product Card",
   parameters: {
     docs: {
       description: {
-        story: `
-### Welcome to Dim Framework
+        story: `Interactive product card demonstrating local state management with hover effects.`
+      }
+    }
+  }
+};
 
-This page provides a comprehensive introduction to Dim, including installation instructions, your first component, and a live interactive example.
+export const CartCalculationsDemo = {
+  render: () => <cart-summary-example />,
+  name: "useMemo - Cart Summary",
+  parameters: {
+    docs: {
+      description: {
+        story: `Cart summary showing memoized calculations for performance. Open the console to see when calculations run.`
+      }
+    }
+  }
+};
 
-**What you'll find here:**
-- 🔥 **Hero Section**: Overview of Dim's key features
-- 🚀 **Quick Start**: Step-by-step installation and setup
-- ✨ **Live Example**: Interactive demo to try Dim immediately
-- 📚 **Navigation**: Links to continue your learning journey
+export const InputFocusDemo = {
+  render: () => <input-focus-example />,
+  name: "useRef - DOM Access",
+  parameters: {
+    docs: {
+      description: {
+        story: `Input focus management using useRef for direct DOM manipulation.`
+      }
+    }
+  }
+};
 
-**Perfect for:**
-- Developers new to Dim
-- Getting a quick overview of capabilities
-- Understanding the development workflow
-
-Try the interactive example above to see how useState and event handling work in Dim!
-        `
+export const ThemeToggleDemo = {
+  render: () => <theme-toggle-example />,
+  name: "useStyle - Dynamic Theming",
+  parameters: {
+    docs: {
+      description: {
+        story: `Dynamic theme switching with CSS-in-JS, demonstrating reactive styling.`
       }
     }
   }
