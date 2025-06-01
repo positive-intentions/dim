@@ -395,6 +395,1382 @@ const EffectDemo = (_, { useState, useEffect, html, css, useStyle }) => {
   `;
 };
 
+// Advanced Feature Demos
+
+// useScope Demo - Parent/Child Component Composition
+const ScopeDemo = (_, { useState, useScope, html, css, useStyle }) => {
+  const [todos, setTodos] = useState([
+    { id: 1, text: 'Learn useScope', completed: false },
+    { id: 2, text: 'Build nested components', completed: true }
+  ]);
+  
+  // Register child components in scope
+  useScope({
+    'todo-item': TodoItem,
+    'add-todo-form': AddTodoForm
+  });
+  
+  const addTodo = (text) => {
+    setTodos([...todos, {
+      id: Date.now(),
+      text,
+      completed: false
+    }]);
+  };
+  
+  const toggleTodo = (id) => {
+    setTodos(todos.map(todo =>
+      todo.id === id ? { ...todo, completed: !todo.completed } : todo
+    ));
+  };
+  
+  const deleteTodo = (id) => {
+    setTodos(todos.filter(todo => todo.id !== id));
+  };
+  
+  useStyle(css`
+    .scope-demo {
+      max-width: 500px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    
+    .scope-header {
+      background: linear-gradient(135deg, #029cfd, #0278c7);
+      color: white;
+      padding: 1.5rem;
+      text-align: center;
+    }
+    
+    .scope-content {
+      padding: 1.5rem;
+    }
+    
+    .scope-info {
+      background: #e7f3ff;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+      color: #0056b3;
+    }
+  `);
+  
+  return html`
+    <div class="scope-demo">
+      <div class="scope-header">
+        <h3>🔧 useScope Demo</h3>
+        <p>Component Composition with Scoped Children</p>
+      </div>
+      <div class="scope-content">
+        <div class="scope-info">
+          ✨ The TodoItem and AddTodoForm components are registered using useScope, 
+          creating clean component composition without global namespace pollution.
+        </div>
+        
+        <add-todo-form .props="${{ onAdd: addTodo }}"></add-todo-form>
+        
+        ${todos.map(todo => html`
+          <todo-item 
+            .props="${{ 
+              todo, 
+              onToggle: () => toggleTodo(todo.id),
+              onDelete: () => deleteTodo(todo.id)
+            }}"
+          ></todo-item>
+        `)}
+      </div>
+    </div>
+  `;
+};
+
+// Child components for useScope demo
+const TodoItem = ({ todo, onToggle, onDelete }, { html, css, useStyle }) => {
+  useStyle(css`
+    .todo-item {
+      display: flex;
+      align-items: center;
+      padding: 0.75rem;
+      border: 1px solid #e9ecef;
+      border-radius: 4px;
+      margin-bottom: 0.5rem;
+      transition: all 0.2s;
+    }
+    
+    .todo-item:hover {
+      background: #f8f9fa;
+    }
+    
+    .todo-checkbox {
+      margin-right: 0.75rem;
+    }
+    
+    .todo-text {
+      flex: 1;
+      transition: all 0.2s;
+    }
+    
+    .todo-text.completed {
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
+    
+    .delete-btn {
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+    }
+    
+    .delete-btn:hover {
+      background: #c82333;
+    }
+  `);
+  
+  return html`
+    <div class="todo-item">
+      <input 
+        type="checkbox" 
+        class="todo-checkbox"
+        .checked="${todo.completed}"
+        @change="${onToggle}"
+      />
+      <span class="todo-text ${todo.completed ? 'completed' : ''}">${todo.text}</span>
+      <button class="delete-btn" @click="${onDelete}">✕</button>
+    </div>
+  `;
+};
+
+const AddTodoForm = ({ onAdd }, { useState, html, css, useStyle }) => {
+  const [text, setText] = useState('');
+  
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (text.trim()) {
+      onAdd(text.trim());
+      setText('');
+    }
+  };
+  
+  useStyle(css`
+    .add-form {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    .add-input {
+      flex: 1;
+      padding: 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    
+    .add-input:focus {
+      outline: none;
+      border-color: #029cfd;
+      box-shadow: 0 0 0 2px rgba(2, 156, 253, 0.2);
+    }
+    
+    .add-btn {
+      background: #28a745;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    
+    .add-btn:hover {
+      background: #218838;
+    }
+    
+    .add-btn:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+    }
+  `);
+  
+  return html`
+    <form class="add-form" @submit="${handleSubmit}">
+      <input 
+        type="text"
+        class="add-input"
+        .value="${text}"
+        @input="${(e) => setText(e.target.value)}"
+        placeholder="Add a new todo..."
+      />
+      <button type="submit" class="add-btn" ?disabled="${!text.trim()}">
+        Add Todo
+      </button>
+    </form>
+  `;
+};
+
+// useStore Demo - Global State Management
+const StoreDemo = (_, { useStore, useState, html, css, useStyle, useScope }) => {
+  // Create a global store
+  const store = useStore({
+    user: useState({ name: 'John Doe', email: 'john@example.com' }),
+    settings: {
+      theme: useState('light'),
+      notifications: useState(true)
+    },
+    counter: useState(0),
+    cart: {
+      items: useState([]),
+      total: useState(0)
+    }
+  });
+  
+  useScope({
+    'user-profile': UserProfile,
+    'settings-panel': SettingsPanel,
+    'counter-widget': CounterWidget,
+    'shopping-cart': ShoppingCart
+  });
+  
+  useStyle(css`
+    .store-demo {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .store-header {
+      background: linear-gradient(135deg, #6f42c1, #e83e8c);
+      color: white;
+      padding: 2rem;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    
+    .components-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+    
+    @media (max-width: 768px) {
+      .components-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .store-info {
+      background: #f8f4ff;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-bottom: 2rem;
+      color: #6f42c1;
+      font-size: 0.875rem;
+    }
+  `);
+  
+  return html`
+    <div class="store-demo">
+      <div class="store-header">
+        <h3>💾 useStore Demo</h3>
+        <p>Global State Management with Automatic Persistence</p>
+      </div>
+      
+      <div class="store-info">
+        🔄 All state changes are automatically shared between components and persisted to IndexedDB.
+        Try refreshing the page to see persistence in action!
+      </div>
+      
+      <div class="components-grid">
+        <user-profile .props="${{ store }}"></user-profile>
+        <settings-panel .props="${{ store }}"></settings-panel>
+        <counter-widget .props="${{ store }}"></counter-widget>
+        <shopping-cart .props="${{ store }}"></shopping-cart>
+      </div>
+    </div>
+  `;
+};
+
+// Child components for useStore demo
+const UserProfile = ({ store }, { html, css, useStyle }) => {
+  const [user, setUser] = store.user;
+  
+  useStyle(css`
+    .user-profile {
+      background: white;
+      border-radius: 8px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .profile-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .avatar {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6f42c1, #e83e8c);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 1.25rem;
+    }
+    
+    .profile-input {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-bottom: 0.5rem;
+    }
+  `);
+  
+  return html`
+    <div class="user-profile">
+      <h4>👤 User Profile</h4>
+      <div class="profile-header">
+        <div class="avatar">${user.name.charAt(0)}</div>
+        <div>
+          <div><strong>${user.name}</strong></div>
+          <div>${user.email}</div>
+        </div>
+      </div>
+      
+      <input 
+        type="text"
+        class="profile-input"
+        .value="${user.name}"
+        @input="${(e) => setUser({ ...user, name: e.target.value })}"
+        placeholder="Name"
+      />
+      <input 
+        type="email"
+        class="profile-input"
+        .value="${user.email}"
+        @input="${(e) => setUser({ ...user, email: e.target.value })}"
+        placeholder="Email"
+      />
+    </div>
+  `;
+};
+
+const SettingsPanel = ({ store }, { html, css, useStyle }) => {
+  const [theme, setTheme] = store.settings.theme;
+  const [notifications, setNotifications] = store.settings.notifications;
+  
+  useStyle(css`
+    .settings-panel {
+      background: white;
+      border-radius: 8px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .setting-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    
+    .setting-select {
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    
+    .setting-checkbox {
+      transform: scale(1.2);
+    }
+    
+    .current-theme {
+      padding: 1rem;
+      border-radius: 4px;
+      margin-top: 1rem;
+      text-align: center;
+      transition: all 0.3s;
+    }
+    
+    .current-theme.light {
+      background: #f8f9fa;
+      color: #333;
+    }
+    
+    .current-theme.dark {
+      background: #2d3748;
+      color: white;
+    }
+  `);
+  
+  return html`
+    <div class="settings-panel">
+      <h4>⚙️ Settings</h4>
+      
+      <div class="setting-item">
+        <label>Theme:</label>
+        <select 
+          class="setting-select"
+          .value="${theme}"
+          @change="${(e) => setTheme(e.target.value)}"
+        >
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
+      
+      <div class="setting-item">
+        <label>Notifications:</label>
+        <input 
+          type="checkbox"
+          class="setting-checkbox"
+          .checked="${notifications}"
+          @change="${(e) => setNotifications(e.target.checked)}"
+        />
+      </div>
+      
+      <div class="current-theme ${theme}">
+        Current theme: ${theme}
+        ${notifications ? '🔔' : '🔕'}
+      </div>
+    </div>
+  `;
+};
+
+const CounterWidget = ({ store }, { html, css, useStyle }) => {
+  const [counter, setCounter] = store.counter;
+  
+  useStyle(css`
+    .counter-widget {
+      background: white;
+      border-radius: 8px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    
+    .counter-display {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #6f42c1;
+      margin: 1rem 0;
+    }
+    
+    .counter-buttons {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    
+    .counter-btn {
+      background: #6f42c1;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .counter-btn:hover {
+      background: #5a359a;
+    }
+  `);
+  
+  return html`
+    <div class="counter-widget">
+      <h4>🔢 Shared Counter</h4>
+      <div class="counter-display">${counter}</div>
+      <div class="counter-buttons">
+        <button class="counter-btn" @click="${() => setCounter(counter - 1)}">-</button>
+        <button class="counter-btn" @click="${() => setCounter(0)}">Reset</button>
+        <button class="counter-btn" @click="${() => setCounter(counter + 1)}">+</button>
+      </div>
+    </div>
+  `;
+};
+
+const ShoppingCart = ({ store }, { html, css, useStyle }) => {
+  const [cartItems, setCartItems] = store.cart.items;
+  const [total, setTotal] = store.cart.total;
+  
+  const sampleProducts = [
+    { id: 1, name: 'Widget A', price: 19.99 },
+    { id: 2, name: 'Gadget B', price: 39.99 },
+    { id: 3, name: 'Tool C', price: 29.99 }
+  ];
+  
+  const addToCart = (product) => {
+    const existingItem = cartItems.find(item => item.id === product.id);
+    if (existingItem) {
+      setCartItems(cartItems.map(item => 
+        item.id === product.id 
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      ));
+    } else {
+      setCartItems([...cartItems, { ...product, quantity: 1 }]);
+    }
+    updateTotal();
+  };
+  
+  const removeFromCart = (productId) => {
+    setCartItems(cartItems.filter(item => item.id !== productId));
+    updateTotal();
+  };
+  
+  const updateTotal = () => {
+    const newTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    setTotal(newTotal);
+  };
+  
+  // Update total when cartItems changes
+  const currentTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  if (currentTotal !== total) {
+    setTotal(currentTotal);
+  }
+  
+  useStyle(css`
+    .shopping-cart {
+      background: white;
+      border-radius: 8px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .cart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    
+    .cart-total {
+      font-weight: bold;
+      color: #28a745;
+      font-size: 1.125rem;
+    }
+    
+    .products-section {
+      margin-bottom: 1rem;
+    }
+    
+    .product-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .product-name {
+      flex: 1;
+      font-size: 0.875rem;
+    }
+    
+    .product-price {
+      color: #666;
+      margin-right: 0.5rem;
+      font-size: 0.875rem;
+    }
+    
+    .add-btn {
+      background: #28a745;
+      color: white;
+      border: none;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+    }
+    
+    .add-btn:hover {
+      background: #218838;
+    }
+    
+    .cart-items {
+      margin-bottom: 1rem;
+    }
+    
+    .cart-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      background: #f8f9fa;
+      padding: 0.5rem;
+      border-radius: 4px;
+      margin-bottom: 0.5rem;
+    }
+    
+    .item-info {
+      flex: 1;
+      font-size: 0.875rem;
+    }
+    
+    .remove-btn {
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+    }
+    
+    .remove-btn:hover {
+      background: #c82333;
+    }
+    
+    .empty-cart {
+      text-align: center;
+      color: #666;
+      font-style: italic;
+      padding: 1rem 0;
+    }
+    
+    .clear-btn {
+      background: #6c757d;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 0.5rem;
+    }
+    
+    .clear-btn:hover {
+      background: #545b62;
+    }
+  `);
+  
+  return html`
+    <div class="shopping-cart">
+      <div class="cart-header">
+        <h4>🛒 Shopping Cart</h4>
+        <div class="cart-total">$${total.toFixed(2)}</div>
+      </div>
+      
+      <div class="products-section">
+        <strong>Available Products:</strong>
+        ${sampleProducts.map(product => html`
+          <div class="product-item">
+            <span class="product-name">${product.name}</span>
+            <span class="product-price">$${product.price}</span>
+            <button class="add-btn" @click="${() => addToCart(product)}">Add</button>
+          </div>
+        `)}
+      </div>
+      
+      <div class="cart-items">
+        <strong>Cart Items (${cartItems.length}):</strong>
+        ${cartItems.length === 0 ? html`
+          <div class="empty-cart">Cart is empty</div>
+        ` : cartItems.map(item => html`
+          <div class="cart-item">
+            <div class="item-info">
+              ${item.name} x${item.quantity} = $${(item.price * item.quantity).toFixed(2)}
+            </div>
+            <button class="remove-btn" @click="${() => removeFromCart(item.id)}">Remove</button>
+          </div>
+        `)}
+      </div>
+      
+      ${cartItems.length > 0 ? html`
+        <button class="clear-btn" @click="${() => { setCartItems([]); setTotal(0); }}">
+          Clear Cart
+        </button>
+      ` : ''}
+    </div>
+  `;
+};
+
+// useMemo Demo - Performance Optimization
+const MemoDemo = (_, { useState, useMemo, html, css, useStyle }) => {
+  const [items, setItems] = useState(
+    Array.from({ length: 1000 }, (_, i) => ({
+      id: i,
+      name: `Product ${i + 1}`,
+      price: Math.floor(Math.random() * 100) + 10,
+      category: ['Electronics', 'Clothing', 'Books', 'Home'][Math.floor(Math.random() * 4)]
+    }))
+  );
+  const [filter, setFilter] = useState('');
+  const [sortBy, setSortBy] = useState('name');
+  const [renderCount, setRenderCount] = useState(0);
+  
+  // Expensive computation - only recalculates when items, filter, or sortBy changes
+  const processedItems = useMemo(() => {
+    console.log('🔄 Processing items...');
+    
+    let filtered = items.filter(item =>
+      item.name.toLowerCase().includes(filter.toLowerCase()) ||
+      item.category.toLowerCase().includes(filter.toLowerCase())
+    );
+    
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'price': return a.price - b.price;
+        case 'name': return a.name.localeCompare(b.name);
+        case 'category': return a.category.localeCompare(b.category);
+        default: return 0;
+      }
+    });
+    
+    return filtered.slice(0, 50); // Show only first 50 for demo
+  }, [items, filter, sortBy]);
+  
+  // Expensive stats calculation
+  const stats = useMemo(() => {
+    console.log('📊 Calculating stats...');
+    return {
+      total: processedItems.length,
+      avgPrice: processedItems.length > 0 
+        ? processedItems.reduce((sum, item) => sum + item.price, 0) / processedItems.length 
+        : 0,
+      categories: [...new Set(processedItems.map(item => item.category))]
+    };
+  }, [processedItems]);
+  
+  // This will cause re-render but NOT recalculate memoized values
+  const forceRerender = () => {
+    setRenderCount(renderCount + 1);
+  };
+  
+  useStyle(css`
+    .memo-demo {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .memo-header {
+      background: linear-gradient(135deg, #ff6b6b, #ffa500);
+      color: white;
+      padding: 2rem;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      background: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .control-input, .control-select {
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    
+    .stats {
+      background: #fff3cd;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+    
+    .stat-item {
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #856404;
+    }
+    
+    .items-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .item-card {
+      background: white;
+      padding: 1rem;
+      border-radius: 4px;
+      border: 1px solid #e9ecef;
+      transition: transform 0.2s;
+    }
+    
+    .item-card:hover {
+      transform: translateY(-2px);
+    }
+    
+    .performance-info {
+      background: #d1ecf1;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+      color: #0c5460;
+      font-size: 0.875rem;
+    }
+    
+    .rerender-btn {
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-bottom: 1rem;
+    }
+  `);
+  
+  return html`
+    <div class="memo-demo">
+      <div class="memo-header">
+        <h3>🚀 useMemo Demo</h3>
+        <p>Performance Optimization with Memoization</p>
+      </div>
+      
+      <div class="performance-info">
+        💡 Open browser console to see when expensive calculations run. 
+        useMemo prevents unnecessary recalculations when dependencies don't change.
+        <br><br>
+        <strong>Render count:</strong> ${renderCount}
+        <button class="rerender-btn" @click="${forceRerender}">
+          Force Re-render (won't recalculate memo)
+        </button>
+      </div>
+      
+      <div class="controls">
+        <div class="control-group">
+          <label><strong>Filter:</strong></label>
+          <input 
+            type="text"
+            class="control-input"
+            .value="${filter}"
+            @input="${(e) => setFilter(e.target.value)}"
+            placeholder="Search products..."
+          />
+        </div>
+        
+        <div class="control-group">
+          <label><strong>Sort by:</strong></label>
+          <select 
+            class="control-select"
+            .value="${sortBy}"
+            @change="${(e) => setSortBy(e.target.value)}"
+          >
+            <option value="name">Name</option>
+            <option value="price">Price</option>
+            <option value="category">Category</option>
+          </select>
+        </div>
+        
+        <div class="control-group">
+          <label><strong>Actions:</strong></label>
+          <button 
+            class="control-input"
+            @click="${() => setItems([...items].sort(() => Math.random() - 0.5))}"
+            style="cursor: pointer; background: #28a745; color: white; border: none;"
+          >
+            Shuffle Items
+          </button>
+        </div>
+      </div>
+      
+      <div class="stats">
+        <div class="stat-item">
+          <div class="stat-value">${stats.total}</div>
+          <div>Items Found</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">$${stats.avgPrice.toFixed(2)}</div>
+          <div>Average Price</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${stats.categories.length}</div>
+          <div>Categories</div>
+        </div>
+      </div>
+      
+      <div class="items-grid">
+        ${processedItems.map(item => html`
+          <div class="item-card">
+            <h4>${item.name}</h4>
+            <p><strong>$${item.price}</strong></p>
+            <p>${item.category}</p>
+          </div>
+        `)}
+      </div>
+    </div>
+  `;
+};
+
+// useRef Demo - Imperative APIs
+const RefDemo = (_, { useRef, useState, html, css, useStyle, useScope }) => {
+  const [status, setStatus] = useState('Ready');
+  const [playerState, setPlayerState] = useState({ volume: 50, currentTime: 0 });
+  const playerRef = useRef();
+  const formRef = useRef();
+  
+  useScope({
+    'media-player': MediaPlayer,
+    'form-validator': FormValidator
+  });
+  
+  useStyle(css`
+    .ref-demo {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .ref-header {
+      background: linear-gradient(135deg, #20c997, #28a745);
+      color: white;
+      padding: 2rem;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    
+    .demo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+    
+    .control-panel {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .control-btn {
+      background: #20c997;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 0.25rem;
+    }
+    
+    .control-btn:hover {
+      background: #1ba085;
+    }
+    
+    .status-display {
+      background: #e7f6f1;
+      padding: 1rem;
+      border-radius: 4px;
+      margin: 1rem 0;
+      color: #20c997;
+      font-weight: bold;
+    }
+    
+    .ref-info {
+      background: #d4edda;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-bottom: 2rem;
+      color: #155724;
+      font-size: 0.875rem;
+    }
+  `);
+  
+  return html`
+    <div class="ref-demo">
+      <div class="ref-header">
+        <h3>🎯 useRef Demo</h3>
+        <p>Imperative APIs and Component References</p>
+      </div>
+      
+      <div class="ref-info">
+        🔗 useRef allows you to expose imperative APIs from components, 
+        enabling parent components to call methods directly on child components.
+      </div>
+      
+      <div class="demo-grid">
+        <div class="control-panel">
+          <h4>Media Player Controls</h4>
+          <div class="status-display">Status: ${status}</div>
+          
+          <button class="control-btn" @click="${() => {
+            if (playerRef.current?.play) {
+              playerRef.current.play();
+              setStatus('Playing...');
+            }
+          }}">▶️ Play</button>
+          
+          <button class="control-btn" @click="${() => {
+            if (playerRef.current?.pause) {
+              playerRef.current.pause();
+              setStatus('Paused');
+            }
+          }}">⏸️ Pause</button>
+          
+          <button class="control-btn" @click="${() => {
+            if (playerRef.current?.seek) {
+              playerRef.current.seek(30);
+              setStatus('Seeking to 30s');
+            }
+          }}">⏭️ Seek 30s</button>
+          
+          <button class="control-btn" @click="${() => {
+            if (playerRef.current?.setVolume) {
+              const newVolume = Math.floor(Math.random() * 100);
+              playerRef.current.setVolume(newVolume);
+              setPlayerState({ ...playerState, volume: newVolume });
+              setStatus(`Volume: ${newVolume}%`);
+            }
+          }}">🔊 Random Volume</button>
+        </div>
+        
+        <div class="control-panel">
+          <h4>Form Validation</h4>
+          
+          <button class="control-btn" @click="${() => {
+            if (formRef.current?.validate) {
+              const result = formRef.current.validate();
+              setStatus(`Valid: ${result.isValid}, Errors: ${result.errors.length}`);
+            }
+          }}">✅ Validate Form</button>
+          
+          <button class="control-btn" @click="${() => {
+            if (formRef.current?.reset) {
+              formRef.current.reset();
+              setStatus('Form Reset');
+            }
+          }}">🔄 Reset Form</button>
+          
+          <button class="control-btn" @click="${() => {
+            if (formRef.current?.fillSample) {
+              formRef.current.fillSample();
+              setStatus('Sample Data Filled');
+            }
+          }}">📝 Fill Sample</button>
+        </div>
+      </div>
+      
+      <div class="demo-grid">
+        <media-player .props="${{ onStateChange: setPlayerState, ref: playerRef }}"></media-player>
+        <form-validator .props="${{ ref: formRef }}"></form-validator>
+      </div>
+    </div>
+  `;
+};
+
+// Media Player component for useRef demo
+const MediaPlayer = ({ onStateChange, ref }, { useRef, useState, useEffect, html, css, useStyle }) => {
+  const playerRef = ref || useRef();
+  const [state, setState] = useState({
+    isPlaying: false,
+    volume: 50,
+    currentTime: 0,
+    duration: 180
+  });
+  
+  // Timer effect for playing
+  useEffect(() => {
+    let interval;
+    if (state.isPlaying && state.currentTime < state.duration) {
+      interval = setInterval(() => {
+        setState(prev => {
+          const newTime = Math.min(prev.currentTime + 1, prev.duration);
+          const newState = { ...prev, currentTime: newTime };
+          
+          // Auto-pause when reaching the end
+          if (newTime >= prev.duration) {
+            newState.isPlaying = false;
+          }
+          
+          onStateChange?.(newState);
+          return newState;
+        });
+      }, 1000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [state.isPlaying, state.currentTime, state.duration]);
+  
+  // Expose imperative API
+  playerRef.current = {
+    play: () => {
+      setState(prev => ({ ...prev, isPlaying: true }));
+      onStateChange?.({ ...state, isPlaying: true });
+    },
+    pause: () => {
+      setState(prev => ({ ...prev, isPlaying: false }));
+      onStateChange?.({ ...state, isPlaying: false });
+    },
+    seek: (time) => {
+      setState(prev => ({ ...prev, currentTime: time }));
+      onStateChange?.({ ...state, currentTime: time });
+    },
+    setVolume: (volume) => {
+      setState(prev => ({ ...prev, volume }));
+      onStateChange?.({ ...state, volume });
+    }
+  };
+  
+  useStyle(css`
+    .media-player {
+      background: #1a1a1a;
+      color: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      text-align: center;
+    }
+    
+    .player-display {
+      background: #2d2d2d;
+      padding: 2rem;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+    }
+    
+    .time-info {
+      font-family: monospace;
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 4px;
+      background: #555;
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 1rem 0;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: #20c997;
+      transition: width 0.3s;
+    }
+    
+    .volume-info {
+      margin-top: 1rem;
+      opacity: 0.8;
+    }
+  `);
+  
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  return html`
+    <div class="media-player">
+      <h4>🎵 Media Player</h4>
+      <div class="player-display">
+        <div class="time-info">
+          ${formatTime(state.currentTime)} / ${formatTime(state.duration)}
+        </div>
+        <div class="progress-bar">
+          <div 
+            class="progress-fill" 
+            style="width: ${(state.currentTime / state.duration) * 100}%"
+          ></div>
+        </div>
+        <div>Status: ${state.isPlaying ? '▶️ Playing' : '⏸️ Paused'}</div>
+        <div class="volume-info">Volume: ${state.volume}%</div>
+      </div>
+      <div style="font-size: 0.875rem; opacity: 0.7;">
+        Use the controls above to interact with this player
+      </div>
+    </div>
+  `;
+};
+
+// Form Validator component for useRef demo
+const FormValidator = ({ ref }, { useRef, useState, html, css, useStyle }) => {
+  const formRef = ref || useRef();
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    age: ''
+  });
+  const [errors, setErrors] = useState([]);
+  
+  // Expose imperative API
+  formRef.current = {
+    validate: () => {
+      const newErrors = [];
+      
+      if (!formData.name.trim()) {
+        newErrors.push('Name is required');
+      }
+      
+      if (!formData.email.trim()) {
+        newErrors.push('Email is required');
+      } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+        newErrors.push('Invalid email format');
+      }
+      
+      if (!formData.age) {
+        newErrors.push('Age is required');
+      } else if (isNaN(formData.age) || formData.age < 0 || formData.age > 120) {
+        newErrors.push('Age must be between 0 and 120');
+      }
+      
+      setErrors(newErrors);
+      return {
+        isValid: newErrors.length === 0,
+        errors: newErrors,
+        data: formData
+      };
+    },
+    reset: () => {
+      setFormData({ name: '', email: '', age: '' });
+      setErrors([]);
+    },
+    fillSample: () => {
+      setFormData({
+        name: 'John Doe',
+        email: 'john@example.com',
+        age: '25'
+      });
+      setErrors([]);
+    }
+  };
+  
+  useStyle(css`
+    .form-validator {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    
+    .form-label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: bold;
+      color: #333;
+    }
+    
+    .form-input {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    
+    .form-input.error {
+      border-color: #dc3545;
+    }
+    
+    .errors-list {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-top: 1rem;
+    }
+    
+    .error-item {
+      margin-bottom: 0.25rem;
+    }
+    
+    .success-message {
+      background: #d4edda;
+      color: #155724;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-top: 1rem;
+    }
+  `);
+  
+  return html`
+    <div class="form-validator">
+      <h4>📋 Form Validator</h4>
+      
+      <div class="form-group">
+        <label class="form-label">Name:</label>
+        <input 
+          type="text"
+          class="form-input ${errors.some(e => e.includes('Name')) ? 'error' : ''}"
+          .value="${formData.name}"
+          @input="${(e) => setFormData({ ...formData, name: e.target.value })}"
+          placeholder="Enter your name"
+        />
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Email:</label>
+        <input 
+          type="email"
+          class="form-input ${errors.some(e => e.includes('Email')) ? 'error' : ''}"
+          .value="${formData.email}"
+          @input="${(e) => setFormData({ ...formData, email: e.target.value })}"
+          placeholder="Enter your email"
+        />
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Age:</label>
+        <input 
+          type="number"
+          class="form-input ${errors.some(e => e.includes('Age')) ? 'error' : ''}"
+          .value="${formData.age}"
+          @input="${(e) => setFormData({ ...formData, age: e.target.value })}"
+          placeholder="Enter your age"
+        />
+      </div>
+      
+      ${errors.length > 0 ? html`
+        <div class="errors-list">
+          <strong>Validation Errors:</strong>
+          ${errors.map(error => html`<div class="error-item">• ${error}</div>`)}
+        </div>
+      ` : ''}
+      
+      ${errors.length === 0 && (formData.name || formData.email || formData.age) ? html`
+        <div class="success-message">
+          ✅ Form is ready to validate!
+        </div>
+      ` : ''}
+      
+      <div style="font-size: 0.875rem; opacity: 0.7; margin-top: 1rem;">
+        Use the controls above to validate, reset, or fill sample data
+      </div>
+    </div>
+  `;
+};
+
 // Main Tutorial Component
 const DimTutorial = (_, { html, css, useStyle, useScope }) => {
   useScope({
@@ -403,7 +1779,11 @@ const DimTutorial = (_, { html, css, useStyle, useScope }) => {
     'counter-demo': CounterDemo,
     'input-demo': InputDemo,
     'style-demo': StyleDemo,
-    'effect-demo': EffectDemo
+    'effect-demo': EffectDemo,
+    'scope-demo': ScopeDemo,
+    'store-demo': StoreDemo,
+    'memo-demo': MemoDemo,
+    'ref-demo': RefDemo
   });
   
   useStyle(css`
@@ -787,6 +2167,13 @@ const TodoApp = (_, { useScope, html }) => {
 
 // Child components are scoped to this parent
 // No global namespace pollution`}"></code-example>
+          
+          <live-demo 
+            title="Component Composition Demo" 
+            description="See how useScope enables clean component composition with TodoItem and AddTodoForm child components"
+          >
+            <scope-demo></scope-demo>
+          </live-demo>
         </div>
         
         <div class="subsection">
@@ -817,6 +2204,13 @@ const [cartItems, setCartItems] = store.cart.items;
 // Shared across all components using the store
 setUser({ name: 'John', email: 'john@example.com' });
 setTheme('dark');`}"></code-example>
+          
+          <live-demo 
+            title="Global State Management Demo" 
+            description="Multiple components sharing state through useStore with UserProfile, SettingsPanel, CounterWidget, and ShoppingCart - all with persistent storage"
+          >
+            <store-demo></store-demo>
+          </live-demo>
         </div>
         
         <div class="subsection">
@@ -849,6 +2243,13 @@ setTheme('dark');`}"></code-example>
     </div>
   \`;
 };`}"></code-example>
+          
+          <live-demo 
+            title="Performance Optimization Demo" 
+            description="Watch how useMemo prevents expensive recalculations when filtering and sorting products"
+          >
+            <memo-demo></memo-demo>
+          </live-demo>
         </div>
         
         <div class="subsection">
@@ -881,6 +2282,13 @@ setTheme('dark');`}"></code-example>
 };
 
 // Parent can call: getRef('media-player').play()`}"></code-example>
+          
+          <live-demo 
+            title="Imperative APIs Demo" 
+            description="Interact with MediaPlayer and FormValidator components through exposed imperative methods"
+          >
+            <ref-demo></ref-demo>
+          </live-demo>
         </div>
       </section>
       
