@@ -1,5 +1,6 @@
 import React from "react";
 import { define, html, css, useState, useEffect, useStyle, useScope, useMemo, useRef, useStore, unsafeCSS } from "../core/dim.ts";
+import "./test-crypto.js";
 
 // Shopping Basket Tutorial - Complete Implementation
 const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope, useMemo, useRef, useStore, html, css }) => {
@@ -970,6 +971,19 @@ define({ tag: 'product-card-example', component: ProductCardExample });
 define({ tag: 'cart-summary-example', component: CartSummaryExample });
 define({ tag: 'input-focus-example', component: InputFocusExample });
 define({ tag: 'theme-toggle-example', component: ThemeToggleExample });
+
+export const CryptoTestDemo = {
+  render: () => <crypto-test />,
+  name: "Crypto Test - Encryption/Decryption",
+  parameters: {
+    docs: {
+      description: {
+        story: `Test component to verify encryption and decryption functionality. 
+        Check console logs and IndexedDB to see encrypted values.`
+      }
+    }
+  }
+};
 
 export default {
   title: "Getting Started",

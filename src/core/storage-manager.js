@@ -5,7 +5,9 @@ const databaseName = "DimDatabase";
 const objectStoreName = "DimStore";
 
 class StorageManager {
-    constructor() {
+    constructor(crypto) {
+        this.crypto = crypto;
+        this.asyncManager = null; // Will be set by async manager
         this.openDatabase();
     }
 
@@ -48,8 +50,8 @@ class StorageManager {
             let transaction = db.transaction([objectStoreName], "readwrite");
             let objectStore = transaction.objectStore(objectStoreName);
 
-            const valueAsBase64 = btoa(unescape(encodeURIComponent(JSON.stringify({ payload: value }))));
-            let request = objectStore.put({ id: id, value: valueAsBase64 });
+            // Value is already encrypted by async-manager (as a JSON string), store it directly
+            let request = objectStore.put({ id: id, value: value });
 
             request.onsuccess = function (event) {
                 resolve("Value written successfully");
@@ -77,10 +79,32 @@ class StorageManager {
             let objectStore = transaction.objectStore(objectStoreName);
             let request = objectStore.get(id);
 
-            request.onsuccess = function (event) {
+            request.onsuccess = async (event) => {
                 if (request.result) {
-                    const value = JSON.parse(decodeURIComponent(escape(atob(request.result.value)))).payload;
-                    resolve({ value, newState });
+                    try {
+                        const storedValue = request.result.value;
+                        
+                        // Check if it's an encrypted value (string that parses to object with encryptedData and iv)
+                        if (this.crypto && typeof storedValue === 'string') {
+                            try {
+                                const parsed = JSON.parse(storedValue);
+                                if (parsed.encryptedData && parsed.iv) {
+                                    // It's encrypted, decrypt it
+                                    const decryptedValue = await this.crypto.decryptData(storedValue);
+                                    resolve({ value: decryptedValue, newState });
+                                    return;
+                                }
+                            } catch {
+                                // Not encrypted JSON, treat as plain value
+                            }
+                        }
+                        
+                        // Fallback for non-encrypted data
+                        resolve({ value: storedValue, newState });
+                    } catch (error) {
+                        console.error('Failed to decrypt stored value:', error);
+                        resolve(null);
+                    }
                 } else {
                     resolve(null);
                 }
@@ -92,7 +116,7 @@ class StorageManager {
         });
     }
 
-    loadFromDatabase = (store) => {
+    loadFromDatabase = (store, listenerId) => {
         const traverse = (obj, path) => {
             Object.keys(obj).forEach((key) => {
                 if (typeof obj[key] === "object" && obj[key].length === undefined) {
@@ -100,13 +124,33 @@ class StorageManager {
                 } else {
                     this
                         .readValue(`${path}${key}`, obj[key])
-                        .then((response) => {
+                        .then(async (response) => {
                             if (response) {
-                                // throw new Error("Value not found in database");
-                                debouncedDispatcher(`${path}${key}`, response.value);
+                                try {
+                                    
+                                    // For initial load, dispatch a component-specific event
+                                    // Use a unique event name that includes the listenerId
+                                    debouncedDispatcher(`${path}${key}-initialLoad-${listenerId}`, {
+                                        value: response.value,
+                                        _isInitialLoad: true
+                                    });
+                                } catch (error) {
+                                    console.error('Failed to encrypt for dispatch:', error);
+                                }
+                            } else {
+                                // No value in DB, set loading to false
+                                if (this.asyncManager?.loadingSetters[`${path}${key}`]) {
+                                    this.asyncManager.loadingSetters[`${path}${key}`](false);
+                                }
                             }
                         })
-                        .catch(console.error);
+                        .catch((error) => {
+                            console.error(error);
+                            // Set loading to false on error
+                            if (this.asyncManager?.loadingSetters[`${path}${key}`]) {
+                                this.asyncManager.loadingSetters[`${path}${key}`](false);
+                            }
+                        });
                 }
             });
         };
