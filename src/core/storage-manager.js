@@ -127,10 +127,6 @@ class StorageManager {
                         .then(async (response) => {
                             if (response) {
                                 try {
-                                    console.log({
-                                        key: `${path}${key}`,
-                                        value: response.value       
-                                    });
                                     
                                     // For initial load, dispatch a component-specific event
                                     // Use a unique event name that includes the listenerId

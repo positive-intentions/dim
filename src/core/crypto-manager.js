@@ -12,9 +12,7 @@ class CryptoManager {
           "SHA-256",
           encoder.encode(password)
         );
-      
-        console.log("password", password, this.arrayBufferToString(passwordSha256Hash));
-      
+        // Use the SHA-256 hash as the salt      
         const salt = passwordSha256Hash;
       
         // Encode the password into binary format

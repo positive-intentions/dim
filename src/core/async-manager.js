@@ -48,13 +48,6 @@ class AsyncronousStateManager {
                     finalValue = decryptedValue;
                 }
                 
-                console.log({
-                    key,
-                    value: finalValue,
-                    isInitialLoad,
-                    listenerId: isInitialLoadEvent ? listenerId : 'global'
-                });
-                
                 // Update the store
                 this.store = {
                     ...this.store,
@@ -119,10 +112,6 @@ class AsyncronousStateManager {
                 try {
                     // encryptData returns a serialized JSON string
                     const encryptedValue = await this.crypto.encryptData(newValue);
-                    console.log({
-                        key,
-                        encryptedValue
-                    });
                     await this.db.writeValue(key, encryptedValue);
                 } catch (error) {
                     console.error('Failed to encrypt and store value:', error);
