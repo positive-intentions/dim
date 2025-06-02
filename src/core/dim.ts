@@ -3,6 +3,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import AsyncronousStateManager from "./async-manager";
 import { css, unsafeCSS } from "./mini-lit";
 import StorageManager from "./storage-manager";
+import CryptoManager from "./crypto-manager";
 
 // Enhanced html function that supports React-like syntax
 export const html = (strings, ...values) => {
@@ -372,18 +373,75 @@ export function useRef() {
   return component.hooks[hookName];
 }
 
-const asyncronousStateManager = new AsyncronousStateManager();
-const storageManager = new StorageManager();
+// Hardcoded password for testing
+const HARDCODED_PASSWORD = 'test-password-123';
 
-export const useStore = (store) => {
+// Create a default crypto manager with hardcoded password
+const defaultCryptoManager = new CryptoManager(HARDCODED_PASSWORD);
+const asyncronousStateManager = new AsyncronousStateManager(defaultCryptoManager);
+const storageManager = new StorageManager(defaultCryptoManager);
+
+// Map to store different crypto managers for different passwords
+const cryptoManagerMap = new Map();
+cryptoManagerMap.set(HARDCODED_PASSWORD, defaultCryptoManager);
+
+const stateManagerMap = new Map();
+stateManagerMap.set(HARDCODED_PASSWORD, asyncronousStateManager);
+
+const storageManagerMap = new Map();  
+storageManagerMap.set(HARDCODED_PASSWORD, storageManager);
+
+export const useStore = (store, password = HARDCODED_PASSWORD) => {
   const [randomId] = useState(crypto.getRandomValues(new Uint8Array(8)));
+  
+  // Get or create crypto manager for this password
+  let cryptoManager = cryptoManagerMap.get(password);
+  let stateManager = stateManagerMap.get(password);
+  let storeManager = storageManagerMap.get(password);
+  
+  if (!cryptoManager) {
+    cryptoManager = new CryptoManager(password);
+    cryptoManagerMap.set(password, cryptoManager);
+    
+    stateManager = new AsyncronousStateManager(cryptoManager);
+    stateManagerMap.set(password, stateManager);
+    
+    storeManager = new StorageManager(cryptoManager);
+    storageManagerMap.set(password, storeManager);
+  }
 
-  asyncronousStateManager.createListeners(store, randomId);
+  // Add loading state for each store property
+  const enhanceStoreWithLoading = (obj, path = '') => {
+    Object.keys(obj).forEach((key) => {
+      if (typeof obj[key] === "object" && obj[key].length === undefined) {
+        enhanceStoreWithLoading(obj[key], `${path}${key}.`);
+      } else if (Array.isArray(obj[key]) && obj[key].length === 2) {
+        const [value, setValue] = obj[key];
+        const [isLoading, setIsLoading] = useState(true);
+        
+        // Replace the store entry with enhanced version that includes loading state
+        obj[key] = [
+          value,
+          setValue,
+          isLoading,
+          setIsLoading
+        ];
+        
+        // Store the loading setter for the async manager
+        const fullKey = `${path}${key}`;
+        stateManager.loadingSetters = stateManager.loadingSetters || {};
+        stateManager.loadingSetters[fullKey] = setIsLoading;
+      }
+    });
+  };
+  
+  enhanceStoreWithLoading(store);
+  stateManager.createListeners(store, randomId);
 
   useEffect(() => {
-    storageManager.loadFromDatabase(store);
+    storeManager.loadFromDatabase(store, randomId);
     return () => {
-      asyncronousStateManager.removeListeners(randomId);
+      stateManager.removeListeners(randomId);
     };
   }, []);
 
