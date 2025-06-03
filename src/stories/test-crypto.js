@@ -1,6 +1,5 @@
-import { define, css, useStore, useState } from "../core/dim.ts";
 
-const CryptoTest = ({ }, { useStore, useState, css }) => {
+const CryptoTest = (props, { useStore, useState, css, html, useEffect, useStyle }) => {
   const styles = css`
     .crypto-test {
       padding: 20px;
@@ -40,10 +39,16 @@ const CryptoTest = ({ }, { useStore, useState, css }) => {
     }
   `;
 
+  // Create state variables separately first
+  const testDataState = useState("Initial unencrypted data");
+  const counterState = useState(0);
+  const objectDataState = useState({ name: "test", value: 123 });
+  
+  // Then pass them to useStore
   const store = useStore({
-    testData: useState("Initial unencrypted data"),
-    counter: useState(0),
-    objectData: useState({ name: "test", value: 123 })
+    testData: testDataState,
+    counter: counterState,
+    objectData: objectDataState
   });
 
   const updateData = () => {
@@ -69,16 +74,30 @@ const CryptoTest = ({ }, { useStore, useState, css }) => {
   };
 
   // Access loading states from the enhanced store (index 2)
-  const isTestDataLoading = store.testData[2];
-  const isCounterLoading = store.counter[2];
-  const isObjectDataLoading = store.objectData[2];
+  // Use safe access in case the store isn't enhanced yet
+  const isTestDataLoading = store.testData && store.testData[2] ? store.testData[2] : false;
+  const isCounterLoading = store.counter && store.counter[2] ? store.counter[2] : false;
+  const isObjectDataLoading = store.objectData && store.objectData[2] ? store.objectData[2] : false;
   
-  const isAnyLoading = isTestDataLoading || isCounterLoading || isObjectDataLoading;
+  // If the store hasn't been enhanced yet (no loading states), show loading
+  const storeEnhanced = store.testData && store.testData.length > 2;
+  const isAnyLoading = !storeEnhanced || isTestDataLoading || isCounterLoading || isObjectDataLoading;
+
+  // Monitor loading state changes
+  useEffect(() => {
+    console.log('Loading states:', {
+      testData: store.testData?.[2],
+      counter: store.counter?.[2],
+      objectData: store.objectData?.[2]
+    });
+  }, [isTestDataLoading, isCounterLoading, isObjectDataLoading]);
   
-  return `
-    <style>${styles}</style>
+  // Use useStyle hook for CSS
+  useStyle(styles);
+  
+  return html`
     <div class="crypto-test" style="position: relative;">
-      ${isAnyLoading ? `<div class="loading-overlay">Loading encrypted data...</div>` : ''}
+      ${isAnyLoading ? html`<div class="loading-overlay">Loading encrypted data...</div>` : ''}
       
       <h2>Crypto Test Component</h2>
       
@@ -86,22 +105,22 @@ const CryptoTest = ({ }, { useStore, useState, css }) => {
         <h3>Current Values:</h3>
         <p>
           <strong>Test Data:</strong> 
-          ${isTestDataLoading ? '<span class="loading">Loading...</span>' : store.testData[0]}
+          ${isTestDataLoading ? html`<span class="loading">Loading...</span>` : (store.testData && store.testData[0] ? store.testData[0] : 'No data')}
         </p>
         <p>
           <strong>Counter:</strong> 
-          ${isCounterLoading ? '<span class="loading">Loading...</span>' : store.counter[0]}
+          ${isCounterLoading ? html`<span class="loading">Loading...</span>` : (store.counter && store.counter[0] !== undefined ? store.counter[0] : 0)}
         </p>
         <p>
           <strong>Object Data:</strong> 
-          ${isObjectDataLoading ? '<span class="loading">Loading...</span>' : `<pre>${JSON.stringify(store.objectData[0], null, 2)}</pre>`}
+          ${isObjectDataLoading ? html`<span class="loading">Loading...</span>` : (store.objectData && store.objectData[0] ? html`<pre>${JSON.stringify(store.objectData[0], null, 2)}</pre>` : html`<pre>{}</pre>`)}
         </p>
       </div>
       
       <div>
-        <button onclick="${updateData}" ${isAnyLoading ? 'disabled' : ''}>Update Test Data</button>
-        <button onclick="${incrementCounter}" ${isAnyLoading ? 'disabled' : ''}>Increment Counter</button>
-        <button onclick="${updateObject}" ${isAnyLoading ? 'disabled' : ''}>Update Object</button>
+        <button @click="${updateData}" ?disabled="${isAnyLoading}">Update Test Data</button>
+        <button @click="${incrementCounter}" ?disabled="${isAnyLoading}">Increment Counter</button>
+        <button @click="${updateObject}" ?disabled="${isAnyLoading}">Update Object</button>
       </div>
       
       <div class="status">
@@ -118,4 +137,4 @@ const CryptoTest = ({ }, { useStore, useState, css }) => {
   `;
 };
 
-define({ tag: "crypto-test", component: CryptoTest });
+// define({ tag: "crypto-test", component: CryptoTest });

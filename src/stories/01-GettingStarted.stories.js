@@ -1,6 +1,6 @@
 import React from "react";
 import { define, html, css, useState, useEffect, useStyle, useScope, useMemo, useRef, useStore, unsafeCSS } from "../core/dim.ts";
-import "./test-crypto.js";
+import "./test-crypto-store-demo.js";
 
 // Shopping Basket Tutorial - Complete Implementation
 const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope, useMemo, useRef, useStore, html, css }) => {
@@ -972,18 +972,7 @@ define({ tag: 'cart-summary-example', component: CartSummaryExample });
 define({ tag: 'input-focus-example', component: InputFocusExample });
 define({ tag: 'theme-toggle-example', component: ThemeToggleExample });
 
-export const CryptoTestDemo = {
-  render: () => <crypto-test />,
-  name: "Crypto Test - Encryption/Decryption",
-  parameters: {
-    docs: {
-      description: {
-        story: `Test component to verify encryption and decryption functionality. 
-        Check console logs and IndexedDB to see encrypted values.`
-      }
-    }
-  }
-};
+
 
 export default {
   title: "Getting Started",
@@ -1468,6 +1457,21 @@ export const ThemeToggleDemo = {
     docs: {
       description: {
         story: `Dynamic theme switching with CSS-in-JS, demonstrating reactive styling.`
+      }
+    }
+  }
+};
+
+export const UseStoreDemo = {
+  render: () => <crypto-test-store-demo />,
+  name: "useStore - Encrypted State Management",
+  parameters: {
+    docs: {
+      description: {
+        story: `Demonstrates the useStore hook for global state management with automatic encryption and persistence. 
+        
+        The store encrypts data at rest in IndexedDB and provides reactive state updates across components.
+        Check the console and IndexedDB in DevTools to see the encrypted values.`
       }
     }
   }
