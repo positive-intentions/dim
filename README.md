@@ -14,7 +14,7 @@
 
 <div align="center">
   
-[**Live Demo & Documentation**](https://dim.positive-intentions.com) | [**Getting Started**](#getting-started) | [**Examples**](#examples) | [**API Reference**](#api-reference)
+[**Live Demo & Documentation**](https://dim.positive-intentions.com) | [**Getting Started**](https://dim.positive-intentions.com/?path=/docs/getting-started--docs) | [**Demo**](https://dim.positive-intentions.com/?path=/story/getting-started--live-demo) | [**API Reference**](https://dim.positive-intentions.com/?path=/docs/api-reference--docs)
 
 </div>
 
@@ -26,8 +26,6 @@
 ![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
 ![Staging](https://github.com/positive-intentions/dim/actions/workflows/main_workflow.yaml/badge.svg) 
 [![gh-pages-build-deployment](https://github.com/positive-intentions/dim/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/positive-intentions/dim/actions/workflows/pages/pages-build-deployment)
-[![CodeQL](https://github.com/positive-intentions/dim/actions/workflows/codeql.yml/badge.svg)](https://github.com/positive-intentions/dim/actions/workflows/codeql.yml)
-![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
 </div>
 
