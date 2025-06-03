@@ -10,7 +10,7 @@
     "lint:eslint": "eslint --fix ./src/**/*.{js,jsx,ts,tsx}",
     "test": "jest",
     "test:watch": "jest --watchAll",
-    "build": "npm run build:reset && npm run build:frontend && npm run build:frontend:vite && npm run build:storybook &&  npm run build:coverage",
+    "build": "npm run build:reset && npm run build:frontend && npm run build:frontend:vite && npm run build:storybook",
     "build:reset": "rm -rf ./Frontend && mkdir ./Frontend",
     "build:storybook": "storybook build && cp -r storybook-static/* ./Frontend",
     "build:frontend": "webpack --mode development && cp -r dist/* ./Frontend",
