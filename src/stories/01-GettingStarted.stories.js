@@ -4,7 +4,7 @@ import "./test-crypto-store-demo.js";
 
 // Shopping Basket Tutorial - Complete Implementation
 const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope, useMemo, useRef, useStore, html, css }) => {
-  // Global store for shopping app
+  // Use persistent store for cart, theme, and user data
   const store = useStore({
     cart: useState([]),
     theme: useState('light'),
@@ -26,8 +26,11 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
   ];
 
   // Product Card Component - Demonstrates useStyle with props
-  const ProductCard = ({ product, theme, cart, setCart }, { useState, useStyle, useEffect, html, css }) => {
+  const ProductCard = (props, { useState, useStyle, useEffect, html, css }) => {
     const [isHovered, setIsHovered] = useState(false);
+    
+    // Extract props from .props attribute
+    const { product, theme, cart, setCart } = props.props || props;
     
     // Provide defaults if not passed
     if (!product) {
@@ -122,8 +125,11 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
   };
 
   // Cart Item Component - Demonstrates useRef for DOM access
-  const CartItem = ({ item, theme, cart, setCart }, { useState, useRef, useStyle, useEffect, html, css }) => {
+  const CartItem = (props, { useState, useRef, useStyle, useEffect, html, css }) => {
     const quantityRef = useRef();
+    
+    // Extract props from .props attribute
+    const { item, theme, cart, setCart } = props.props || props;
     
     // Provide defaults if not passed
     if (!item) {
@@ -246,14 +252,16 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
   };
 
   // Shopping Cart Component - Demonstrates useMemo for calculations
-  const ShoppingCart = ({ theme, cart, setCart }, { useMemo, useStyle, useScope, useEffect, html, css }) => {
-    // Create wrapper for CartItem to pass props
-    const CartItemWrapper = (props, context) => {
-      return CartItem({ ...props, theme, cart, setCart }, context);
-    };
+  const ShoppingCart = (props, { useMemo, useStyle, useScope, useEffect, html, css }) => {
+    // Extract props from .props attribute
+    const { 
+      theme = 'light', 
+      cart = [], 
+      setCart = () => {} 
+    } = props.props || props;
     
     useScope({
-      'cart-item': CartItemWrapper
+      'cart-item': CartItem
     });
 
     // Memoized calculations for performance
@@ -376,12 +384,7 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
             </div>
           ` : html`
             ${cart.map(item => html`
-              <cart-item 
-                .item="${item}"
-                .theme="${theme}"
-                .cart="${cart}"
-                .setCart="${setCart}"
-              ></cart-item>
+              <cart-item .props="${{ item, theme, cart, setCart }}"></cart-item>
             `)}
           `}
         </div>
@@ -414,7 +417,16 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
   };
 
   // User Controls - Demonstrates theme switching and useStore
-  const UserControls = ({ theme, setTheme, user, cart, setCart }, { useStyle, useEffect, html, css }) => {
+  const UserControls = (props, { useStyle, useEffect, html, css }) => {
+    // Extract props from .props attribute
+    const { 
+      theme = 'light', 
+      setTheme = () => {}, 
+      user = { name: 'Guest' }, 
+      cart = [], 
+      setCart = () => {} 
+    } = props.props || props;
+    
     useStyle(css`
       .user-controls {
         display: flex;
@@ -485,25 +497,17 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
   };
 
   // Product Grid - Demonstrates useScope for component composition
-  const ProductGrid = ({ theme, cart, setCart, products }, { useScope, useStyle, useEffect, html, css }) => {
-    // Create individual product card wrappers for each product
-    const createProductCardWrapper = (product) => {
-      return (props, context) => {
-        return ProductCard({ ...props, product, theme, cart, setCart }, context);
-      };
-    };
-    
-    // Register a unique component for each product
-    const scopeMap = {};
-    products.forEach((product, index) => {
-      scopeMap[`product-card-${index}`] = createProductCardWrapper(product);
-    });
+  const ProductGrid = (props, { useScope, useStyle, useEffect, html, css }) => {
+    // Extract props from .props attribute
+    const { 
+      theme = 'light', 
+      cart = [], 
+      setCart = () => {}, 
+      products = [] 
+    } = props.props || props;
     
     useScope({
-      ...scopeMap,
-      'product-card-example': createProductCardWrapper(products[0]), // Default card
       'product-card': ProductCard
-    
     });
 
     useStyle(css`
@@ -537,8 +541,6 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
       }
     `);
 
-    console.log({ products })
-
     return html`
       <div>
         <div class="products-header">
@@ -546,37 +548,19 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
           <p class="products-subtitle">Discover amazing products at great prices</p>
         </div>
         <div class="product-grid">
-          ${products.map((product, index) => html`
-            <product-card-${index}></product-card-${index}>
-          `)}
-        </div>
-        <div class="product-grid">
-          ${products.map((product, index) => html`
-            <product-card .props="${{product}}"></product-card-example>
+          ${products.map(product => html`
+            <product-card .props="${{ product, theme, cart, setCart }}"></product-card>
           `)}
         </div>
       </div>
     `;
   };
 
-  // Create wrappers for all components to pass props
-  const UserControlsWrapper = (props, context) => {
-    return UserControls({ ...props, theme, setTheme, user, cart, setCart }, context);
-  };
-  
-  const ProductGridWrapper = (props, context) => {
-    return ProductGrid({ ...props, theme, cart, setCart, products }, context);
-  };
-  
-  const ShoppingCartWrapper = (props, context) => {
-    return ShoppingCart({ ...props, theme, cart, setCart }, context);
-  };
-  
   // Register all components in scope
   useScope({
-    'user-controls': UserControlsWrapper,
-    'product-grid': ProductGridWrapper,
-    'shopping-cart': ShoppingCartWrapper
+    'user-controls': UserControls,
+    'product-grid': ProductGrid,
+    'shopping-cart': ShoppingCart
   });
 
   // Main container styles
@@ -683,14 +667,17 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
         <p class="app-subtitle">A complete shopping experience built with Dim Framework</p>
       </div>
 
-      <user-controls></user-controls>
+      <user-controls .props="${{ theme, setTheme, user, cart, setCart }}">
+      </user-controls>
 
       <div class="main-content">
         <div class="products-section">
-          <product-grid></product-grid>
+          <product-grid .props="${{ theme, cart, setCart, products }}">
+          </product-grid>
         </div>
         <div class="cart-section">
-          <shopping-cart></shopping-cart>
+          <shopping-cart .props="${{ theme, cart, setCart }}">
+          </shopping-cart>
         </div>
       </div>
 
