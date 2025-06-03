@@ -4,6 +4,9 @@ import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
 import '@fontsource/material-icons';
 
+import React from 'react';
+import { Title, Subtitle, Description, Primary, Controls, Stories } from '@storybook/blocks';
+
 /** @type { import('@storybook/react').Preview } */
 const preview = {
   parameters: {
@@ -19,6 +22,18 @@ const preview = {
       storySort: {
         order: ['Introduction', 'Getting Started', 'API Reference', '*'],
       },
+    },
+    docs: {
+      page: () => (
+        <>
+          <Title />
+          <Subtitle />
+          <Description />
+          <Primary />
+          <Controls />
+          <Stories includePrimary={false}/>
+        </>
+      ),
     },
   },
 };
