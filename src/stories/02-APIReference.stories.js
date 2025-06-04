@@ -193,64 +193,61 @@ const UseEffectDemo = (props, { useState, useEffect, html, css, useStyle }) => {
 };
 
 // useStyle Demo
-const UseStyleDemo = (props, { useState, html, css, useStyle, useEffect }) => {
+const UseStyleDemo = (props, { useState, html, css, useStyle, unsafeCSS }) => {
   const [theme, setTheme] = useState('light');
   const [color, setColor] = useState('#029cfd');
 
-  // Re-apply styles when theme or color changes
-  useEffect(() => {
-    console.log('updated color')
-    useStyle(css`
-      .style-demo {
-        padding: 2rem;
-        border: 2px solid ${unsafeCSS(color)};
-        border-radius: 8px;
-        background-color: ${unsafeCSS(theme === 'light' ? '#f5f5f5' : '#2a2a2a')};
-        color: ${unsafeCSS(theme === 'light' ? '#333' : '#fff')};
-        transition: all 0.3s ease;
-      }
+  // Apply dynamic styles - will update when dependencies change
+  useStyle(css`
+    .style-demo {
+      padding: 2rem;
+      border: 2px solid ${unsafeCSS(color)};
+      border-radius: 8px;
+      background-color: ${unsafeCSS(theme === 'light' ? '#f5f5f5' : '#2a2a2a')};
+      color: ${unsafeCSS(theme === 'light' ? '#333' : '#fff')};
+      transition: all 0.3s ease;
+    }
 
-      .controls {
-        display: flex;
-        gap: 1rem;
-        margin-bottom: 1rem;
-        align-items: center;
-        flex-wrap: wrap;
-      }
+    .controls {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
 
-      button {
-        background: ${unsafeCSS(color)};
-        color: white;
-        border: none;
-        padding: 0.5rem 1rem;
-        border-radius: 4px;
-        cursor: pointer;
-      }
+    button {
+      background: ${unsafeCSS(color)};
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
 
-      button:hover {
-        filter: brightness(0.9);
-      }
+    button:hover {
+      filter: brightness(0.9);
+    }
 
-      .demo-box {
-        width: 100px;
-        height: 100px;
-        background: ${unsafeCSS(color)};
-        border-radius: 8px;
-        margin: 1rem 0;
-        animation: pulse 2s infinite;
-      }
+    .demo-box {
+      width: 100px;
+      height: 100px;
+      background: ${unsafeCSS(color)};
+      border-radius: 8px;
+      margin: 1rem 0;
+      animation: pulse 2s infinite;
+    }
 
-      @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.1); }
-        100% { transform: scale(1); }
-      }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
 
-      input[type="color"] {
-        margin-left: 0.5rem;
-      }
-    `);
-  }, [theme, color]);
+    input[type="color"] {
+      margin-left: 0.5rem;
+    }
+  `);
 
   return html`
     <div class="style-demo">

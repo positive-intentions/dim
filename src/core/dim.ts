@@ -338,21 +338,47 @@ export function useScope(elements) {
   });
 }
 
-export function useStyle(styles) {
-  const component = getCurrentInstance();
+export function useStyle(styles: any) {
+  const component = getCurrentInstance() as any;
+  const hookIndex = component.hookIndex++;
+  const hookName = `style-hook-${hookIndex}`;
 
-  if (!component._stylesApplied) {
-    component._stylesApplied = true;
+  // Convert styles to CSSResult if it's a string
+  const cssResult = typeof styles === 'string' ? unsafeCSS(styles) : styles;
+  const cssText = cssResult.cssText;
 
-    // Apply the styles to the component
-    const styleElement = document.createElement("style");
-    styleElement.textContent = unsafeCSS(styles).cssText;
-    component.shadowRoot.appendChild(styleElement);
+  // Check if styles have changed
+  const prevStyles = component.hooks[hookName];
+  if (prevStyles !== cssText) {
+    component.hooks[hookName] = cssText;
+
+    // Create or update style element
+    let styleElement = component.shadowRoot.querySelector(`[data-style-hook="${hookName}"]`);
+    
+    if (!styleElement) {
+      // Use adoptedStyleSheets when available for static styles
+      if (component.shadowRoot.adoptedStyleSheets !== undefined && cssResult.styleSheet && !prevStyles) {
+        component.shadowRoot.adoptedStyleSheets = [
+          ...component.shadowRoot.adoptedStyleSheets,
+          cssResult.styleSheet
+        ];
+      } else {
+        // Use style element for dynamic styles or fallback
+        styleElement = document.createElement("style");
+        styleElement.setAttribute('data-style-hook', hookName);
+        component.shadowRoot.appendChild(styleElement);
+      }
+    }
+    
+    // Update style content if using style element
+    if (styleElement) {
+      styleElement.textContent = cssText;
+    }
   }
 }
 
-export const useLazyScope = (tag, promise) => {
-  promise.then((module) => {
+export const useLazyScope = (tag: string, promise: Promise<any>) => {
+  promise.then((module: any) => {
     const elementClass = new Function(`return ${module}`)();
 
     if (!customElements.get(tag)) {
@@ -362,7 +388,7 @@ export const useLazyScope = (tag, promise) => {
 };
 
 export function useRef() {
-  const component = getCurrentInstance();
+  const component = getCurrentInstance() as any;
   const hookIndex = component.hookIndex++;
   const hookName = `hook-${hookIndex}`;
 
@@ -391,7 +417,7 @@ stateManagerMap.set(HARDCODED_PASSWORD, asyncronousStateManager);
 const storageManagerMap = new Map();  
 storageManagerMap.set(HARDCODED_PASSWORD, storageManager);
 
-export const useStore = (store, password = HARDCODED_PASSWORD) => {
+export const useStore = (store: any, password = HARDCODED_PASSWORD) => {
   const [randomId] = useState(crypto.getRandomValues(new Uint8Array(8)));
   
   // Get or create crypto manager for this password
@@ -411,7 +437,7 @@ export const useStore = (store, password = HARDCODED_PASSWORD) => {
   }
 
   // Add loading state for each store property
-  const enhanceStoreWithLoading = (obj, path = '') => {
+  const enhanceStoreWithLoading = (obj: any, path = '') => {
     Object.keys(obj).forEach((key) => {
       if (typeof obj[key] === "object" && obj[key].length === undefined) {
         enhanceStoreWithLoading(obj[key], `${path}${key}.`);
