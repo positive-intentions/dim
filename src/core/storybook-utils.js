@@ -9,7 +9,7 @@ function LitHtmlRenderer({ template }) {
   React.useEffect(() => {
     if (containerRef.current && template) {
       // Dynamically import lit's render function
-      import('lit').then(({ render }) => {
+      import('../vendor/lit/index.js').then(({ render }) => {
         // Render the lit-html template into the container
         render(template, containerRef.current);
       });

@@ -1,5 +1,5 @@
-import { LitElement, html as litHtml } from "lit";
-import { unsafeHTML } from "lit/directives/unsafe-html.js";
+import { LitElement, html as litHtml } from "../vendor/lit/index.js";
+import { unsafeHTML } from "../vendor/lit/directives/unsafe-html.js";
 import AsyncronousStateManager from "./async-manager";
 import { css, unsafeCSS } from "./mini-lit";
 import StorageManager from "./storage-manager";
