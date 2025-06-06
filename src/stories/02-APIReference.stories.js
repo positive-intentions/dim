@@ -577,7 +577,7 @@ Each hook includes live examples and detailed documentation below.
 };
 
 export const UseState = {
-  render: () => <usestate-demo />,
+  render: () => React.createElement('usestate-demo'),
   name: "useState",
   parameters: {
     docs: {
@@ -618,7 +618,7 @@ setUser({ ...user, age: 30 });
 };
 
 export const UseEffect = {
-  render: () => <useeffect-demo />,
+  render: () => React.createElement('useeffect-demo'),
   name: "useEffect", 
   parameters: {
     docs: {
@@ -672,7 +672,7 @@ useEffect(() => {
 };
 
 export const UseStyle = {
-  render: () => <usestyle-demo />,
+  render: () => React.createElement('usestyle-demo'),
   name: "useStyle",
   parameters: {
     docs: {
@@ -732,7 +732,7 @@ useStyle(css\`
 };
 
 export const UseScope = {
-  render: () => <usescope-demo />,
+  render: () => React.createElement('usescope-demo'),
   name: "useScope",
   parameters: {
     docs: {
@@ -803,7 +803,7 @@ const App = (props, { useScope, html }) => {
 };
 
 export const UseMemo = {
-  render: () => <usememo-demo />,
+  render: () => React.createElement('usememo-demo'),
   name: "useMemo",
   parameters: {
     docs: {
@@ -857,7 +857,7 @@ const filteredData = useMemo(() => {
 };
 
 export const UseRef = {
-  render: () => <useref-demo />,
+  render: () => React.createElement('useref-demo'),
   name: "useRef", 
   parameters: {
     docs: {
@@ -918,7 +918,7 @@ const stopTimer = () => {
 };
 
 export const UseStore = {
-  render: () => <usestore-demo />,
+  render: () => React.createElement('usestore-demo'),
   name: "useStore",
   parameters: {
     docs: {
