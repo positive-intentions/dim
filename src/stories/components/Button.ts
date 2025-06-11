@@ -1,4 +1,4 @@
-import { html } from "lit";
+import { html } from "../../vendor/lit/index.js";
 import { useEffect, useMemo, useState } from "../../core/dim.ts";
 
 const Button = function ({ children, initialstate = 0 }) {

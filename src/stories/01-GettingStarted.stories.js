@@ -94,15 +94,16 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
     `);
 
     const addToCart = () => {
-      const existingItem = cart.find(item => item.id === product.id);
+      const currentCart = Array.isArray(cart) ? cart : [];
+      const existingItem = currentCart.find(item => item.id === product.id);
       if (existingItem) {
-        setCart(cart.map(item => 
+        setCart(currentCart.map(item => 
           item.id === product.id 
             ? { ...item, quantity: item.quantity + 1 }
             : item
         ));
       } else {
-        setCart([...cart, { ...product, quantity: 1 }]);
+        setCart([...currentCart, { ...product, quantity: 1 }]);
       }
     };
 
@@ -210,7 +211,8 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
         removeItem();
         return;
       }
-      setCart(cart.map(cartItem => 
+      const currentCart = Array.isArray(cart) ? cart : [];
+      setCart(currentCart.map(cartItem => 
         cartItem.id === item.id 
           ? { ...cartItem, quantity: newQuantity }
           : cartItem
@@ -218,7 +220,8 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
     };
 
     const removeItem = () => {
-      setCart(cart.filter(cartItem => cartItem.id !== item.id));
+      const currentCart = Array.isArray(cart) ? cart : [];
+      setCart(currentCart.filter(cartItem => cartItem.id !== item.id));
     };
 
     const focusQuantityInput = () => {
@@ -266,7 +269,8 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
 
     // Memoized calculations for performance
     const cartSummary = useMemo(() => {
-      const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const currentCart = Array.isArray(cart) ? cart : [];
+      const subtotal = currentCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       const tax = subtotal * 0.08; // 8% tax
       const shipping = subtotal > 50 ? 0 : 9.99; // Free shipping over $50
       const total = subtotal + tax + shipping;
@@ -276,7 +280,7 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
         tax: tax.toFixed(2),
         shipping: shipping.toFixed(2),
         total: total.toFixed(2),
-        itemCount: cart.reduce((sum, item) => sum + item.quantity, 0)
+        itemCount: currentCart.reduce((sum, item) => sum + item.quantity, 0)
       };
     }, [cart]);
 
@@ -377,19 +381,19 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
         </div>
 
         <div class="cart-items">
-          ${cart.length === 0 ? html`
+          ${Array.isArray(cart) && cart.length === 0 ? html`
             <div class="empty-cart">
               🛒 Your cart is empty<br>
               <small>Add some products to get started!</small>
             </div>
           ` : html`
-            ${cart.map(item => html`
+            ${Array.isArray(cart) ? cart.map(item => html`
               <cart-item .props="${{ item, theme, cart, setCart }}"></cart-item>
-            `)}
+            `) : ''}
           `}
         </div>
 
-        ${cart.length > 0 ? html`
+        ${Array.isArray(cart) && cart.length > 0 ? html`
           <div class="cart-summary" style="border-top: 1px solid ${theme === 'light' ? '#e9ecef' : '#404040'};">
             <div class="summary-row" style="color: ${theme === 'light' ? '#333' : '#fff'};">
               <span>Subtotal:</span>
@@ -486,7 +490,7 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
           <button class="theme-toggle" style="background: ${theme === 'light' ? '#6c757d' : '#029cfd'};" @click="${() => setTheme(theme === 'light' ? 'dark' : 'light')}">
             ${theme === 'light' ? '🌙 Dark' : '☀️ Light'} Mode
           </button>
-          ${cart.length > 0 ? html`
+          ${Array.isArray(cart) && cart.length > 0 ? html`
             <button class="clear-cart" @click="${() => setCart([])}">
               Clear Cart
             </button>
@@ -653,7 +657,8 @@ const ShoppingBasketTutorial = (props, { useState, useEffect, useStyle, useScope
 
   // Effect to demonstrate lifecycle
   useEffect(() => {
-    console.log(`Shopping app mounted with ${cart.length} items in cart`);
+    const cartLength = Array.isArray(cart) ? cart.length : 0;
+    console.log(`Shopping app mounted with ${cartLength} items in cart`);
     
     return () => {
       console.log('Shopping app unmounted');
