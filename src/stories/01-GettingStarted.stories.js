@@ -1029,7 +1029,7 @@ Perfect for developers wanting to learn modern web component development with a 
 };
 
 export const LiveDemo = {
-  render: () => <shopping-basket-tutorial />,
+  render: () => React.createElement('shopping-basket-tutorial'),
   name: "Live Demo",
   parameters: {
     docs: {
@@ -1407,7 +1407,7 @@ You've now learned all the core Dim hooks by building a complete shopping basket
 };
 
 export const ProductCatalogDemo = {
-  render: () => <product-card-example />,
+  render: () => React.createElement('product-card-example'),
   name: "useState - Product Card",
   parameters: {
     docs: {
@@ -1419,7 +1419,7 @@ export const ProductCatalogDemo = {
 };
 
 export const CartCalculationsDemo = {
-  render: () => <cart-summary-example />,
+  render: () => React.createElement('cart-summary-example'),
   name: "useMemo - Cart Summary",
   parameters: {
     docs: {
@@ -1431,7 +1431,7 @@ export const CartCalculationsDemo = {
 };
 
 export const InputFocusDemo = {
-  render: () => <input-focus-example />,
+  render: () => React.createElement('input-focus-example'),
   name: "useRef - DOM Access",
   parameters: {
     docs: {
@@ -1443,7 +1443,7 @@ export const InputFocusDemo = {
 };
 
 export const ThemeToggleDemo = {
-  render: () => <theme-toggle-example />,
+  render: () => React.createElement('theme-toggle-example'),
   name: "useStyle - Dynamic Theming",
   parameters: {
     docs: {
@@ -1455,7 +1455,7 @@ export const ThemeToggleDemo = {
 };
 
 export const UseStoreDemo = {
-  render: () => <crypto-test-store-demo />,
+  render: () => React.createElement('crypto-test-store-demo'),
   name: "useStore - Encrypted State Management",
   parameters: {
     docs: {

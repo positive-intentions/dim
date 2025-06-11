@@ -182,7 +182,7 @@ export const StyledButton = ({
 };
 
 export const ButtonShowcase = {
-  render: () => <styled-button-demo />,
+  render: () => React.createElement('styled-button-demo'),
   name: "Styled Button",
   parameters: {
     docs: {
