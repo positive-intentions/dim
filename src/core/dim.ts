@@ -4,6 +4,7 @@ import AsyncronousStateManager from "./async-manager";
 import { css, unsafeCSS } from "./mini-lit";
 import StorageManager from "./storage-manager";
 import CryptoManager from "./crypto-manager";
+import { useViewTransition, viewTransitionStyles, setCurrentInstance as setViewTransitionInstance } from "./view-transitions.js";
 
 // Enhanced html function that supports React-like syntax
 export const html = (strings, ...values) => {
@@ -137,6 +138,8 @@ let currentInstance = null;
 
 function setCurrentInstance(instance) {
   currentInstance = instance;
+  // Also set for view transitions
+  setViewTransitionInstance(instance);
 }
 
 function getCurrentInstance() {
@@ -198,6 +201,16 @@ export function define({ tag, component: CustomFunctionalComponent }) {
 
       this.props = this.props || {};
 
+      // Auto-detect transitionId prop and set up view transitions
+      let autoTransition = null;
+      if (attributes.transitionId !== undefined || this.props.transitionId !== undefined) {
+        const transitionId = attributes.transitionId || this.props.transitionId;
+        autoTransition = useViewTransition(transitionId.toString(), {
+          duration: parseInt(attributes.transitionDuration) || 500,
+          autoDirection: attributes.transitionAutoDirection !== 'false'
+        });
+      }
+
       const querySelector = this.shadowRoot?.querySelector.bind(
         this.shadowRoot
       );
@@ -217,6 +230,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         useScope,
         useStyle,
         useStore,
+        useViewTransition,
         html: litHtml,
         css,
         unsafeCSS,
@@ -246,6 +260,30 @@ export function define({ tag, component: CustomFunctionalComponent }) {
 
       // Clear the current instance context
       setCurrentInstance(null);
+
+      // Auto-wrap result with view transitions if transitionId is present
+      if (autoTransition) {
+        const transitionClasses = autoTransition.getTransitionClasses('view-transition-item');
+        const transitionStyles = autoTransition.getTransitionStyles();
+        const styleString = Object.entries(transitionStyles).map(([key, value]) => `${key}: ${value}`).join('; ');
+        
+        return litHtml`
+          <style>
+            ${viewTransitionStyles}
+            .auto-transition-wrapper {
+              position: relative;
+              overflow: hidden;
+              width: 100%;
+              height: 100%;
+            }
+          </style>
+          <div class="auto-transition-wrapper view-transition-container">
+            <div class="${transitionClasses}" style="${styleString}">
+              ${result}
+            </div>
+          </div>
+        `;
+      }
 
       return result;
     }
@@ -476,3 +514,6 @@ export const useStore = (store: any, password = HARDCODED_PASSWORD) => {
 
 // Re-export utilities from mini-lit
 export { css, unsafeCSS } from "./mini-lit";
+
+// Re-export view transitions
+export { useViewTransition, viewTransitionStyles } from "./view-transitions.js";
