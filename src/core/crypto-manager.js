@@ -46,7 +46,16 @@ class CryptoManager {
       }
       
       arrayBufferToString(buffer) {
-        return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+        const bytes = new Uint8Array(buffer);
+        let binaryString = '';
+        const chunkSize = 8192; // Process in chunks to avoid stack overflow
+        
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          const chunk = bytes.subarray(i, i + chunkSize);
+          binaryString += String.fromCharCode.apply(null, chunk);
+        }
+        
+        return btoa(binaryString);
       }
       
       stringToArrayBuffer(str) {

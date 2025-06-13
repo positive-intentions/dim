@@ -210,6 +210,11 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         return component.hooks[refHookName].current;
       };
 
+      // Create a useFS function that uses the current component context
+      const useFS = (options = {}) => {
+        return _useFS(options, { useState, useEffect, useStore });
+      };
+
       const sharedDependencies = {
         useState,
         useEffect,
@@ -217,6 +222,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         useScope,
         useStyle,
         useStore,
+        useFS,
         html: litHtml,
         css,
         unsafeCSS,
@@ -474,5 +480,11 @@ export const useStore = (store: any, password = HARDCODED_PASSWORD) => {
   return store;
 };
 
+// Import custom hooks
+import { useFS as _useFS } from "../hooks/useFS.js";
+
 // Re-export utilities from mini-lit
 export { css, unsafeCSS } from "./mini-lit";
+
+// Re-export hooks
+export { useFS } from "../hooks/useFS.js";
