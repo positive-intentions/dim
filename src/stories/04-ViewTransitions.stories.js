@@ -4,7 +4,7 @@ import "./components/SimpleGallery.js";
 import "./components/NavigationExample.js";
 
 export default {
-  title: "View Transitions",
+  title: "useTransition()",
   parameters: {
     layout: "fullscreen",
     docs: {
