@@ -1879,7 +1879,7 @@ define({ tag: 'opfs-example', component: OPFSExample });
 define({ tag: 'encrypted-file-manager-demo', component: EncryptedFileManagerDemo });
 
 export default {
-  title: "Hooks/useFS",
+  title: "useFS()",
   parameters: {
     layout: "fullscreen",
     docs: {

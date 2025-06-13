@@ -113,7 +113,7 @@ const StyledButtonDemo = (props, { html, css, useStyle, useState }) => {
 define({ tag: 'styled-button-demo', component: StyledButtonDemo });
 
 export default {
-  title: "Styled Components",
+  title: "useStyle()",
   parameters: {
     layout: "centered",
     docs: {
