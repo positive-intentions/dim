@@ -155,7 +155,7 @@ function setCurrentInstance(instance) {
 
 function getCurrentInstance() {
   if (!currentInstance) {
-    throw new Error("Hooks can only be called inside a component.");
+    console.error("Hooks should only be called inside a component.");
   }
   return currentInstance;
 }
