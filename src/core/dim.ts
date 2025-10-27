@@ -550,3 +550,8 @@ export { css, unsafeCSS } from "./mini-lit";
 export { useFS } from "../hooks/useFS.js";
 // Re-export view transitions
 export { useViewTransition, viewTransitionStyles } from "./view-transitions.js";
+
+// Re-export core managers for external use
+export { default as CryptoManager } from "./crypto-manager";
+export { default as StorageManager } from "./storage-manager";
+export { default as AsyncronousStateManager } from "./async-manager";

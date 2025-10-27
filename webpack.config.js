@@ -15,7 +15,14 @@ module.exports = {
         static: path.resolve(__dirname, "/dist"),
         //   watchContentBase: true,
         hot: true,
+        liveReload: true,
+        port: 8083,
+        open: true,
         historyApiFallback: true,
+        client: {
+            overlay: false,
+        },
+        watchFiles: ['src/**/*'],
     },
     module: {
         rules: [

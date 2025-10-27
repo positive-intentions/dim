@@ -8,4 +8,8 @@ addons.setConfig({
   },
   // Set the initial active story to the tutorial
   initialActive: 'getting-started-tutorial--interactive-tutorial',
+  panel: {
+    showPanel: false,
+  },
+  bottomPanelHeight: 0,
 });
