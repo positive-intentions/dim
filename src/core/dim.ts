@@ -543,15 +543,17 @@ export const useStore = (store: any, password = HARDCODED_PASSWORD) => {
 // Import custom hooks
 import { useFS as _useFS } from "../hooks/useFS.js";
 
-// Re-export utilities from mini-lit
-export { css, unsafeCSS } from "./mini-lit";
+// Re-export utilities from mini-lit (already imported above for internal use)
+export { css, unsafeCSS };
 
 // Re-export hooks
 export { useFS } from "../hooks/useFS.js";
-// Re-export view transitions
-export { useViewTransition, viewTransitionStyles } from "./view-transitions.js";
+export { useDimStore } from "../hooks/useDimStore.ts";
 
-// Re-export core managers for external use
+// Re-export view transitions (already imported above for internal use)
+export { useViewTransition, viewTransitionStyles };
+
+// Re-export core managers for external use (already imported above for internal use)
 export { default as CryptoManager } from "./crypto-manager";
 export { default as StorageManager } from "./storage-manager";
 export { default as AsyncronousStateManager } from "./async-manager";
