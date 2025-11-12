@@ -57,6 +57,7 @@ export function useDimStore({
   const eventListenerRef = useRef<((event: CustomEvent) => void) | null>(null);
   const instanceIdRef = useRef<string>(Math.random().toString(36).substring(2, 15));
   const isSettingValueRef = useRef<boolean>(false);
+  const hasLoadedRef = useRef<boolean>(false);
 
   // Load initial value from IndexedDB and set up event listener
   useEffect(() => {
@@ -68,16 +69,25 @@ export function useDimStore({
 
         if (!mountedRef.current) return;
 
-        if (result && result.value !== null && result.value !== undefined) {
+        // Only set value if we haven't already loaded and if we're not currently setting a value
+        // This prevents race conditions where a save happens before load completes
+        if (!hasLoadedRef.current && !isSettingValueRef.current) {
+          if (result && result.value !== null && result.value !== undefined) {
+            setValue(result.value);
+          } else {
+            // No stored value, use default
+            setValue(defaultValue);
+          }
+          hasLoadedRef.current = true;
+        } else if (hasLoadedRef.current && result && result.value !== null && result.value !== undefined) {
+          // If we've already loaded but got a new value (from another instance), update it
           setValue(result.value);
-        } else {
-          // No stored value, use default
-          setValue(defaultValue);
         }
       } catch (error) {
         console.error('Failed to load from storage:', error);
-        if (mountedRef.current) {
+        if (mountedRef.current && !hasLoadedRef.current) {
           setValue(defaultValue);
+          hasLoadedRef.current = true;
         }
       } finally {
         if (mountedRef.current) {
