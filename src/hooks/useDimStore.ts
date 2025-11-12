@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import CryptoManager from '../core/crypto-manager.js';
 import StorageManager from '../core/storage-manager.js';
+import { debouncedDispatcher } from '../core/mini-lit.js';
 
 // Default password matching the one in Dim framework
 const DEFAULT_PASSWORD = "test-password-123";
@@ -53,8 +54,11 @@ export function useDimStore({
   const [isLoading, setIsLoading] = useState(true);
   const { cryptoManager, storageManager } = getManagers(password);
   const mountedRef = useRef(true);
+  const eventListenerRef = useRef<((event: CustomEvent) => void) | null>(null);
+  const instanceIdRef = useRef<string>(Math.random().toString(36).substring(2, 15));
+  const isSettingValueRef = useRef<boolean>(false);
 
-  // Load initial value from IndexedDB
+  // Load initial value from IndexedDB and set up event listener
   useEffect(() => {
     mountedRef.current = true;
 
@@ -84,25 +88,93 @@ export function useDimStore({
 
     loadFromStorage();
 
+    // Set up event listener for cross-component synchronization
+    const eventListener = async (event: CustomEvent) => {
+      try {
+        // Skip if this is our own update (prevent infinite loop)
+        if (event.detail._instanceId === instanceIdRef.current) {
+          return;
+        }
+
+        // Skip if we're currently setting a value (prevent processing our own dispatched event)
+        if (isSettingValueRef.current) {
+          return;
+        }
+
+        if (!mountedRef.current) return;
+
+        // Decrypt the incoming event data
+        // decryptData expects an object with encryptedData and iv properties (from JSON.parse of encrypted string)
+        const decryptedValue = await cryptoManager.decryptData({
+          ...event.detail,
+          crypto: cryptoManager
+        });
+
+        if (!mountedRef.current) return;
+
+        // Update local state (use functional update to avoid stale closure)
+        setValue((currentValue) => {
+          // Only update if value actually changed
+          if (decryptedValue !== currentValue) {
+            return decryptedValue;
+          }
+          return currentValue;
+        });
+      } catch (error) {
+        console.error('Failed to process event data:', error);
+      }
+    };
+
+    // Listen for events with the key as event name
+    window.addEventListener(key, eventListener as EventListener);
+    eventListenerRef.current = eventListener as (event: CustomEvent) => void;
+
     return () => {
       mountedRef.current = false;
+      // Clean up event listener
+      if (eventListenerRef.current) {
+        window.removeEventListener(key, eventListenerRef.current as EventListener);
+        eventListenerRef.current = null;
+      }
     };
+    // Note: cryptoManager and storageManager are stable (cached per password), so we only need password in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, password, defaultValue]);
 
-  // Save to IndexedDB whenever value changes
+  // Save to IndexedDB and dispatch encrypted event whenever value changes
   const setValueAndStore = async (newValue: string) => {
+    // Mark that we're setting a value to prevent processing our own event
+    isSettingValueRef.current = true;
+
+    // Update local state immediately
     setValue(newValue);
 
     try {
       // Encrypt the data
       const encryptedData = await cryptoManager.encryptData(newValue);
 
-      // Store encrypted data
+      // Store encrypted data in IndexedDB
       await storageManager.writeValue(key, encryptedData);
 
       console.log(`Stored encrypted value for key "${key}" in IndexedDB`);
+
+      // Dispatch encrypted custom event for cross-component synchronization
+      // Parse the encrypted string back to object for dispatch (same pattern as async-manager)
+      try {
+        const encryptedObject = JSON.parse(encryptedData);
+        // Include instance ID so we can skip processing our own event
+        encryptedObject._instanceId = instanceIdRef.current;
+        debouncedDispatcher(key, encryptedObject);
+      } catch (error) {
+        console.error('Failed to dispatch event:', error);
+      }
     } catch (error) {
       console.error('Failed to store value:', error);
+    } finally {
+      // Reset flag after a short delay to allow event to be dispatched
+      setTimeout(() => {
+        isSettingValueRef.current = false;
+      }, 100);
     }
   };
 

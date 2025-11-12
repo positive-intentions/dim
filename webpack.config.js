@@ -16,7 +16,7 @@ module.exports = {
         //   watchContentBase: true,
         hot: true,
         liveReload: true,
-        port: 8083,
+        port: 8085,
         open: true,
         historyApiFallback: true,
         client: {
