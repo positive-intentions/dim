@@ -106,7 +106,24 @@ class CryptoManager {
             payload = encryptedPayload;
         }
         
+        // Validate payload structure
+        if (!payload || typeof payload !== 'object') {
+            throw new Error('Invalid encrypted payload format');
+        }
+        
         const { encryptedData, iv, crypto: cryptoManager } = payload;
+        
+        // Validate required fields
+        if (!encryptedData || !iv) {
+            throw new Error('Invalid encrypted payload: missing encryptedData or iv');
+        }
+        
+        // Ensure we don't accidentally return the encrypted payload structure
+        // If the payload looks like it might be the encrypted structure itself, reject it
+        if (typeof encryptedData === 'object' || typeof iv === 'object') {
+            throw new Error('Invalid encrypted payload: encryptedData and iv must be strings');
+        }
+        
         const key = cryptoManager || this;
         
         // Wait for key to be ready
@@ -127,15 +144,33 @@ class CryptoManager {
             const dec = new TextDecoder();
             const decryptedString = dec.decode(decryptedData);
             
-            // Try to parse as JSON, otherwise return as string
+            // Validate that we got actual decrypted data, not the encrypted structure
+            // If decrypted string looks like JSON with encryptedData/iv, something went wrong
             try {
-                return JSON.parse(decryptedString);
-            } catch {
+                const parsed = JSON.parse(decryptedString);
+                // Check if this looks like an encrypted payload structure (shouldn't happen)
+                if (parsed && typeof parsed === 'object' && parsed.encryptedData && parsed.iv) {
+                    throw new Error('Decryption returned encrypted payload structure - possible password mismatch or corruption');
+                }
+                return parsed;
+            } catch (parseError) {
+                // Not JSON, return as string
+                // But verify it's not the encrypted payload structure
+                if (decryptedString.includes('encryptedData') && decryptedString.includes('iv')) {
+                    throw new Error('Decryption returned encrypted payload structure - possible password mismatch');
+                }
                 return decryptedString;
             }
         } catch (error) {
+            // Check if this is a password mismatch error
+            const errorMessage = error.message || String(error);
+            if (errorMessage.includes('OperationError') || 
+                errorMessage.includes('decrypt') ||
+                errorMessage.includes('AES-GCM')) {
+                throw new Error('Decryption failed: Incorrect password or corrupted data');
+            }
             console.error('Decryption failed:', error);
-            throw new Error('Decryption failed: ' + error.message);
+            throw new Error('Decryption failed: ' + errorMessage);
         }
       }
 }

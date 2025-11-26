@@ -90,11 +90,34 @@ class StorageManager {
                                 const parsed = JSON.parse(storedValue);
                                 if (parsed.encryptedData && parsed.iv) {
                                     // It's encrypted, decrypt it
-                                    const decryptedValue = await this.crypto.decryptData(storedValue);
-                                    resolve({ value: decryptedValue, newState });
-                                    return;
+                                    try {
+                                        const decryptedValue = await this.crypto.decryptData(storedValue);
+                                        
+                                        // Validate that we got a decrypted value, not the encrypted structure
+                                        if (decryptedValue && typeof decryptedValue === 'object' && 
+                                            decryptedValue.encryptedData && decryptedValue.iv) {
+                                            // This shouldn't happen - decryption returned encrypted structure
+                                            reject(new Error('Decryption failed: Incorrect password - returned encrypted payload structure'));
+                                            return;
+                                        }
+                                        
+                                        resolve({ value: decryptedValue, newState });
+                                        return;
+                                    } catch (decryptError) {
+                                        // Check if this is a password mismatch error
+                                        const errorMessage = decryptError.message || String(decryptError);
+                                        if (errorMessage.includes('Incorrect password') || 
+                                            errorMessage.includes('Decryption failed')) {
+                                            // Password is wrong - reject instead of returning null
+                                            reject(new Error('Decryption failed: Incorrect password'));
+                                            return;
+                                        }
+                                        // Other decryption errors - still reject
+                                        reject(decryptError);
+                                        return;
+                                    }
                                 }
-                            } catch {
+                            } catch (parseError) {
                                 // Not encrypted JSON, treat as plain value
                             }
                         }
@@ -103,7 +126,14 @@ class StorageManager {
                         resolve({ value: storedValue, newState });
                     } catch (error) {
                         console.error('Failed to decrypt stored value:', error);
-                        resolve(null);
+                        // Only resolve with null if it's not a password error
+                        const errorMessage = error.message || String(error);
+                        if (errorMessage.includes('Incorrect password') || 
+                            errorMessage.includes('Decryption failed')) {
+                            reject(error);
+                        } else {
+                            resolve(null);
+                        }
                     }
                 } else {
                     resolve(null);

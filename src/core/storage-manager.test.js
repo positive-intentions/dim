@@ -174,6 +174,84 @@ describe('StorageManager', () => {
       const result = await readPromise;
       expect(result).toBe(null);
     });
+
+    test('should reject readValue when password is incorrect', async () => {
+      // Create storage manager with correct password
+      const correctCryptoManager = new CryptoManager('correct-password');
+      storageManager = new StorageManager(correctCryptoManager);
+      
+      // Simulate successful DB open
+      const openRequest = indexedDB.open.mock.results[0].value;
+      openRequest.onsuccess({ target: { result: mockDB } });
+
+      // Encrypt data with correct password
+      const originalValue = 'test data';
+      const encryptedValue = await correctCryptoManager.encryptData(originalValue);
+
+      // Create storage manager with wrong password
+      const wrongCryptoManager = new CryptoManager('wrong-password');
+      const wrongStorageManager = new StorageManager(wrongCryptoManager);
+      
+      // Simulate successful DB open for wrong storage manager
+      const wrongOpenRequest = indexedDB.open.mock.results[1].value;
+      wrongOpenRequest.onsuccess({ target: { result: mockDB } });
+
+      const mockRequest = {
+        onsuccess: null,
+        onerror: null,
+        result: null
+      };
+      mockObjectStore.get.mockReturnValue(mockRequest);
+
+      const readPromise = wrongStorageManager.readValue('testKey', null);
+      
+      // Simulate successful read with encrypted value
+      mockRequest.result = { id: 'testKey', value: encryptedValue };
+      
+      // Mock decryptData to throw error (simulating wrong password)
+      wrongCryptoManager.decryptData = jest.fn().mockRejectedValue(
+        new Error('Decryption failed: OperationError')
+      );
+      
+      await mockRequest.onsuccess({});
+
+      // Should reject with error, not return null
+      await expect(readPromise).rejects.toThrow();
+    });
+
+    test('should properly decrypt with correct password', async () => {
+      storageManager = new StorageManager(cryptoManager);
+      
+      // Simulate successful DB open
+      const openRequest = indexedDB.open.mock.results[0].value;
+      openRequest.onsuccess({ target: { result: mockDB } });
+
+      const mockRequest = {
+        onsuccess: null,
+        onerror: null,
+        result: null
+      };
+      mockObjectStore.get.mockReturnValue(mockRequest);
+
+      const id = 'testKey';
+      const originalValue = 'test value';
+      const encryptedValue = await cryptoManager.encryptData(originalValue);
+
+      const readPromise = storageManager.readValue(id, null);
+      
+      // Simulate successful read
+      mockRequest.result = { id, value: encryptedValue };
+      await mockRequest.onsuccess({});
+
+      const result = await readPromise;
+
+      expect(result).toEqual({
+        value: originalValue,
+        newState: null
+      });
+      expect(result.value).toBe(originalValue);
+      expect(typeof result.value).toBe('string');
+    });
   });
 
   describe('loadFromDatabase', () => {

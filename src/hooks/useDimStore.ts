@@ -69,6 +69,25 @@ export function useDimStore({
 
         if (!mountedRef.current) return;
 
+        // Validate that result.value is not an encrypted payload structure
+        if (result && result.value !== null && result.value !== undefined) {
+          const value = result.value;
+          // Check if value looks like an encrypted payload structure (shouldn't happen)
+          if (typeof value === 'object' && value !== null && 
+              value.encryptedData && value.iv) {
+            console.error('useDimStore: Received encrypted payload structure instead of decrypted value - password may be incorrect');
+            // Password is wrong - use default value
+            if (!hasLoadedRef.current && !isSettingValueRef.current) {
+              setValue(defaultValue);
+              hasLoadedRef.current = true;
+            }
+            if (mountedRef.current) {
+              setIsLoading(false);
+            }
+            return;
+          }
+        }
+
         // Only set value if we haven't already loaded and if we're not currently setting a value
         // This prevents race conditions where a save happens before load completes
         if (!hasLoadedRef.current && !isSettingValueRef.current) {
@@ -84,7 +103,15 @@ export function useDimStore({
           setValue(result.value);
         }
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         console.error('Failed to load from storage:', error);
+        
+        // If it's a password error, use default value and log warning
+        if (errorMessage.includes('Incorrect password') || 
+            errorMessage.includes('Decryption failed')) {
+          console.warn('useDimStore: Password mismatch - using default value');
+        }
+        
         if (mountedRef.current && !hasLoadedRef.current) {
           setValue(defaultValue);
           hasLoadedRef.current = true;
@@ -122,6 +149,13 @@ export function useDimStore({
 
         if (!mountedRef.current) return;
 
+        // Validate that decryptedValue is not an encrypted payload structure
+        if (decryptedValue && typeof decryptedValue === 'object' && 
+            decryptedValue.encryptedData && decryptedValue.iv) {
+          console.error('useDimStore: Event decryption returned encrypted payload structure - password may be incorrect');
+          return; // Don't update with encrypted structure
+        }
+
         // Update local state (use functional update to avoid stale closure)
         setValue((currentValue) => {
           // Only update if value actually changed
@@ -131,7 +165,13 @@ export function useDimStore({
           return currentValue;
         });
       } catch (error) {
-        console.error('Failed to process event data:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('Incorrect password') || 
+            errorMessage.includes('Decryption failed')) {
+          console.warn('useDimStore: Failed to process event data - password mismatch');
+        } else {
+          console.error('Failed to process event data:', error);
+        }
       }
     };
 

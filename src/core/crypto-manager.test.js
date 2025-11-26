@@ -114,6 +114,56 @@ describe('CryptoManager', () => {
       
       await expect(cryptoManager.decryptData(corrupted)).rejects.toThrow();
     });
+
+    test('should reject decryption with wrong password', async () => {
+      const originalData = 'test data';
+      const encrypted = await cryptoManager.encryptData(originalData);
+      
+      // Create a new CryptoManager with different password
+      const wrongCryptoManager = new CryptoManager('wrong-password');
+      
+      // Should throw error when trying to decrypt with wrong password
+      await expect(wrongCryptoManager.decryptData(encrypted)).rejects.toThrow();
+    });
+
+    test('should return decrypted value, not encrypted payload structure', async () => {
+      const originalData = 'test string';
+      const encrypted = await cryptoManager.encryptData(originalData);
+      const decrypted = await cryptoManager.decryptData(encrypted);
+      
+      // Should return the original string, not an object with encryptedData/iv
+      expect(decrypted).toBe(originalData);
+      expect(typeof decrypted).toBe('string');
+      expect(decrypted).not.toHaveProperty('encryptedData');
+      expect(decrypted).not.toHaveProperty('iv');
+    });
+
+    test('should throw specific error for password mismatch', async () => {
+      const originalData = 'sensitive data';
+      const encrypted = await cryptoManager.encryptData(originalData);
+      
+      const wrongCryptoManager = new CryptoManager('different-password');
+      
+      try {
+        await wrongCryptoManager.decryptData(encrypted);
+        fail('Should have thrown an error');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        expect(error.message).toContain('Decryption failed');
+      }
+    });
+
+    test('should handle encrypted data that fails to decrypt', async () => {
+      const originalData = 'test';
+      const encrypted = await cryptoManager.encryptData(originalData);
+      const parsed = JSON.parse(encrypted);
+      
+      // Modify IV to cause decryption failure
+      parsed.iv = 'invalid-iv-data';
+      const invalidEncrypted = JSON.stringify(parsed);
+      
+      await expect(cryptoManager.decryptData(invalidEncrypted)).rejects.toThrow();
+    });
   });
 
   describe('Integration with Event Details', () => {
