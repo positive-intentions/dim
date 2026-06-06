@@ -3,38 +3,14 @@ import { define, html, css, useState, useEffect, useStyle } from "../../core/dim
 const SimpleGallery = (props, { useState, useEffect, useStyle, html, css }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Sample images for the gallery
+  // Emoji slides for the gallery (instant, no network load) so the automatic
+  // transition is easy to see and test.
   const images = [
-    {
-      id: 1,
-      src: "https://picsum.photos/800/600?random=1",
-      alt: "Beautiful landscape 1",
-      title: "Mountain Vista"
-    },
-    {
-      id: 2,
-      src: "https://picsum.photos/800/600?random=2",
-      alt: "Beautiful landscape 2",
-      title: "Ocean Waves"
-    },
-    {
-      id: 3,
-      src: "https://picsum.photos/800/600?random=3",
-      alt: "Beautiful landscape 3",
-      title: "Forest Path"
-    },
-    {
-      id: 4,
-      src: "https://picsum.photos/800/600?random=4",
-      alt: "Beautiful landscape 4",
-      title: "Desert Sunset"
-    },
-    {
-      id: 5,
-      src: "https://picsum.photos/800/600?random=5",
-      alt: "Beautiful landscape 5",
-      title: "City Lights"
-    }
+    { id: 1, emoji: "🏔️", title: "Mountain Vista", bg: "#dbeafe" },
+    { id: 2, emoji: "🌊", title: "Ocean Waves", bg: "#cffafe" },
+    { id: 3, emoji: "🌲", title: "Forest Path", bg: "#dcfce7" },
+    { id: 4, emoji: "🏜️", title: "Desert Sunset", bg: "#fef3c7" },
+    { id: 5, emoji: "🌃", title: "City Lights", bg: "#ede9fe" },
   ];
 
   useStyle(css`
@@ -67,7 +43,6 @@ const SimpleGallery = (props, { useState, useEffect, useStyle, html, css }) => {
     .main-image {
       width: 100%;
       height: 100%;
-      object-fit: cover;
       border-radius: 8px;
     }
 
@@ -127,7 +102,11 @@ const SimpleGallery = (props, { useState, useEffect, useStyle, html, css }) => {
     .thumbnail {
       width: 80px;
       height: 60px;
-      object-fit: cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+      background: #e9ecef;
       border-radius: 4px;
       cursor: pointer;
       border: 3px solid transparent;
@@ -234,20 +213,19 @@ const SimpleGallery = (props, { useState, useEffect, useStyle, html, css }) => {
       <simple-image 
         transitionId="${currentIndex}"
         transitionDuration="500"
-        src="${images[currentIndex].src}"
-        alt="${images[currentIndex].alt}"
+        emoji="${images[currentIndex].emoji}"
         title="${images[currentIndex].title}"
+        bg="${images[currentIndex].bg}"
       ></simple-image>
 
       <div class="thumbnail-container">
         ${images.map((image, index) => html`
-          <img 
+          <div 
             class="thumbnail ${index === currentIndex ? 'active' : ''}"
-            src="${image.src}" 
-            alt="${image.alt}"
+            role="button"
+            aria-label="${image.title}"
             @click="${() => goToImage(index)}"
-            loading="lazy"
-          />
+          >${image.emoji}</div>
         `)}
       </div>
 
@@ -266,7 +244,7 @@ const SimpleGallery = (props, { useState, useEffect, useStyle, html, css }) => {
           &lt;simple-image <br>
           &nbsp;&nbsp;transitionId="\${currentIndex}"<br>
           &nbsp;&nbsp;transitionDuration="500"<br>
-          &nbsp;&nbsp;src="\${image.src}"<br>
+          &nbsp;&nbsp;emoji="\${image.emoji}"<br>
           &nbsp;&nbsp;title="\${image.title}"<br>
           &gt;&lt;/simple-image&gt;
         </div>
@@ -282,18 +260,13 @@ const SimpleGallery = (props, { useState, useEffect, useStyle, html, css }) => {
   `;
 };
 
-// Simple image component that will automatically get view transitions
+// Simple emoji slide that will automatically get view transitions
 const SimpleImage = (props, { html }) => {
-  const { src, alt, title } = props;
+  const { emoji, title, bg } = props;
   
   return html`
-    <div style="position: relative; width: 100%; height: 400px; border-radius: 8px; overflow: hidden; background: #000;">
-      <img 
-        src="${src}" 
-        alt="${alt}"
-        style="width: 100%; height: 100%; object-fit: cover;"
-        loading="lazy"
-      />
+    <div style="position: relative; width: 100%; height: 400px; border-radius: 8px; overflow: hidden; background: ${bg || '#dbeafe'}; display: flex; align-items: center; justify-content: center;">
+      <span style="font-size: 9rem; line-height: 1; user-select: none;">${emoji}</span>
       <div style="position: absolute; bottom: 20px; left: 20px; background: rgba(0, 0, 0, 0.7); color: white; padding: 0.5rem 1rem; border-radius: 4px; font-size: 1.1rem; font-weight: 600;">
         ${title}
       </div>

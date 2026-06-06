@@ -1,4 +1,4 @@
-"use strict";(self.webpackChunkdim=self.webpackChunkdim||[]).push([[277],{"./src/stories/04-ViewTransitions.stories.js":(__unused_webpack_module,__webpack_exports__,__webpack_require__)=>{__webpack_require__.r(__webpack_exports__),__webpack_require__.d(__webpack_exports__,{AdvancedNavigation:()=>_04_ViewTransitions_stories_AdvancedNavigation,AnimationShowcase:()=>AnimationShowcase,AutomaticTransitions:()=>AutomaticTransitions,ImageGallery:()=>ImageGallery,PageNavigation:()=>PageNavigation,__namedExportsOrder:()=>__namedExportsOrder,default:()=>_04_ViewTransitions_stories});var react=__webpack_require__("./node_modules/react/index.js"),dim=__webpack_require__("./src/core/dim.ts");const ViewTransitionsGallery=(props,{useState,useEffect,useStyle,useViewTransition,html,css})=>{const[currentIndex,setCurrentIndex]=useState(0),transition=useViewTransition(currentIndex.toString(),{duration:500,autoDirection:!0}),images=[{id:1,src:"https://picsum.photos/800/600?random=1",alt:"Beautiful landscape 1",title:"Mountain Vista"},{id:2,src:"https://picsum.photos/800/600?random=2",alt:"Beautiful landscape 2",title:"Ocean Waves"},{id:3,src:"https://picsum.photos/800/600?random=3",alt:"Beautiful landscape 3",title:"Forest Path"},{id:4,src:"https://picsum.photos/800/600?random=4",alt:"Beautiful landscape 4",title:"Desert Sunset"},{id:5,src:"https://picsum.photos/800/600?random=5",alt:"Beautiful landscape 5",title:"City Lights"}];useStyle(css`
+"use strict";(self.webpackChunkdim=self.webpackChunkdim||[]).push([[277],{"./src/stories/04-ViewTransitions.stories.js":(__unused_webpack_module,__webpack_exports__,__webpack_require__)=>{__webpack_require__.r(__webpack_exports__),__webpack_require__.d(__webpack_exports__,{AdvancedNavigation:()=>_04_ViewTransitions_stories_AdvancedNavigation,AnimationShowcase:()=>AnimationShowcase,AutomaticTransitions:()=>AutomaticTransitions,ImageGallery:()=>ImageGallery,PageNavigation:()=>PageNavigation,__namedExportsOrder:()=>__namedExportsOrder,default:()=>_04_ViewTransitions_stories});var react=__webpack_require__("./node_modules/react/index.js"),dim=__webpack_require__("./src/core/dim.ts");const ViewTransitionsGallery=(props,{useState,useEffect,useStyle,useViewTransition,html,css,keyed})=>{const[currentIndex,setCurrentIndex]=useState(0),transition=useViewTransition(currentIndex.toString(),{duration:500,autoDirection:!0}),images=[{id:1,emoji:"🏔️",title:"Mountain Vista",bg:"#dbeafe"},{id:2,emoji:"🌊",title:"Ocean Waves",bg:"#cffafe"},{id:3,emoji:"🌲",title:"Forest Path",bg:"#dcfce7"},{id:4,emoji:"🏜️",title:"Desert Sunset",bg:"#fef3c7"},{id:5,emoji:"🌃",title:"City Lights",bg:"#ede9fe"}];useStyle(css`
     /* Include view transition styles */
     ${dim.fZ}
     
@@ -35,9 +35,17 @@
       left: 0;
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       opacity: 1;
       transform: translateX(0);
+    }
+
+    .slide-emoji {
+      font-size: 9rem;
+      line-height: 1;
+      user-select: none;
     }
 
     .nav-button {
@@ -101,7 +109,11 @@
     .thumbnail {
       width: 80px;
       height: 60px;
-      object-fit: cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+      background: #e9ecef;
       border-radius: 4px;
       cursor: pointer;
       border: 3px solid transparent;
@@ -197,18 +209,32 @@
         align-items: center;
       }
     }
-  `);const nextImage=()=>{transition.isTransitioning||setCurrentIndex((prev=>(prev+1)%images.length))},prevImage=()=>{transition.isTransitioning||setCurrentIndex((prev=>(prev-1+images.length)%images.length))},goToImage=index=>{transition.isTransitioning||index===currentIndex||setCurrentIndex(index)};return useEffect((()=>{const interval=setInterval((()=>{transition.isTransitioning||nextImage()}),4e3);return()=>clearInterval(interval)}),[transition.isTransitioning]),html`
+  `);const nextImage=()=>{transition.isTransitioning||setCurrentIndex((prev=>(prev+1)%images.length))},prevImage=()=>{transition.isTransitioning||setCurrentIndex((prev=>(prev-1+images.length)%images.length))},goToImage=index=>{transition.isTransitioning||index===currentIndex||setCurrentIndex(index)};useEffect((()=>{const interval=setInterval((()=>{transition.isTransitioning||nextImage()}),4e3);return()=>clearInterval(interval)}),[transition.isTransitioning]);const previousIndex=transition.isTransitioning&&null!==transition.previousId&&void 0!==transition.previousId?parseInt(transition.previousId,10):null,outgoingImage=null!==previousIndex&&images[previousIndex]?images[previousIndex]:null;return html`
     <div class="gallery-container">
       <h2 class="gallery-title">🖼️ View Transitions Gallery</h2>
       
       <div class="main-image-container view-transition-container">
-        <img 
-          class="main-image view-transition-item ${transition.getTransitionClasses()}"
-          src="${images[currentIndex].src}" 
-          alt="${images[currentIndex].alt}"
-          loading="lazy"
-          style="${Object.entries(transition.getTransitionStyles()).map((([key,value])=>`${key}: ${value}`)).join("; ")}"
-        />
+        ${outgoingImage?keyed(previousIndex,html`
+          <div
+            class="${transition.getOutgoingClass("main-image")}"
+            style="background:${outgoingImage.bg}"
+            role="img"
+            aria-label="${outgoingImage.title}"
+          >
+            <span class="slide-emoji">${outgoingImage.emoji}</span>
+          </div>
+        `):""}
+
+        ${keyed(currentIndex,html`
+          <div
+            class="${transition.getIncomingClass("main-image")}"
+            style="background:${images[currentIndex].bg}"
+            role="img"
+            aria-label="${images[currentIndex].title}"
+          >
+            <span class="slide-emoji">${images[currentIndex].emoji}</span>
+          </div>
+        `)}
         
         <button 
           class="nav-button prev-button" 
@@ -238,13 +264,12 @@
 
       <div class="thumbnail-container">
         ${images.map(((image,index)=>html`
-          <img 
+          <div 
             class="thumbnail ${index===currentIndex?"active":""}"
-            src="${image.src}" 
-            alt="${image.alt}"
+            role="button"
+            aria-label="${image.title}"
             @click="${()=>goToImage(index)}"
-            loading="lazy"
-          />
+          >${image.emoji}</div>
         `))}
       </div>
 
@@ -267,7 +292,7 @@
         Classes: ${transition.getTransitionClasses("debug")}
       </div>
     </div>
-  `};(0,dim.E8)({tag:"view-transitions-gallery",component:ViewTransitionsGallery});const SimpleGallery=(props,{useState,useEffect,useStyle,html,css})=>{const[currentIndex,setCurrentIndex]=useState(0),images=[{id:1,src:"https://picsum.photos/800/600?random=1",alt:"Beautiful landscape 1",title:"Mountain Vista"},{id:2,src:"https://picsum.photos/800/600?random=2",alt:"Beautiful landscape 2",title:"Ocean Waves"},{id:3,src:"https://picsum.photos/800/600?random=3",alt:"Beautiful landscape 3",title:"Forest Path"},{id:4,src:"https://picsum.photos/800/600?random=4",alt:"Beautiful landscape 4",title:"Desert Sunset"},{id:5,src:"https://picsum.photos/800/600?random=5",alt:"Beautiful landscape 5",title:"City Lights"}];useStyle(css`
+  `};(0,dim.E8)({tag:"view-transitions-gallery",component:ViewTransitionsGallery});const SimpleGallery=(props,{useState,useEffect,useStyle,html,css})=>{const[currentIndex,setCurrentIndex]=useState(0),images=[{id:1,emoji:"🏔️",title:"Mountain Vista",bg:"#dbeafe"},{id:2,emoji:"🌊",title:"Ocean Waves",bg:"#cffafe"},{id:3,emoji:"🌲",title:"Forest Path",bg:"#dcfce7"},{id:4,emoji:"🏜️",title:"Desert Sunset",bg:"#fef3c7"},{id:5,emoji:"🌃",title:"City Lights",bg:"#ede9fe"}];useStyle(css`
     .gallery-container {
       max-width: 900px;
       margin: 0 auto;
@@ -297,7 +322,6 @@
     .main-image {
       width: 100%;
       height: 100%;
-      object-fit: cover;
       border-radius: 8px;
     }
 
@@ -357,7 +381,11 @@
     .thumbnail {
       width: 80px;
       height: 60px;
-      object-fit: cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+      background: #e9ecef;
       border-radius: 4px;
       cursor: pointer;
       border: 3px solid transparent;
@@ -440,20 +468,19 @@
       <simple-image 
         transitionId="${currentIndex}"
         transitionDuration="500"
-        src="${images[currentIndex].src}"
-        alt="${images[currentIndex].alt}"
+        emoji="${images[currentIndex].emoji}"
         title="${images[currentIndex].title}"
+        bg="${images[currentIndex].bg}"
       ></simple-image>
 
       <div class="thumbnail-container">
         ${images.map(((image,index)=>html`
-          <img 
+          <div 
             class="thumbnail ${index===currentIndex?"active":""}"
-            src="${image.src}" 
-            alt="${image.alt}"
+            role="button"
+            aria-label="${image.title}"
             @click="${()=>(index=>{index!==currentIndex&&setCurrentIndex(index)})(index)}"
-            loading="lazy"
-          />
+          >${image.emoji}</div>
         `))}
       </div>
 
@@ -472,7 +499,7 @@
           &lt;simple-image <br>
           &nbsp;&nbsp;transitionId="\${currentIndex}"<br>
           &nbsp;&nbsp;transitionDuration="500"<br>
-          &nbsp;&nbsp;src="\${image.src}"<br>
+          &nbsp;&nbsp;emoji="\${image.emoji}"<br>
           &nbsp;&nbsp;title="\${image.title}"<br>
           &gt;&lt;/simple-image&gt;
         </div>
@@ -485,19 +512,14 @@
         <div>• Animation timing</div>
       </div>
     </div>
-  `};(0,dim.E8)({tag:"simple-gallery",component:SimpleGallery}),(0,dim.E8)({tag:"simple-image",component:(props,{html})=>{const{src,alt,title}=props;return html`
-    <div style="position: relative; width: 100%; height: 400px; border-radius: 8px; overflow: hidden; background: #000;">
-      <img 
-        src="${src}" 
-        alt="${alt}"
-        style="width: 100%; height: 100%; object-fit: cover;"
-        loading="lazy"
-      />
+  `};(0,dim.E8)({tag:"simple-gallery",component:SimpleGallery}),(0,dim.E8)({tag:"simple-image",component:(props,{html})=>{const{emoji,title,bg}=props;return html`
+    <div style="position: relative; width: 100%; height: 400px; border-radius: 8px; overflow: hidden; background: ${bg||"#dbeafe"}; display: flex; align-items: center; justify-content: center;">
+      <span style="font-size: 9rem; line-height: 1; user-select: none;">${emoji}</span>
       <div style="position: absolute; bottom: 20px; left: 20px; background: rgba(0, 0, 0, 0.7); color: white; padding: 0.5rem 1rem; border-radius: 4px; font-size: 1.1rem; font-weight: 600;">
         ${title}
       </div>
     </div>
-  `}});const NavigationExample=(props,{useState,useEffect,useStyle,html,css})=>{const[currentPage,setCurrentPage]=useState("home"),[navigationHistory,setNavigationHistory]=useState(["home"]),pages={home:{id:"home",title:"Home",icon:"🏠",color:"#e3f2fd",content:{heading:"Welcome Home",description:"This is the main landing page of our application.",features:["Beautiful design","Smooth animations","Responsive layout","Modern framework"]}},about:{id:"about",title:"About",icon:"👋",color:"#f3e5f5",content:{heading:"About Us",description:"Learn more about our company and mission.",features:["Founded in 2024","Innovative solutions","Customer focused","Global reach"]}},services:{id:"services",title:"Services",icon:"⚙️",color:"#e8f5e8",content:{heading:"Our Services",description:"Discover what we can do for you.",features:["Web Development","Mobile Apps","UI/UX Design","Consulting"]}},portfolio:{id:"portfolio",title:"Portfolio",icon:"💼",color:"#fff3e0",content:{heading:"Our Work",description:"Check out our latest projects and achievements.",features:["E-commerce sites","SaaS platforms","Mobile applications","Design systems"]}},contact:{id:"contact",title:"Contact",icon:"📧",color:"#ffebee",content:{heading:"Get in Touch",description:"Ready to start your project? Contact us today.",features:["Free consultation","24/7 support","Quick response","Flexible pricing"]}}},pageOrder=["home","about","services","portfolio","contact"];useStyle(css`
+  `}});const NavigationExample=(props,{useState,useEffect,useStyle,html,css})=>{const[currentPage,setCurrentPage]=useState("home"),[navigationHistory,setNavigationHistory]=useState(["home"]),pages={home:{id:"home",title:"Home",icon:"🏠",color:"#e3f2fd",content:{heading:"Welcome Home",description:"This is the main landing page of our application.",features:["Shared Component","Beautiful design","Smooth animations","Responsive layout","Modern framework"]}},about:{id:"about",title:"About",icon:"👋",color:"#f3e5f5",content:{heading:"About Us",description:"Learn more about our company and mission.",features:["Founded in 2024","Innovative solutions","Shared Component","Customer focused","Global reach"]}},services:{id:"services",title:"Services",icon:"⚙️",color:"#e8f5e8",content:{heading:"Our Services",description:"Discover what we can do for you.",features:["Web Development","Mobile Apps","UI/UX Design","Consulting","Shared Component"]}},portfolio:{id:"portfolio",title:"Portfolio",icon:"💼",color:"#fff3e0",content:{heading:"Our Work",description:"Check out our latest projects and achievements.",features:["E-commerce sites","Shared Component","SaaS platforms","Mobile applications","Design systems"]}},contact:{id:"contact",title:"Contact",icon:"📧",color:"#ffebee",content:{heading:"Get in Touch",description:"Ready to start your project? Contact us today.",features:["Free consultation","24/7 support","Quick response","Flexible pricing","Shared Component"]}}},pageOrder=["home","about","services","portfolio","contact"];useStyle(css`
     .navigation-app {
       max-width: 1200px;
       margin: 0 auto;
@@ -585,55 +607,6 @@
       position: relative;
       min-height: 500px;
       overflow: hidden;
-    }
-
-    .page-content {
-      padding: 3rem 2rem;
-      text-align: center;
-    }
-
-    .page-heading {
-      font-size: 2.5rem;
-      font-weight: bold;
-      margin-bottom: 1rem;
-      color: #333;
-    }
-
-    .page-description {
-      font-size: 1.125rem;
-      color: #6c757d;
-      margin-bottom: 3rem;
-      max-width: 600px;
-      margin-left: auto;
-      margin-right: auto;
-      line-height: 1.6;
-    }
-
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    .feature-card {
-      background: white;
-      padding: 1.5rem;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      border-left: 4px solid #667eea;
-      transition: transform 0.2s ease;
-    }
-
-    .feature-card:hover {
-      transform: translateY(-2px);
-    }
-
-    .feature-title {
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 0.5rem;
     }
 
     .controls {
@@ -782,7 +755,7 @@
       <div class="page-container">
         <!-- This is where the magic happens - automatic view transitions! -->
         <page-content 
-          transitionId="${currentPage}"
+          transitionId="${getCurrentPageIndex()}"
           transitionDuration="600"
           pageData="${JSON.stringify(pages[currentPage])}"
         ></page-content>
@@ -814,7 +787,7 @@
         
         <div class="code-block">
 &lt;page-content 
-  transitionId="\${currentPage}"
+  transitionId="\${pageIndex}"
   transitionDuration="600"
   pageData="\${JSON.stringify(pages[currentPage])}"
 &gt;&lt;/page-content&gt;
@@ -830,17 +803,80 @@
         </ul>
       </div>
     </div>
-  `};(0,dim.E8)({tag:"navigation-example",component:NavigationExample}),(0,dim.E8)({tag:"page-content",component:(props,{html})=>{const pageData=JSON.parse(props.pageData||"{}"),{content,color}=pageData;return html`
+  `};(0,dim.E8)({tag:"navigation-example",component:NavigationExample}),(0,dim.E8)({tag:"page-content",component:(props,{html,useStyle,css})=>{const raw=props.pageData,pageData="string"==typeof raw?JSON.parse(raw||"{}"):raw||{},{content={heading:"",description:"",features:[]},color}=pageData;return useStyle(css`
+    .page-content {
+      padding: 3rem 2rem;
+      text-align: center;
+      min-height: 500px;
+      box-sizing: border-box;
+    }
+
+    .page-heading {
+      font-size: 2.5rem;
+      font-weight: bold;
+      margin-bottom: 1rem;
+      color: #333;
+    }
+
+    .page-description {
+      font-size: 1.125rem;
+      color: #6c757d;
+      margin-bottom: 3rem;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.6;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .feature-card {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      border-left: 4px solid #667eea;
+      transition: transform 0.2s ease;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-2px);
+    }
+
+    /* The shared card is visually distinct so the FLIP reposition is easy to
+       follow as it moves between tabs. */
+    .feature-card.shared-card {
+      background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+      border-left-color: #f59e0b;
+      box-shadow: 0 6px 16px rgba(245, 158, 11, 0.35);
+    }
+
+    .feature-title {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+  `),html`
     <div class="page-content" style="background: ${color};">
       <h2 class="page-heading">${content.heading}</h2>
       <p class="page-description">${content.description}</p>
       
       <div class="features-grid">
-        ${content.features.map((feature=>html`
-          <div class="feature-card">
-            <div class="feature-title">${feature}</div>
-          </div>
-        `))}
+        ${content.features.map((feature=>"Shared Component"===feature?html`
+                <div class="feature-card shared-card" data-vt-shared="shared-feature">
+                  <div class="feature-title">⭐ ${feature}</div>
+                </div>
+              `:html`
+                <div class="feature-card">
+                  <div class="feature-title">${feature}</div>
+                </div>
+              `))}
       </div>
     </div>
   `}}),(0,dim.E8)({tag:"advanced-navigation",component:(props,{useState,useStyle,html,css})=>{const[currentSection,setCurrentSection]=useState("dashboard"),[currentSubPage,setCurrentSubPage]=useState("overview"),sections={dashboard:{title:"Dashboard",icon:"📊",subPages:["overview","analytics","reports"]},users:{title:"Users",icon:"👥",subPages:["list","permissions","activity"]},settings:{title:"Settings",icon:"⚙️",subPages:["general","security","billing"]}};return useStyle(css`
@@ -958,4 +994,4 @@
       </div>
     </div>
   `}});const _04_ViewTransitions_stories={title:"useTransition()",parameters:{layout:"fullscreen",docs:{description:{component:"\n# 🖼️ View Transitions Gallery\n\nA beautiful image gallery demonstrating smooth sliding animations and view transitions using the Dim Framework.\n\n## 🎯 Features\n\n- **Smooth Sliding Animations** - CSS transitions with cubic-bezier easing\n- **Multiple Navigation Methods** - Arrow keys, thumbnails, dots, and buttons\n- **Auto-play Functionality** - Automatic slideshow with 4-second intervals\n- **Responsive Design** - Adapts to different screen sizes\n- **Touch-friendly** - Optimized for mobile interaction\n- **Loading States** - Prevents rapid clicks during transitions\n\n## 🚀 Animation Techniques\n\n### CSS Transitions\n- Uses `transform: translateX()` for smooth horizontal sliding\n- `cubic-bezier(0.4, 0, 0.2, 1)` for natural easing\n- Opacity transitions for fade effects\n\n### Performance Optimizations\n- Uses `transform` and `opacity` for GPU acceleration\n- Prevents animation overlaps with transition state management\n- Lazy loading for images\n\n## 🎨 Interaction States\n\n- **Hover Effects** - Scale and opacity changes on interactive elements\n- **Active States** - Visual feedback for current selection\n- **Disabled States** - Prevents actions during transitions\n- **Loading States** - Smooth transitions between images\n\n## 📱 Responsive Behavior\n\n- Thumbnail grid adapts to screen width\n- Touch-friendly button sizes on mobile\n- Optimized image dimensions for different viewports\n        "}}},tags:["autodocs"]},ImageGallery={render:()=>react.createElement("view-transitions-gallery"),name:"Image Gallery with Sliding Transitions",parameters:{docs:{description:{story:"\nA complete image gallery with smooth sliding animations. Features include:\n\n- **Navigation**: Use arrow buttons, click thumbnails, or indicator dots\n- **Auto-play**: Automatically advances every 4 seconds\n- **Smooth Transitions**: CSS-powered sliding animations\n- **Responsive**: Works on desktop and mobile devices\n\nThe gallery uses CSS transforms and transitions for smooth animations, with state management to prevent rapid-fire clicks during transitions.\n        "}}}},AutomaticTransitions={render:()=>react.createElement("simple-gallery"),name:"🚀 Simple Automatic Transitions",parameters:{docs:{description:{story:'\n**Framework Magic!** This gallery uses the new automatic view transitions feature.\n\n### How it works:\n1. Just add `transitionId` prop to any component\n2. When the ID changes, transitions happen automatically\n3. Direction is auto-calculated based on ID comparison\n4. No manual CSS classes or state management needed!\n\n### Example Syntax:\n```html\n<simple-image \n  transitionId="${currentIndex}"\n  transitionDuration="500"\n  src="${image.src}"\n  title="${image.title}"\n></simple-image>\n```\n\nThe framework automatically handles:\n- Transition detection\n- Direction calculation (left/right)\n- CSS class application\n- Wrapper elements\n- Animation timing\n        '}}}},PageNavigation={render:()=>react.createElement("navigation-example"),name:"🔥 Page Navigation Transitions",parameters:{docs:{description:{story:'\n**Complex Navigation Made Simple!** This demonstrates automatic view transitions for multi-page navigation.\n\n### Features Demonstrated:\n- **Multi-page navigation** with automatic sliding\n- **Smart direction detection** based on page order\n- **Navigation history** with breadcrumb tracking\n- **Responsive design** that works on mobile\n- **Auto-advance demo** cycling through pages\n\n### Framework Magic:\n```html\n<page-content \n  transitionId="${currentPage}"\n  transitionDuration="600"\n  pageData="${JSON.stringify(pages[currentPage])}"\n></page-content>\n```\n\n### Automatic Behaviors:\n- 🎯 **Direction Detection**: Slides left/right based on page order\n- ⚡ **Smooth Transitions**: 600ms sliding animations\n- 🔄 **History Tracking**: Breadcrumb navigation\n- 📱 **Mobile Responsive**: Touch-friendly navigation\n- 🎨 **Auto-styling**: No manual CSS classes needed\n\n### Complex Navigation:\nThe example also includes a nested navigation component showing how view transitions work with:\n- Sidebar navigation\n- Sub-page routing\n- Nested transition IDs (`section-subpage`)\n- Multi-level content transitions\n\nPerfect for dashboards, admin panels, and complex applications!\n        '}}}},_04_ViewTransitions_stories_AdvancedNavigation={render:()=>react.createElement("advanced-navigation"),name:"🏗️ Nested Navigation",parameters:{docs:{description:{story:'\n**Advanced Navigation Patterns** - Demonstrates nested transitions with complex routing.\n\n### Features:\n- **Sidebar + Sub-navigation** layout\n- **Nested transition IDs** (e.g., `dashboard-overview`)\n- **Two-level routing** with automatic transitions\n- **State coordination** between sections and sub-pages\n\n### Transition ID Strategy:\n```html\n<nested-content \n  transitionId="${currentSection}-${currentSubPage}"\n  transitionDuration="400"\n></nested-content>\n```\n\nThis creates unique IDs like:\n- `dashboard-overview`\n- `dashboard-analytics`\n- `users-list`\n- `settings-security`\n\nThe framework automatically determines direction based on the combined ID comparison!\n        '}}}},AnimationShowcase={render:()=>react.createElement("view-transitions-gallery"),name:"Manual View Transitions (Advanced)",parameters:{docs:{description:{story:"\nThis story shows the manual approach using the `useViewTransition` hook directly.\n\n### Manual Hook Usage:\n```javascript\nconst transition = useViewTransition(currentIndex.toString(), {\n  duration: 500,\n  autoDirection: true\n});\n```\n\n### CSS Animations Used:\n- `transform: translateX()` for slide transitions\n- `opacity` changes for fade effects\n- `scale()` transforms for hover states\n- `cubic-bezier` easing for natural motion\n\n### Performance Considerations:\n- GPU-accelerated properties (`transform`, `opacity`)\n- Transition state management prevents animation conflicts\n- Efficient re-renders with useState hooks\n\n### User Experience:\n- Visual feedback for all interactive elements\n- Disabled states during transitions\n- Auto-play with manual override\n- Multiple navigation methods for accessibility\n        "}}}},__namedExportsOrder=["ImageGallery","AutomaticTransitions","PageNavigation","AdvancedNavigation","AnimationShowcase"];ImageGallery.parameters={...ImageGallery.parameters,docs:{...ImageGallery.parameters?.docs,source:{originalSource:"{\n  render: () => React.createElement('view-transitions-gallery'),\n  name: \"Image Gallery with Sliding Transitions\",\n  parameters: {\n    docs: {\n      description: {\n        story: `\nA complete image gallery with smooth sliding animations. Features include:\n\n- **Navigation**: Use arrow buttons, click thumbnails, or indicator dots\n- **Auto-play**: Automatically advances every 4 seconds\n- **Smooth Transitions**: CSS-powered sliding animations\n- **Responsive**: Works on desktop and mobile devices\n\nThe gallery uses CSS transforms and transitions for smooth animations, with state management to prevent rapid-fire clicks during transitions.\n        `\n      }\n    }\n  }\n}",...ImageGallery.parameters?.docs?.source}}},AutomaticTransitions.parameters={...AutomaticTransitions.parameters,docs:{...AutomaticTransitions.parameters?.docs,source:{originalSource:'{\n  render: () => React.createElement(\'simple-gallery\'),\n  name: "🚀 Simple Automatic Transitions",\n  parameters: {\n    docs: {\n      description: {\n        story: `\n**Framework Magic!** This gallery uses the new automatic view transitions feature.\n\n### How it works:\n1. Just add \\`transitionId\\` prop to any component\n2. When the ID changes, transitions happen automatically\n3. Direction is auto-calculated based on ID comparison\n4. No manual CSS classes or state management needed!\n\n### Example Syntax:\n\\`\\`\\`html\n<simple-image \n  transitionId="\\${currentIndex}"\n  transitionDuration="500"\n  src="\\${image.src}"\n  title="\\${image.title}"\n></simple-image>\n\\`\\`\\`\n\nThe framework automatically handles:\n- Transition detection\n- Direction calculation (left/right)\n- CSS class application\n- Wrapper elements\n- Animation timing\n        `\n      }\n    }\n  }\n}',...AutomaticTransitions.parameters?.docs?.source}}},PageNavigation.parameters={...PageNavigation.parameters,docs:{...PageNavigation.parameters?.docs,source:{originalSource:'{\n  render: () => React.createElement(\'navigation-example\'),\n  name: "🔥 Page Navigation Transitions",\n  parameters: {\n    docs: {\n      description: {\n        story: `\n**Complex Navigation Made Simple!** This demonstrates automatic view transitions for multi-page navigation.\n\n### Features Demonstrated:\n- **Multi-page navigation** with automatic sliding\n- **Smart direction detection** based on page order\n- **Navigation history** with breadcrumb tracking\n- **Responsive design** that works on mobile\n- **Auto-advance demo** cycling through pages\n\n### Framework Magic:\n\\`\\`\\`html\n<page-content \n  transitionId="\\${currentPage}"\n  transitionDuration="600"\n  pageData="\\${JSON.stringify(pages[currentPage])}"\n></page-content>\n\\`\\`\\`\n\n### Automatic Behaviors:\n- 🎯 **Direction Detection**: Slides left/right based on page order\n- ⚡ **Smooth Transitions**: 600ms sliding animations\n- 🔄 **History Tracking**: Breadcrumb navigation\n- 📱 **Mobile Responsive**: Touch-friendly navigation\n- 🎨 **Auto-styling**: No manual CSS classes needed\n\n### Complex Navigation:\nThe example also includes a nested navigation component showing how view transitions work with:\n- Sidebar navigation\n- Sub-page routing\n- Nested transition IDs (\\`section-subpage\\`)\n- Multi-level content transitions\n\nPerfect for dashboards, admin panels, and complex applications!\n        `\n      }\n    }\n  }\n}',...PageNavigation.parameters?.docs?.source}}},_04_ViewTransitions_stories_AdvancedNavigation.parameters={..._04_ViewTransitions_stories_AdvancedNavigation.parameters,docs:{..._04_ViewTransitions_stories_AdvancedNavigation.parameters?.docs,source:{originalSource:'{\n  render: () => React.createElement(\'advanced-navigation\'),\n  name: "🏗️ Nested Navigation",\n  parameters: {\n    docs: {\n      description: {\n        story: `\n**Advanced Navigation Patterns** - Demonstrates nested transitions with complex routing.\n\n### Features:\n- **Sidebar + Sub-navigation** layout\n- **Nested transition IDs** (e.g., \\`dashboard-overview\\`)\n- **Two-level routing** with automatic transitions\n- **State coordination** between sections and sub-pages\n\n### Transition ID Strategy:\n\\`\\`\\`html\n<nested-content \n  transitionId="\\${currentSection}-\\${currentSubPage}"\n  transitionDuration="400"\n></nested-content>\n\\`\\`\\`\n\nThis creates unique IDs like:\n- \\`dashboard-overview\\`\n- \\`dashboard-analytics\\`\n- \\`users-list\\`\n- \\`settings-security\\`\n\nThe framework automatically determines direction based on the combined ID comparison!\n        `\n      }\n    }\n  }\n}',..._04_ViewTransitions_stories_AdvancedNavigation.parameters?.docs?.source}}},AnimationShowcase.parameters={...AnimationShowcase.parameters,docs:{...AnimationShowcase.parameters?.docs,source:{originalSource:"{\n  render: () => React.createElement('view-transitions-gallery'),\n  name: \"Manual View Transitions (Advanced)\",\n  parameters: {\n    docs: {\n      description: {\n        story: `\nThis story shows the manual approach using the \\`useViewTransition\\` hook directly.\n\n### Manual Hook Usage:\n\\`\\`\\`javascript\nconst transition = useViewTransition(currentIndex.toString(), {\n  duration: 500,\n  autoDirection: true\n});\n\\`\\`\\`\n\n### CSS Animations Used:\n- \\`transform: translateX()\\` for slide transitions\n- \\`opacity\\` changes for fade effects\n- \\`scale()\\` transforms for hover states\n- \\`cubic-bezier\\` easing for natural motion\n\n### Performance Considerations:\n- GPU-accelerated properties (\\`transform\\`, \\`opacity\\`)\n- Transition state management prevents animation conflicts\n- Efficient re-renders with useState hooks\n\n### User Experience:\n- Visual feedback for all interactive elements\n- Disabled states during transitions\n- Auto-play with manual override\n- Multiple navigation methods for accessibility\n        `\n      }\n    }\n  }\n}",...AnimationShowcase.parameters?.docs?.source}}}}}]);
-//# sourceMappingURL=stories-04-ViewTransitions-stories.cc2aec5c.iframe.bundle.js.map
+//# sourceMappingURL=stories-04-ViewTransitions-stories.48629225.iframe.bundle.js.map

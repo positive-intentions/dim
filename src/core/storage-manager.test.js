@@ -1,326 +1,146 @@
 import StorageManager from './storage-manager.js';
 import CryptoManager from './crypto-manager.js';
 
-// Mock IndexedDB
-const mockDB = {
-  transaction: jest.fn(),
-  objectStoreNames: {
-    contains: jest.fn()
-  }
-};
-
-const mockTransaction = {
-  objectStore: jest.fn()
-};
-
-const mockObjectStore = {
-  put: jest.fn(),
-  get: jest.fn()
-};
-
-// Mock debouncedDispatcher
+// Mock debouncedDispatcher so we can assert dispatched initial-load events.
 jest.mock('./mini-lit.js', () => ({
   debouncedDispatcher: jest.fn()
 }));
 
 import { debouncedDispatcher } from './mini-lit.js';
 
+// Low iteration count keeps PBKDF2 fast in tests.
+const makeCrypto = (password) => new CryptoManager(password, { iterations: 1000 });
+
+// Unique key generator so tests do not collide in the shared fake IndexedDB.
+let keyCounter = 0;
+const uniqueKey = (prefix = 'k') => `${prefix}-${Date.now()}-${keyCounter++}`;
+
 describe('StorageManager', () => {
-  let storageManager;
-  let cryptoManager;
-  const testPassword = 'test-password';
-
   beforeEach(() => {
-    cryptoManager = new CryptoManager(testPassword);
-    
-    // Mock IndexedDB
-    global.indexedDB = {
-      open: jest.fn(() => ({
-        onupgradeneeded: null,
-        onsuccess: null,
-        onerror: null,
-        result: mockDB
-      }))
-    };
-
-    mockDB.transaction.mockReturnValue(mockTransaction);
-    mockTransaction.objectStore.mockReturnValue(mockObjectStore);
-    
     jest.clearAllMocks();
   });
 
-  describe('Database Operations', () => {
-    test('should open database on initialization', async () => {
-      storageManager = new StorageManager(cryptoManager);
-      
-      // Simulate successful DB open
-      const openRequest = indexedDB.open.mock.results[0].value;
-      openRequest.onsuccess({ target: { result: mockDB } });
+  describe('Plaintext storage (no crypto)', () => {
+    test('writes and reads back a value', async () => {
+      const sm = new StorageManager(null);
+      const id = uniqueKey('plain');
 
-      expect(indexedDB.open).toHaveBeenCalledWith('DimDatabase', 1);
+      await sm.writeValue(id, 'hello world');
+      const result = await sm.readValue(id, null);
+
+      expect(result).toEqual({ value: 'hello world', newState: null });
     });
 
-    test('should write encrypted value to database', async () => {
-      storageManager = new StorageManager(cryptoManager);
-      
-      // Simulate successful DB open
-      const openRequest = indexedDB.open.mock.results[0].value;
-      openRequest.onsuccess({ target: { result: mockDB } });
-
-      const mockRequest = {
-        onsuccess: null,
-        onerror: null
-      };
-      mockObjectStore.put.mockReturnValue(mockRequest);
-
-      const id = 'testKey';
-      const encryptedValue = await cryptoManager.encryptData('testValue');
-
-      const writePromise = storageManager.writeValue(id, encryptedValue);
-      
-      // Simulate successful write
-      mockRequest.onsuccess({});
-
-      await writePromise;
-
-      expect(mockObjectStore.put).toHaveBeenCalledWith({
-        id: id,
-        value: encryptedValue
-      });
-    });
-
-    test('should read and decrypt value from database', async () => {
-      storageManager = new StorageManager(cryptoManager);
-      
-      // Simulate successful DB open
-      const openRequest = indexedDB.open.mock.results[0].value;
-      openRequest.onsuccess({ target: { result: mockDB } });
-
-      const mockRequest = {
-        onsuccess: null,
-        onerror: null,
-        result: null
-      };
-      mockObjectStore.get.mockReturnValue(mockRequest);
-
-      const id = 'testKey';
-      const originalValue = 'testValue';
-      const encryptedValue = await cryptoManager.encryptData(originalValue);
-
-      const readPromise = storageManager.readValue(id, ['state', jest.fn()]);
-      
-      // Simulate successful read
-      mockRequest.result = { id, value: encryptedValue };
-      await mockRequest.onsuccess({});
-
-      const result = await readPromise;
-
-      expect(result).toEqual({
-        value: originalValue,
-        newState: ['state', jest.fn()]
-      });
-    });
-
-    test('should handle non-encrypted legacy data', async () => {
-      storageManager = new StorageManager(cryptoManager);
-      
-      // Simulate successful DB open
-      const openRequest = indexedDB.open.mock.results[0].value;
-      openRequest.onsuccess({ target: { result: mockDB } });
-
-      const mockRequest = {
-        onsuccess: null,
-        onerror: null,
-        result: null
-      };
-      mockObjectStore.get.mockReturnValue(mockRequest);
-
-      const id = 'testKey';
-      const plainValue = 'plainTextValue';
-
-      const readPromise = storageManager.readValue(id, ['state', jest.fn()]);
-      
-      // Simulate successful read with plain value
-      mockRequest.result = { id, value: plainValue };
-      await mockRequest.onsuccess({});
-
-      const result = await readPromise;
-
-      expect(result).toEqual({
-        value: plainValue,
-        newState: ['state', jest.fn()]
-      });
-    });
-
-    test('should return null for non-existent values', async () => {
-      storageManager = new StorageManager(cryptoManager);
-      
-      // Simulate successful DB open
-      const openRequest = indexedDB.open.mock.results[0].value;
-      openRequest.onsuccess({ target: { result: mockDB } });
-
-      const mockRequest = {
-        onsuccess: null,
-        onerror: null,
-        result: null
-      };
-      mockObjectStore.get.mockReturnValue(mockRequest);
-
-      const readPromise = storageManager.readValue('nonExistent', ['state', jest.fn()]);
-      
-      // Simulate no result
-      await mockRequest.onsuccess({});
-
-      const result = await readPromise;
+    test('returns null for a non-existent key', async () => {
+      const sm = new StorageManager(null);
+      const result = await sm.readValue(uniqueKey('missing'), null);
       expect(result).toBe(null);
     });
 
-    test('should reject readValue when password is incorrect', async () => {
-      // Create storage manager with correct password
-      const correctCryptoManager = new CryptoManager('correct-password');
-      storageManager = new StorageManager(correctCryptoManager);
-      
-      // Simulate successful DB open
-      const openRequest = indexedDB.open.mock.results[0].value;
-      openRequest.onsuccess({ target: { result: mockDB } });
+    test('passes through newState', async () => {
+      const sm = new StorageManager(null);
+      const id = uniqueKey('plain');
+      const newState = ['state', jest.fn()];
 
-      // Encrypt data with correct password
-      const originalValue = 'test data';
-      const encryptedValue = await correctCryptoManager.encryptData(originalValue);
+      await sm.writeValue(id, 'value');
+      const result = await sm.readValue(id, newState);
 
-      // Create storage manager with wrong password
-      const wrongCryptoManager = new CryptoManager('wrong-password');
-      const wrongStorageManager = new StorageManager(wrongCryptoManager);
-      
-      // Simulate successful DB open for wrong storage manager
-      const wrongOpenRequest = indexedDB.open.mock.results[1].value;
-      wrongOpenRequest.onsuccess({ target: { result: mockDB } });
+      expect(result.value).toBe('value');
+      expect(result.newState).toBe(newState);
+    });
+  });
 
-      const mockRequest = {
-        onsuccess: null,
-        onerror: null,
-        result: null
-      };
-      mockObjectStore.get.mockReturnValue(mockRequest);
+  describe('Encrypted storage', () => {
+    test('round-trips an encrypted value with the correct password', async () => {
+      const crypto = makeCrypto('correct-password');
+      const sm = new StorageManager(crypto);
+      const id = uniqueKey('enc');
+      const original = 'secret value';
 
-      const readPromise = wrongStorageManager.readValue('testKey', null);
-      
-      // Simulate successful read with encrypted value
-      mockRequest.result = { id: 'testKey', value: encryptedValue };
-      
-      // Mock decryptData to throw error (simulating wrong password)
-      wrongCryptoManager.decryptData = jest.fn().mockRejectedValue(
-        new Error('Decryption failed: OperationError')
-      );
-      
-      await mockRequest.onsuccess({});
+      const encrypted = await crypto.encryptData(original);
+      await sm.writeValue(id, encrypted);
 
-      // Should reject with error, not return null
-      await expect(readPromise).rejects.toThrow();
+      const result = await sm.readValue(id, null);
+      expect(result.value).toBe(original);
     });
 
-    test('should properly decrypt with correct password', async () => {
-      storageManager = new StorageManager(cryptoManager);
-      
-      // Simulate successful DB open
-      const openRequest = indexedDB.open.mock.results[0].value;
-      openRequest.onsuccess({ target: { result: mockDB } });
+    test('rejects when reading with the wrong password', async () => {
+      const writeCrypto = makeCrypto('correct-password');
+      const writeSm = new StorageManager(writeCrypto);
+      const id = uniqueKey('enc');
 
-      const mockRequest = {
-        onsuccess: null,
-        onerror: null,
-        result: null
-      };
-      mockObjectStore.get.mockReturnValue(mockRequest);
+      const encrypted = await writeCrypto.encryptData('secret');
+      await writeSm.writeValue(id, encrypted);
 
-      const id = 'testKey';
-      const originalValue = 'test value';
-      const encryptedValue = await cryptoManager.encryptData(originalValue);
+      const wrongCrypto = makeCrypto('wrong-password');
+      const wrongSm = new StorageManager(wrongCrypto);
 
-      const readPromise = storageManager.readValue(id, null);
-      
-      // Simulate successful read
-      mockRequest.result = { id, value: encryptedValue };
-      await mockRequest.onsuccess({});
+      await expect(wrongSm.readValue(id, null)).rejects.toThrow();
+    });
+  });
 
-      const result = await readPromise;
+  describe('Instance scoping', () => {
+    test('two managers share the underlying database', async () => {
+      const writer = new StorageManager(null);
+      const reader = new StorageManager(null);
+      const id = uniqueKey('shared');
 
-      expect(result).toEqual({
-        value: originalValue,
-        newState: null
-      });
-      expect(result.value).toBe(originalValue);
-      expect(typeof result.value).toBe('string');
+      await writer.writeValue(id, 'shared-value');
+      const result = await reader.readValue(id, null);
+
+      expect(result.value).toBe('shared-value');
     });
   });
 
   describe('loadFromDatabase', () => {
-    test('should load all store values from database', async () => {
-      storageManager = new StorageManager(cryptoManager);
-      
-      // Mock async manager
-      const mockAsyncManager = {
-        loadingSetters: {
-          'prop1': jest.fn(),
-          'nested.prop2': jest.fn()
-        }
-      };
-      storageManager.asyncManager = mockAsyncManager;
+    test('dispatches initial-load events for stored values', async () => {
+      const sm = new StorageManager(null);
+      const prop1Key = uniqueKey('p1');
+      const prop2Key = uniqueKey('p2');
+
+      sm.asyncManager = { loadingSetters: {} };
 
       const store = {
-        prop1: ['value1', jest.fn()],
+        [prop1Key]: ['v1', jest.fn()],
         nested: {
-          prop2: ['value2', jest.fn()]
+          [prop2Key]: ['v2', jest.fn()]
         }
       };
 
-      // Mock readValue to return encrypted values
-      storageManager.readValue = jest.fn()
-        .mockResolvedValueOnce({ value: 'loadedValue1' })
-        .mockResolvedValueOnce({ value: 'loadedValue2' });
+      // Bypass real IndexedDB reads to focus on dispatch behaviour.
+      sm.readValue = jest.fn()
+        .mockResolvedValueOnce({ value: 'loaded1' })
+        .mockResolvedValueOnce({ value: 'loaded2' });
 
-      storageManager.loadFromDatabase(store, 'listener-id');
+      sm.loadFromDatabase(store, 'listener-id');
 
-      // Wait for async operations
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // Should dispatch events for loaded values
       expect(debouncedDispatcher).toHaveBeenCalledWith(
-        'prop1-initialLoad-listener-id',
-        { value: 'loadedValue1', _isInitialLoad: true }
+        `${prop1Key}-initialLoad-listener-id`,
+        { value: 'loaded1', _isInitialLoad: true }
       );
       expect(debouncedDispatcher).toHaveBeenCalledWith(
-        'nested.prop2-initialLoad-listener-id',
-        { value: 'loadedValue2', _isInitialLoad: true }
+        `nested.${prop2Key}-initialLoad-listener-id`,
+        { value: 'loaded2', _isInitialLoad: true }
       );
     });
 
-    test('should set loading to false when no value exists', async () => {
-      storageManager = new StorageManager(cryptoManager);
-      
-      // Mock async manager
-      const mockSetLoading = jest.fn();
-      const mockAsyncManager = {
-        loadingSetters: {
-          'prop1': mockSetLoading
-        }
-      };
-      storageManager.asyncManager = mockAsyncManager;
+    test('sets loading to false when no value exists', async () => {
+      const sm = new StorageManager(null);
+      const setLoading = jest.fn();
+      const propKey = uniqueKey('p');
 
-      const store = {
-        prop1: ['value1', jest.fn()]
-      };
+      sm.asyncManager = { loadingSetters: { [propKey]: setLoading } };
 
-      // Mock readValue to return null
-      storageManager.readValue = jest.fn().mockResolvedValue(null);
+      const store = { [propKey]: ['v1', jest.fn()] };
+      sm.readValue = jest.fn().mockResolvedValue(null);
 
-      storageManager.loadFromDatabase(store, 'listener-id');
+      sm.loadFromDatabase(store, 'listener-id');
 
-      // Wait for async operations
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // Should set loading to false
-      expect(mockSetLoading).toHaveBeenCalledWith(false);
+      expect(setLoading).toHaveBeenCalledWith(false);
     });
   });
 });

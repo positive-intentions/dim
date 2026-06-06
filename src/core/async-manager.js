@@ -3,7 +3,7 @@ import {debouncedDispatcher} from './mini-lit.js';
 // import CryptoManager from "./crypto-manager.js";
 
 class AsyncronousStateManager {
-    constructor(crypto) {
+    constructor(crypto = null) {
         this.store = {};
         this.loadingSetters = {};
         this.eventListener = [];
@@ -36,16 +36,18 @@ class AsyncronousStateManager {
         const createListener = (isInitialLoadEvent) => async (event) => {
             try {
                 // Check if this is an initial load event (has _isInitialLoad flag)
-                const isInitialLoad = isInitialLoadEvent || event.detail._isInitialLoad;
+                const isInitialLoad = isInitialLoadEvent || event.detail?._isInitialLoad;
                 
                 let finalValue;
                 if (isInitialLoad) {
                     // For initial load, the value is already decrypted by storage manager
                     finalValue = event.detail.value;
-                } else {
+                } else if (this.crypto) {
                     // For user updates, decrypt the value
-                    const decryptedValue = await this.crypto.decryptData({...event.detail, crypto: this.crypto});
-                    finalValue = decryptedValue;
+                    finalValue = await this.crypto.decryptData({...event.detail, crypto: this.crypto});
+                } else {
+                    // No encryption: the dispatched detail is the plaintext value
+                    finalValue = event.detail;
                 }
                 
                 // Update the store
@@ -110,26 +112,34 @@ class AsyncronousStateManager {
             
             const storeToDB = async () => {
                 try {
-                    // encryptData returns a serialized JSON string
-                    const encryptedValue = await this.crypto.encryptData(newValue);
-                    await this.db.writeValue(key, encryptedValue);
+                    // When encryption is enabled, persist the serialized ciphertext;
+                    // otherwise persist the plaintext value directly.
+                    const valueToStore = this.crypto
+                        ? await this.crypto.encryptData(newValue)
+                        : newValue;
+                    await this.db.writeValue(key, valueToStore);
                 } catch (error) {
-                    console.error('Failed to encrypt and store value:', error);
+                    console.error('Failed to store value:', error);
                 }
             };
             storeToDB();
 
-            const encryptAndDispatch = async (listenerName, newValue) => {
+            const dispatchUpdate = async (eventName, value) => {
                 try {
-                    const encryptedValue = await this.crypto.encryptData(newValue);
-                    // Parse the encrypted string back to object for dispatch
-                    const encryptedObject = JSON.parse(encryptedValue);
-                    debouncedDispatcher(listenerName, encryptedObject);
+                    if (this.crypto) {
+                        const encryptedValue = await this.crypto.encryptData(value);
+                        // Parse the encrypted string back to object for dispatch
+                        const encryptedObject = JSON.parse(encryptedValue);
+                        debouncedDispatcher(eventName, encryptedObject);
+                    } else {
+                        // No encryption: dispatch the plaintext value directly
+                        debouncedDispatcher(eventName, value);
+                    }
                 } catch (error) {
-                    console.error('Failed to encrypt for dispatch:', error);
+                    console.error('Failed to dispatch update:', error);
                 }
             };
-            encryptAndDispatch(listenerName, newValue);
+            dispatchUpdate(listenerName, newValue);
         };
 
         const newState = this.store[key] || value[0];

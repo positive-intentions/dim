@@ -1,99 +1,138 @@
+const DEFAULT_ITERATIONS = 1000000;
+
 class CryptoManager {
-    constructor(password) {
+    constructor(password, options = {}) {
         this.password = password;
+        this.iterations = options.iterations || DEFAULT_ITERATIONS;
+        // Cache derived keys by `${password}::${saltBase64}` so we only run the
+        // (expensive) PBKDF2 derivation once per unique salt.
+        this._keyCache = new Map();
+        // Legacy: some callers read `this.key`/`this.keyPromise`. Kept for
+        // backwards compatibility, derived with the deterministic fallback salt.
         this.key = null;
-        this.keyPromise = this.generateKey(password);
+        this.keyPromise = this.generateKey(password).then((key) => {
+            this.key = key;
+            return key;
+        });
     }
 
-    async generateKey(password) {
-        const encoder = new TextEncoder();
-      
-        const passwordSha256Hash = await crypto.subtle.digest(
-          "SHA-256",
-          encoder.encode(password)
-        );
-        // Use the SHA-256 hash as the salt      
-        const salt = passwordSha256Hash;
-      
-        // Encode the password into binary format
-        const passwordKey = await crypto.subtle.importKey(
-          "raw",
-          encoder.encode(password),
-          "PBKDF2",
-          false,
-          ["deriveKey"]
-        );
-      
-        // Derive a key using PBKDF2 with the provided or generated salt
-        const derivedKey = await crypto.subtle.deriveKey(
-          {
-            name: "PBKDF2",
-            salt: salt,
-            iterations: 1000000,
-            hash: "SHA-256",
-          },
-          passwordKey,
-          {
-            name: "AES-GCM",
-            length: 256,
-          },
-          true,
-          ["encrypt", "decrypt"]
-        );
-      
-        this.key = derivedKey;
-        return derivedKey;
-      }
-      
-      arrayBufferToString(buffer) {
-        const bytes = new Uint8Array(buffer);
+    arrayBufferToString(buffer) {
+        const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
         let binaryString = '';
         const chunkSize = 8192; // Process in chunks to avoid stack overflow
-        
+
         for (let i = 0; i < bytes.length; i += chunkSize) {
-          const chunk = bytes.subarray(i, i + chunkSize);
-          binaryString += String.fromCharCode.apply(null, chunk);
+            const chunk = bytes.subarray(i, i + chunkSize);
+            binaryString += String.fromCharCode.apply(null, chunk);
         }
-        
+
         return btoa(binaryString);
-      }
-      
-      stringToArrayBuffer(str) {
+    }
+
+    stringToArrayBuffer(str) {
         const binaryString = atob(str);
         const len = binaryString.length;
         const bytes = new Uint8Array(len);
         for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
+            bytes[i] = binaryString.charCodeAt(i);
         }
         return bytes.buffer;
-      }
+    }
 
-      async encryptData(data) {
-        // Wait for key to be ready
-        if (!this.key) {
-            await this.keyPromise;
+    // Derive the deterministic fallback salt for a password (legacy behaviour).
+    // Only used when no explicit salt is supplied. Real encryption always uses
+    // a random per-record salt embedded in the payload.
+    async _fallbackSalt(password) {
+        const encoder = new TextEncoder();
+        const hash = await crypto.subtle.digest('SHA-256', encoder.encode(password));
+        return new Uint8Array(hash);
+    }
+
+    /**
+     * Derive an AES-GCM key from a password and salt using PBKDF2.
+     * @param {string} password
+     * @param {Uint8Array|ArrayBuffer} [salt] - random salt; falls back to a
+     *   deterministic salt derived from the password when omitted.
+     * @returns {Promise<CryptoKey>}
+     */
+    async getKeyFromPassword(password, salt) {
+        const encoder = new TextEncoder();
+
+        let saltBytes;
+        if (salt === undefined || salt === null) {
+            saltBytes = await this._fallbackSalt(password);
+        } else {
+            saltBytes = salt instanceof Uint8Array ? salt : new Uint8Array(salt);
         }
-        
+
+        const cacheKey = `${password}::${this.arrayBufferToString(saltBytes)}`;
+        if (this._keyCache.has(cacheKey)) {
+            return this._keyCache.get(cacheKey);
+        }
+
+        const keyPromise = (async () => {
+            const passwordKey = await crypto.subtle.importKey(
+                'raw',
+                encoder.encode(password),
+                'PBKDF2',
+                false,
+                ['deriveKey']
+            );
+
+            return crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt: saltBytes,
+                    iterations: this.iterations,
+                    hash: 'SHA-256',
+                },
+                passwordKey,
+                {
+                    name: 'AES-GCM',
+                    length: 256,
+                },
+                true,
+                ['encrypt', 'decrypt']
+            );
+        })();
+
+        this._keyCache.set(cacheKey, keyPromise);
+        return keyPromise;
+    }
+
+    // Legacy wrapper retained for backwards compatibility.
+    async generateKey(password) {
+        const key = await this.getKeyFromPassword(password);
+        this.key = key;
+        return key;
+    }
+
+    async encryptData(data) {
         const enc = new TextEncoder();
         const iv = crypto.getRandomValues(new Uint8Array(12));
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const key = await this.getKeyFromPassword(this.password, salt);
+
         const dataString = typeof data === 'string' ? data : JSON.stringify(data);
         const encryptedData = await crypto.subtle.encrypt(
-          {
-            name: "AES-GCM",
-            iv: iv,
-          },
-          this.key,
-          enc.encode(dataString)
+            {
+                name: 'AES-GCM',
+                iv: iv,
+            },
+            key,
+            enc.encode(dataString)
         );
-    
-        // Return as a single serialized string
-        return JSON.stringify({ 
-            encryptedData: this.arrayBufferToString(encryptedData), 
-            iv: this.arrayBufferToString(iv) 
+
+        // Return as a single serialized string, embedding the random salt so it
+        // can be used to re-derive the key on decryption.
+        return JSON.stringify({
+            encryptedData: this.arrayBufferToString(encryptedData),
+            iv: this.arrayBufferToString(iv),
+            salt: this.arrayBufferToString(salt),
         });
-      }
-    
-      async decryptData(encryptedPayload) {
+    }
+
+    async decryptData(encryptedPayload) {
         // Handle both string and object inputs
         let payload;
         if (typeof encryptedPayload === 'string') {
@@ -105,74 +144,67 @@ class CryptoManager {
         } else {
             payload = encryptedPayload;
         }
-        
+
         // Validate payload structure
         if (!payload || typeof payload !== 'object') {
             throw new Error('Invalid encrypted payload format');
         }
-        
-        const { encryptedData, iv, crypto: cryptoManager } = payload;
-        
+
+        const { encryptedData, iv, salt } = payload;
+
         // Validate required fields
         if (!encryptedData || !iv) {
             throw new Error('Invalid encrypted payload: missing encryptedData or iv');
         }
-        
-        // Ensure we don't accidentally return the encrypted payload structure
-        // If the payload looks like it might be the encrypted structure itself, reject it
+
+        // Ensure we don't accidentally treat the encrypted payload structure as
+        // the ciphertext (which would indicate a malformed/double-wrapped value).
         if (typeof encryptedData === 'object' || typeof iv === 'object') {
             throw new Error('Invalid encrypted payload: encryptedData and iv must be strings');
         }
-        
-        const key = cryptoManager || this;
-        
-        // Wait for key to be ready
-        if (!key.key) {
-            await key.keyPromise;
-        }
-        
+
+        // Derive the key from the embedded salt (new format). When no salt is
+        // present we fall back to the deterministic salt for the password.
+        const saltBytes = salt ? new Uint8Array(this.stringToArrayBuffer(salt)) : undefined;
+        const key = await this.getKeyFromPassword(this.password, saltBytes);
+
         try {
             const decryptedData = await crypto.subtle.decrypt(
-              {
-                name: "AES-GCM",
-                iv: this.stringToArrayBuffer(iv),
-              },
-              key.key,
-              this.stringToArrayBuffer(encryptedData)
+                {
+                    name: 'AES-GCM',
+                    iv: this.stringToArrayBuffer(iv),
+                },
+                key,
+                this.stringToArrayBuffer(encryptedData)
             );
-    
+
             const dec = new TextDecoder();
             const decryptedString = dec.decode(decryptedData);
-            
+
             // Validate that we got actual decrypted data, not the encrypted structure
-            // If decrypted string looks like JSON with encryptedData/iv, something went wrong
             try {
                 const parsed = JSON.parse(decryptedString);
-                // Check if this looks like an encrypted payload structure (shouldn't happen)
                 if (parsed && typeof parsed === 'object' && parsed.encryptedData && parsed.iv) {
                     throw new Error('Decryption returned encrypted payload structure - possible password mismatch or corruption');
                 }
                 return parsed;
             } catch (parseError) {
                 // Not JSON, return as string
-                // But verify it's not the encrypted payload structure
                 if (decryptedString.includes('encryptedData') && decryptedString.includes('iv')) {
                     throw new Error('Decryption returned encrypted payload structure - possible password mismatch');
                 }
                 return decryptedString;
             }
         } catch (error) {
-            // Check if this is a password mismatch error
             const errorMessage = error.message || String(error);
-            if (errorMessage.includes('OperationError') || 
+            if (errorMessage.includes('OperationError') ||
                 errorMessage.includes('decrypt') ||
                 errorMessage.includes('AES-GCM')) {
                 throw new Error('Decryption failed: Incorrect password or corrupted data');
             }
-            console.error('Decryption failed:', error);
             throw new Error('Decryption failed: ' + errorMessage);
         }
-      }
+    }
 }
 
 export default CryptoManager;

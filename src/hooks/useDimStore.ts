@@ -3,9 +3,6 @@ import CryptoManager from '../core/crypto-manager.js';
 import StorageManager from '../core/storage-manager.js';
 import { debouncedDispatcher } from '../core/mini-lit.js';
 
-// Default password matching the one in Dim framework
-const DEFAULT_PASSWORD = "test-password-123";
-
 // Global instances map to reuse crypto/storage managers per password
 const cryptoManagerMap = new Map<string, CryptoManager>();
 const storageManagerMap = new Map<string, StorageManager>();
@@ -32,7 +29,7 @@ function getManagers(password: string) {
 
 interface UseDimStoreOptions {
   key: string;
-  password?: string;
+  password: string;
   defaultValue?: string;
 }
 
@@ -41,15 +38,22 @@ interface UseDimStoreOptions {
  *
  * @param options - Configuration object
  * @param options.key - The key to store the value under in IndexedDB
- * @param options.password - Optional password for encryption (defaults to "test-password-123")
+ * @param options.password - Required encryption key. There is no default; an
+ *   explicit key must be supplied by the caller.
  * @param options.defaultValue - Default value if nothing is stored
  * @returns [value, setValue, isLoading] - Current value, setter function, and loading state
  */
 export function useDimStore({
   key,
-  password = DEFAULT_PASSWORD,
+  password,
   defaultValue = ""
 }: UseDimStoreOptions): [string, (newValue: string) => void, boolean] {
+  if (!password) {
+    throw new Error(
+      "useDimStore: an explicit `password` (encryption key) is required."
+    );
+  }
+
   const [value, setValue] = useState<string>(defaultValue);
   const [isLoading, setIsLoading] = useState(true);
   const { cryptoManager, storageManager } = getManagers(password);
