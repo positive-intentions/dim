@@ -7,6 +7,8 @@ import '../stories/components/ViewTransitionsGallery.js';
 import '../stories/components/SimpleGallery.js';
 // Registers <navigation-example> / <page-content> for the pageData test.
 import '../stories/components/NavigationExample.js';
+import '../stories/components/messaging/MessagingAppDemo.js';
+import '../stories/components/shopping/ShoppingAppDemo.js';
 
 async function mount(tag) {
   const el = document.createElement(tag);
@@ -44,6 +46,25 @@ const txt = (el, sel) => get(el, sel).textContent.trim();
 async function flushMicrotasks() {
   await new Promise((r) => requestAnimationFrame(r));
   await Promise.resolve();
+}
+
+async function flushAnimationFrames() {
+  await new Promise((r) => requestAnimationFrame(r));
+  await new Promise((r) => requestAnimationFrame(r));
+  await Promise.resolve();
+}
+
+function queryDeep(root, selector) {
+  const found = [];
+  const visit = (node) => {
+    if (!node?.querySelectorAll) return;
+    node.querySelectorAll(selector).forEach((el) => found.push(el));
+    node.querySelectorAll('*').forEach((el) => {
+      if (el.shadowRoot) visit(el.shadowRoot);
+    });
+  };
+  visit(root);
+  return found;
 }
 
 describe('view transitions', () => {
@@ -637,6 +658,146 @@ describe('view transitions', () => {
           );
         }
         animateSpy.mockRestore();
+        if (!hadAnimate) {
+          delete Element.prototype.animate;
+        }
+      }
+    });
+  });
+
+  describe('shopping app multi-shared FLIP', () => {
+    test('catalog to product detail lifts image, name, and price overlays', async () => {
+      const rectMocks = {
+        wrapper: { left: 0, top: 0, width: 800, height: 600 },
+        cardImage: { left: 40, top: 140, width: 80, height: 80 },
+        heroImage: { left: 120, top: 80, width: 320, height: 240 },
+        cardName: { left: 40, top: 230, width: 160, height: 22 },
+        heroName: { left: 120, top: 340, width: 200, height: 28 },
+        cardPrice: { left: 40, top: 280, width: 80, height: 24 },
+        heroPrice: { left: 120, top: 400, width: 100, height: 32 },
+      };
+
+      const gbcr = Element.prototype.getBoundingClientRect;
+      Element.prototype.getBoundingClientRect = jest.fn(function mockGbcr() {
+        if (this.classList?.contains('auto-transition-wrapper')) {
+          return rectMocks.wrapper;
+        }
+        const key = this.getAttribute?.('data-vt-shared') || '';
+        if (key.startsWith('image-')) {
+          return this.classList?.contains('hero')
+            ? rectMocks.heroImage
+            : rectMocks.cardImage;
+        }
+        if (key.startsWith('name-')) {
+          return this.classList?.contains('detail-name')
+            ? rectMocks.heroName
+            : rectMocks.cardName;
+        }
+        if (key.startsWith('price-')) {
+          return this.classList?.contains('detail-price')
+            ? rectMocks.heroPrice
+            : rectMocks.cardPrice;
+        }
+        return { left: 0, top: 0, width: 0, height: 0 };
+      });
+
+      const hadAnimate = typeof Element.prototype.animate === 'function';
+      if (!hadAnimate) {
+        Element.prototype.animate = () => ({});
+      }
+
+      try {
+        const app = await mount('shopping-app-demo');
+        const navView = app.shadowRoot.querySelector('shopping-navigation-view');
+        await navView.updateComplete;
+
+        const priorProps = navView.props || {};
+        navView.setAttribute('transitionId', '202');
+        navView.props = {
+          ...priorProps,
+          navStack: ['catalog', 'product:2'],
+        };
+        await navView.updateComplete;
+        await flushMicrotasks();
+        await flushAnimationFrames();
+        await flushAnimationFrames();
+
+        expect(queryDeep(navView.shadowRoot, '.vt-layer').length).toBe(2);
+
+        const overlays = queryDeep(navView.shadowRoot, '.vt-shared-overlay');
+        expect(overlays.length).toBeGreaterThanOrEqual(3);
+      } finally {
+        Element.prototype.getBoundingClientRect = gbcr;
+        if (!hadAnimate) {
+          delete Element.prototype.animate;
+        }
+      }
+    });
+  });
+
+  describe('messaging app multi-shared FLIP', () => {
+    test('list to chat lifts avatar, name, and lastMessage overlays', async () => {
+      const rectMocks = {
+        wrapper: { left: 0, top: 0, width: 800, height: 600 },
+        listAvatar: { left: 24, top: 120, width: 40, height: 40 },
+        headerAvatar: { left: 56, top: 12, width: 32, height: 32 },
+        listName: { left: 80, top: 118, width: 140, height: 20 },
+        headerName: { left: 96, top: 10, width: 120, height: 22 },
+        listPreview: { left: 80, top: 142, width: 220, height: 18 },
+        listBubble: { left: 80, top: 400, width: 260, height: 48 },
+      };
+
+      const gbcr = Element.prototype.getBoundingClientRect;
+      Element.prototype.getBoundingClientRect = jest.fn(function mockGbcr() {
+        if (this.classList?.contains('auto-transition-wrapper')) {
+          return rectMocks.wrapper;
+        }
+        const key = this.getAttribute?.('data-vt-shared') || '';
+        if (key.startsWith('avatar-')) {
+          return this.closest?.('.chat-header')
+            ? rectMocks.headerAvatar
+            : rectMocks.listAvatar;
+        }
+        if (key.startsWith('name-')) {
+          return this.closest?.('.chat-header')
+            ? rectMocks.headerName
+            : rectMocks.listName;
+        }
+        if (key.startsWith('lastMessage-')) {
+          return this.classList?.contains('bubble')
+            ? rectMocks.listBubble
+            : rectMocks.listPreview;
+        }
+        return { left: 0, top: 0, width: 0, height: 0 };
+      });
+
+      const hadAnimate = typeof Element.prototype.animate === 'function';
+      if (!hadAnimate) {
+        Element.prototype.animate = () => ({});
+      }
+
+      try {
+        const app = await mount('messaging-app-demo');
+        const navView = app.shadowRoot.querySelector('navigation-view');
+        await navView.updateComplete;
+
+        const priorProps = navView.props || {};
+        navView.setAttribute('transitionId', '202');
+        navView.props = {
+          ...priorProps,
+          navStack: ['list', 'chat:2'],
+        };
+        await navView.updateComplete;
+        await flushMicrotasks();
+        await flushAnimationFrames();
+        await flushAnimationFrames();
+
+        expect(queryDeep(navView.shadowRoot, '.vt-layer').length).toBe(2);
+
+        const overlays = queryDeep(navView.shadowRoot, '.vt-shared-overlay');
+        expect(overlays.length).toBeGreaterThanOrEqual(3);
+      } finally {
+        Element.prototype.getBoundingClientRect = gbcr;
         if (!hadAnimate) {
           delete Element.prototype.animate;
         }
