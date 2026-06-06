@@ -1,5 +1,6 @@
 import { LitElement, html as litHtml } from "../vendor/lit/index.js";
 import { unsafeHTML } from "../vendor/lit/directives/unsafe-html.js";
+import { keyed } from "../vendor/lit/directives/keyed.js";
 import AsyncronousStateManager from "./async-manager";
 import { css, unsafeCSS } from "./mini-lit";
 import StorageManager from "./storage-manager";
@@ -9,6 +10,7 @@ import {
   viewTransitionStyles,
   setCurrentInstance as setViewTransitionInstance,
 } from "./view-transitions.js";
+import { AutoTransitionHost } from "./auto-transition-host.js";
 
 // Enhanced html function that supports React-like syntax
 export const html = (strings, ...values) => {
@@ -59,9 +61,12 @@ function processReactLikeSyntax(strings, values) {
   while ((match = objectAttrRegex.exec(fullTemplate)) !== null) {
     const [fullMatch, attrName, attrValue] = match;
 
-    // Try to parse the object literal
+    // Parse the object literal as JSON instead of evaluating arbitrary code.
+    // This avoids the security/perf cost of `new Function`. Object attributes
+    // that are not valid JSON (e.g. containing function references) should be
+    // passed via the `.props` property instead.
     try {
-      const objValue = new Function("return {" + attrValue + "}")();
+      const objValue = JSON.parse("{" + attrValue + "}");
       const jsonString = JSON.stringify(objValue);
 
       // Replace with JSON string
@@ -71,7 +76,10 @@ function processReactLikeSyntax(strings, values) {
       });
       hasReplacements = true;
     } catch (e) {
-      console.warn("Failed to parse object attribute:", attrValue);
+      console.warn(
+        "Failed to parse object attribute as JSON (use .props for functions/non-JSON values):",
+        attrValue
+      );
     }
   }
 
@@ -174,6 +182,9 @@ export function define({ tag, component: CustomFunctionalComponent }) {
       this._childNodes = [];
       this._slotContent = null;
       this._childNodesCaptured = false;
+      this._attributeObserver = null;
+      this._attributeUpdateScheduled = false;
+      this._transitionHost = new AutoTransitionHost(this);
     }
 
     connectedCallback() {
@@ -184,6 +195,34 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         this._slotContent = this.innerHTML;
         this._childNodesCaptured = true;
       }
+
+      // dim renders from the host's attributes (see render()), but LitElement
+      // only re-renders on reactive property changes. Watch attribute mutations
+      // so plain-attribute APIs (e.g. transitionId="${id}") trigger a re-render.
+      // Safe from loops: render() writes only to the shadow root and we never
+      // reflect props back to host attributes, so this only fires for external
+      // (parent-driven) attribute changes.
+      if (!this._attributeObserver) {
+        this._attributeObserver = new MutationObserver(() => {
+          if (!this._attributeUpdateScheduled) {
+            this._attributeUpdateScheduled = true;
+            requestAnimationFrame(() => {
+              this._attributeUpdateScheduled = false;
+              this.requestUpdate();
+            });
+          }
+        });
+      }
+      this._attributeObserver.observe(this, { attributes: true });
+    }
+
+    disconnectedCallback() {
+      super.disconnectedCallback();
+      if (this._attributeObserver) {
+        this._attributeObserver.disconnect();
+      }
+      this._attributeUpdateScheduled = false;
+      this._transitionHost.disconnect();
     }
 
     render() {
@@ -212,16 +251,25 @@ export function define({ tag, component: CustomFunctionalComponent }) {
 
       this.props = this.props || {};
 
+      // HTML lowercases attribute names (e.g. `transitionId` is stored as
+      // `transitionid`), so camelCase lookups must be case-insensitive.
+      const readProp = (obj, name) => {
+        if (obj[name] !== undefined) return obj[name];
+        const lower = name.toLowerCase();
+        const key = Object.keys(obj).find((k) => k.toLowerCase() === lower);
+        return key !== undefined ? obj[key] : undefined;
+      };
+
       // Auto-detect transitionId prop and set up view transitions
       let autoTransition = null;
-      if (
-        attributes.transitionId !== undefined ||
-        this.props.transitionId !== undefined
-      ) {
-        const transitionId = attributes.transitionId || this.props.transitionId;
+      const transitionId =
+        readProp(attributes, "transitionId") ??
+        readProp(this.props, "transitionId");
+      if (transitionId !== undefined && transitionId !== null) {
         autoTransition = useViewTransition(transitionId.toString(), {
-          duration: parseInt(attributes.transitionDuration) || 500,
-          autoDirection: attributes.transitionAutoDirection !== "false",
+          duration: parseInt(readProp(attributes, "transitionDuration")) || 500,
+          autoDirection:
+            readProp(attributes, "transitionAutoDirection") !== "false",
         });
       }
 
@@ -258,6 +306,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         querySelector,
         getRef,
         renderChildren,
+        keyed,
       };
 
       // Process children to make them available
@@ -268,14 +317,31 @@ export function define({ tag, component: CustomFunctionalComponent }) {
           (node.nodeType === Node.TEXT_NODE && node.textContent.trim())
       );
 
+      // Wrap props in a case-insensitive proxy so components can read camelCase
+      // attributes (e.g. `props.pageData`) even though the DOM stores attribute
+      // names lowercased (`pagedata`).
+      const rawProps = {
+        ...attributes,
+        ...this.props,
+        children,
+        childElements,
+      };
+      const componentProps = new Proxy(rawProps, {
+        get(target, key) {
+          if (typeof key === "string" && !(key in target)) {
+            const lower = key.toLowerCase();
+            const match = Object.keys(target).find(
+              (k) => k.toLowerCase() === lower
+            );
+            if (match !== undefined) return target[match];
+          }
+          return target[key];
+        },
+      });
+
       // Call the functional component
       const result = CustomFunctionalComponent(
-        {
-          ...attributes,
-          ...this.props,
-          children,
-          childElements,
-        },
+        componentProps,
         sharedDependencies
       );
 
@@ -284,33 +350,21 @@ export function define({ tag, component: CustomFunctionalComponent }) {
 
       // Auto-wrap result with view transitions if transitionId is present
       if (autoTransition) {
-        const transitionClasses = autoTransition.getTransitionClasses(
-          "view-transition-item"
+        return this._transitionHost.wrapRender(
+          autoTransition,
+          result,
+          litHtml
         );
-        const transitionStyles = autoTransition.getTransitionStyles();
-        const styleString = Object.entries(transitionStyles)
-          .map(([key, value]) => `${key}: ${value}`)
-          .join("; ");
-
-        return litHtml`
-          <style>
-            ${viewTransitionStyles}
-            .auto-transition-wrapper {
-              position: relative;
-              overflow: hidden;
-              width: 100%;
-              height: 100%;
-            }
-          </style>
-          <div class="auto-transition-wrapper view-transition-container">
-            <div class="${transitionClasses}" style="${styleString}">
-              ${result}
-            </div>
-          </div>
-        `;
       }
 
+      // Cache the latest render so a future transitionId can animate from it.
+      this._transitionHost.cacheRenderResult(result);
       return result;
+    }
+
+    updated(changedProperties) {
+      super.updated(changedProperties);
+      this._transitionHost.onUpdated();
     }
   }
 
@@ -331,6 +385,10 @@ export function useState(initialState) {
       typeof newState === "function"
         ? newState(component.hooks[hookName])
         : newState;
+    // Bail out of re-rendering when the value is unchanged (matches React).
+    if (Object.is(component.hooks[hookName], value)) {
+      return;
+    }
     component.hooks[hookName] = value;
     component.requestUpdate();
   };
@@ -343,32 +401,39 @@ export function useEffect(effect, dependencies) {
   const hookIndex = component.hookIndex++;
   const hookName = `hook-${hookIndex}`;
 
-  const prevDeps = component.hooks[hookName]?.dependencies;
+  const prev = component.hooks[hookName];
+  const prevDeps = prev?.dependencies;
   const hasChanged =
     !prevDeps || dependencies.some((dep, i) => dep !== prevDeps[i]);
 
   if (hasChanged) {
-    if (component.hooks[hookName]?.cleanup) {
-      component.hooks[hookName].cleanup();
+    if (prev?.cleanup) {
+      prev.cleanup();
     }
     const cleanup = effect();
-    component.hooks[hookName] = { dependencies, cleanup };
+    component.hooks[hookName] = {
+      dependencies,
+      cleanup,
+      controllerRegistered: prev?.controllerRegistered || false,
+    };
   }
 
-  // // Add event listener to handle unmount
-  // component.addEventListener("disconnectedCallback", () => {
-  //   if (component.hooks[hookName]?.cleanup) {
-  //     component.hooks[hookName].cleanup();
-  //   }
-  // });
-
-  component.addController({
-    hostDisconnected() {
-      if (component.hooks[hookName]?.cleanup) {
-        component.hooks[hookName].cleanup();
-      }
-    },
-  });
+  // Register the disconnect-cleanup controller only ONCE per hook slot.
+  // Previously this ran on every render, accumulating a new controller each
+  // time and causing cleanups to run multiple times / leak.
+  if (!component.hooks[hookName].controllerRegistered) {
+    component.hooks[hookName].controllerRegistered = true;
+    component.addController({
+      hostDisconnected() {
+        const hook = component.hooks[hookName];
+        if (hook?.cleanup) {
+          hook.cleanup();
+          // Guard against double invocation if disconnected more than once.
+          hook.cleanup = undefined;
+        }
+      },
+    });
+  }
 }
 
 export function useMemo(calculation, dependencies) {
@@ -446,6 +511,10 @@ export function useStyle(styles: any) {
   }
 }
 
+// SECURITY / EXPERIMENTAL: this evaluates a code string resolved from `promise`
+// via `new Function`, which executes arbitrary JavaScript. Only use it with
+// fully trusted sources. It exists as a proof-of-concept for module federation
+// and is NOT safe for untrusted/remote input.
 export const useLazyScope = (tag: string, promise: Promise<any>) => {
   promise.then((module: any) => {
     const elementClass = new Function(`return ${module}`)();
@@ -456,55 +525,63 @@ export const useLazyScope = (tag: string, promise: Promise<any>) => {
   });
 };
 
-export function useRef() {
+export function useRef(initialValue?: any) {
   const component = getCurrentInstance() as any;
   const hookIndex = component.hookIndex++;
   const hookName = `hook-${hookIndex}`;
 
   if (!component.hooks[hookName]) {
-    component.hooks[hookName] = { current: component };
+    // When an initial value is supplied, use it (React-like behaviour).
+    // Otherwise default `current` to the component instance to preserve the
+    // existing `getRef` lookup behaviour.
+    component.hooks[hookName] = {
+      current: initialValue !== undefined ? initialValue : component,
+    };
   }
 
   return component.hooks[hookName];
 }
 
-// Hardcoded password for testing
-const HARDCODED_PASSWORD = "test-password-123";
+// State managers keyed by encryption key. Encryption is opt-in: when no key is
+// provided the store operates on plaintext. There is intentionally no default
+// password baked into the framework.
+const stateManagerMap = new Map<string, any>();
+const cryptoManagerMap = new Map<string, any>();
 
-// Create a default crypto manager with hardcoded password
-const defaultCryptoManager = new CryptoManager(HARDCODED_PASSWORD);
-const asyncronousStateManager = new AsyncronousStateManager(
-  defaultCryptoManager
-);
-const storageManager = new StorageManager(defaultCryptoManager);
+// Shared singleton manager used when encryption is not enabled.
+const plaintextStateManager = new AsyncronousStateManager(null);
 
-// Map to store different crypto managers for different passwords
-const cryptoManagerMap = new Map();
-cryptoManagerMap.set(HARDCODED_PASSWORD, defaultCryptoManager);
+/**
+ * Bottom-up reactive store.
+ *
+ * @param store - schema object of `useState` tuples
+ * @param options - optional config. Pass `{ encryptionKey }` (or a string key)
+ *   to enable encrypted persistence. Encryption is OFF by default and there is
+ *   no hardcoded fallback password.
+ */
+export const useStore = (
+  store: any,
+  options: { encryptionKey?: string } | string = {}
+) => {
+  const encryptionKey =
+    typeof options === "string" ? options : options?.encryptionKey;
 
-const stateManagerMap = new Map();
-stateManagerMap.set(HARDCODED_PASSWORD, asyncronousStateManager);
-
-const storageManagerMap = new Map();
-storageManagerMap.set(HARDCODED_PASSWORD, storageManager);
-
-export const useStore = (store: any, password = HARDCODED_PASSWORD) => {
   const [randomId] = useState(crypto.getRandomValues(new Uint8Array(8)));
 
-  // Get or create crypto manager for this password
-  let cryptoManager = cryptoManagerMap.get(password);
-  let stateManager = stateManagerMap.get(password);
-  let storeManager = storageManagerMap.get(password);
+  let stateManager;
+  if (encryptionKey) {
+    let cryptoManager = cryptoManagerMap.get(encryptionKey);
+    stateManager = stateManagerMap.get(encryptionKey);
 
-  if (!cryptoManager) {
-    cryptoManager = new CryptoManager(password);
-    cryptoManagerMap.set(password, cryptoManager);
+    if (!cryptoManager) {
+      cryptoManager = new CryptoManager(encryptionKey);
+      cryptoManagerMap.set(encryptionKey, cryptoManager);
 
-    stateManager = new AsyncronousStateManager(cryptoManager);
-    stateManagerMap.set(password, stateManager);
-
-    storeManager = new StorageManager(cryptoManager);
-    storageManagerMap.set(password, storeManager);
+      stateManager = new AsyncronousStateManager(cryptoManager);
+      stateManagerMap.set(encryptionKey, stateManager);
+    }
+  } else {
+    stateManager = plaintextStateManager;
   }
 
   // Add loading state for each store property
@@ -531,7 +608,8 @@ export const useStore = (store: any, password = HARDCODED_PASSWORD) => {
   stateManager.createListeners(store, randomId);
 
   useEffect(() => {
-    storeManager.loadFromDatabase(store, randomId);
+    // The async manager owns its StorageManager instance (stateManager.db).
+    stateManager.db.loadFromDatabase(store, randomId);
     return () => {
       stateManager.removeListeners(randomId);
     };
@@ -552,6 +630,9 @@ export { useDimStore } from "../hooks/useDimStore.ts";
 
 // Re-export view transitions (already imported above for internal use)
 export { useViewTransition, viewTransitionStyles };
+
+// Re-export the keyed directive (already imported above for internal use)
+export { keyed };
 
 // Re-export core managers for external use (already imported above for internal use)
 export { default as CryptoManager } from "./crypto-manager";

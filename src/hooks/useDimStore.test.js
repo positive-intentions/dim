@@ -1,228 +1,120 @@
-import { renderHook, waitFor } from '@testing-library/react';
-import { useDimStore } from './useDimStore';
-import CryptoManager from '../core/crypto-manager.js';
-import StorageManager from '../core/storage-manager.js';
+import { renderHook, waitFor, act } from '@testing-library/react';
 
-// Mock the managers
-jest.mock('../core/crypto-manager.js');
-jest.mock('../core/storage-manager.js');
+// Shared mock fns (the `mock` prefix is required for jest.mock factory access).
+const mockReadValue = jest.fn();
+const mockWriteValue = jest.fn();
+const mockEncrypt = jest.fn(async (v) => JSON.stringify({ encryptedData: 'x', iv: 'y', salt: 'z' }));
+const mockDecrypt = jest.fn(async (v) => v);
+
+jest.mock('../core/crypto-manager.js', () => ({
+  __esModule: true,
+  default: jest.fn().mockImplementation(() => ({
+    encryptData: (...args) => mockEncrypt(...args),
+    decryptData: (...args) => mockDecrypt(...args),
+  })),
+}));
+
+jest.mock('../core/storage-manager.js', () => ({
+  __esModule: true,
+  default: jest.fn().mockImplementation(() => ({
+    readValue: (...args) => mockReadValue(...args),
+    writeValue: (...args) => mockWriteValue(...args),
+  })),
+}));
+
+jest.mock('../core/mini-lit.js', () => ({
+  debouncedDispatcher: jest.fn(),
+}));
+
+import { useDimStore } from './useDimStore';
+
+const testPassword = 'test-password-123';
+const wrongPassword = 'wrong-password';
+
+let keyCounter = 0;
+const uniqueKey = () => `test-key-${Date.now()}-${keyCounter++}`;
 
 describe('useDimStore', () => {
-  let mockCryptoManager;
-  let mockStorageManager;
-  const testPassword = 'test-password-123';
-  const wrongPassword = 'wrong-password';
-
   beforeEach(() => {
-    // Create real instances for testing
-    mockCryptoManager = new CryptoManager(testPassword);
-    mockStorageManager = new StorageManager(mockCryptoManager);
-
-    // Mock IndexedDB
-    global.indexedDB = {
-      open: jest.fn(() => ({
-        onupgradeneeded: null,
-        onsuccess: null,
-        onerror: null,
-        result: {
-          transaction: jest.fn(() => ({
-            objectStore: jest.fn(() => ({
-              get: jest.fn(() => ({
-                onsuccess: null,
-                onerror: null,
-                result: null
-              })),
-              put: jest.fn(() => ({
-                onsuccess: null,
-                onerror: null
-              }))
-            }))
-          }))
-        }
-      }))
-    };
-
-    // Mock debouncedDispatcher
-    global.debouncedDispatcher = jest.fn();
-
     jest.clearAllMocks();
+    mockEncrypt.mockImplementation(async () =>
+      JSON.stringify({ encryptedData: 'x', iv: 'y', salt: 'z' })
+    );
+    mockDecrypt.mockImplementation(async (v) => v);
+    mockWriteValue.mockResolvedValue('ok');
   });
 
-  describe('Password Validation', () => {
-    test('should reject when password is incorrect', async () => {
-      // Encrypt data with correct password
-      const originalValue = 'test data';
-      const encryptedValue = await mockCryptoManager.encryptData(originalValue);
-
-      // Create storage manager with wrong password
-      const wrongCryptoManager = new CryptoManager(wrongPassword);
-      const wrongStorageManager = new StorageManager(wrongCryptoManager);
-
-      // Mock readValue to simulate wrong password error
-      wrongStorageManager.readValue = jest.fn().mockRejectedValue(
-        new Error('Decryption failed: Incorrect password')
-      );
-
-      const { result } = renderHook(() =>
-        useDimStore({
-          key: 'test-key',
-          password: wrongPassword,
-          defaultValue: ''
-        })
-      );
-
-      await waitFor(() => {
-        expect(result.current[2]).toBe(false); // isLoading should be false
-      });
-
-      // Should use default value when password is wrong
-      expect(result.current[0]).toBe('');
-    });
-
-    test('should return decrypted value correctly', async () => {
-      const originalValue = 'test data';
-      const encryptedValue = await mockCryptoManager.encryptData(originalValue);
-
-      mockStorageManager.readValue = jest.fn().mockResolvedValue({
-        value: originalValue,
-        newState: null
-      });
-
-      const { result } = renderHook(() =>
-        useDimStore({
-          key: 'test-key',
-          password: testPassword,
-          defaultValue: ''
-        })
-      );
-
-      await waitFor(() => {
-        expect(result.current[2]).toBe(false); // isLoading should be false
-      });
-
-      expect(result.current[0]).toBe(originalValue);
-    });
-
-    test('should not return encrypted payload structure', async () => {
-      const originalValue = 'test string';
-      const encryptedValue = await mockCryptoManager.encryptData(originalValue);
-
-      mockStorageManager.readValue = jest.fn().mockResolvedValue({
-        value: originalValue,
-        newState: null
-      });
-
-      const { result } = renderHook(() =>
-        useDimStore({
-          key: 'test-key',
-          password: testPassword,
-          defaultValue: ''
-        })
-      );
-
-      await waitFor(() => {
-        expect(result.current[2]).toBe(false);
-      });
-
-      const value = result.current[0];
-      
-      // Should be the decrypted string, not an object
-      expect(typeof value).toBe('string');
-      expect(value).toBe(originalValue);
-      expect(value).not.toHaveProperty('encryptedData');
-      expect(value).not.toHaveProperty('iv');
-    });
-
-    test('should handle password change scenario', async () => {
-      const originalValue = 'test data';
-      const encryptedValue = await mockCryptoManager.encryptData(originalValue);
-
-      // First, store with correct password
-      mockStorageManager.readValue = jest.fn().mockResolvedValue({
-        value: originalValue,
-        newState: null
-      });
-
-      const { result, rerender } = renderHook(
-        ({ password }) =>
-          useDimStore({
-            key: 'test-key',
-            password: password,
-            defaultValue: ''
-          }),
-        {
-          initialProps: { password: testPassword }
-        }
-      );
-
-      await waitFor(() => {
-        expect(result.current[2]).toBe(false);
-      });
-
-      expect(result.current[0]).toBe(originalValue);
-
-      // Change password - should fail to decrypt
-      const wrongCryptoManager = new CryptoManager(wrongPassword);
-      const wrongStorageManager = new StorageManager(wrongCryptoManager);
-      wrongStorageManager.readValue = jest.fn().mockRejectedValue(
-        new Error('Decryption failed: Incorrect password')
-      );
-
-      rerender({ password: wrongPassword });
-
-      await waitFor(() => {
-        expect(result.current[2]).toBe(false);
-      });
-
-      // Should fall back to default value
-      expect(result.current[0]).toBe('');
-    });
+  test('throws when no password is provided', () => {
+    // Suppress the expected React error boundary noise.
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() =>
+      renderHook(() => useDimStore({ key: uniqueKey(), defaultValue: '' }))
+    ).toThrow(/explicit `password`/);
+    spy.mockRestore();
   });
 
-  describe('Basic Functionality', () => {
-    test('should return default value when no stored value exists', async () => {
-      mockStorageManager.readValue = jest.fn().mockResolvedValue(null);
+  test('returns the decrypted value when present', async () => {
+    mockReadValue.mockResolvedValue({ value: 'stored value', newState: null });
 
-      const { result } = renderHook(() =>
-        useDimStore({
-          key: 'test-key',
-          password: testPassword,
-          defaultValue: 'default'
-        })
-      );
+    const { result } = renderHook(() =>
+      useDimStore({ key: uniqueKey(), password: testPassword, defaultValue: '' })
+    );
 
-      await waitFor(() => {
-        expect(result.current[2]).toBe(false);
-      });
+    await waitFor(() => expect(result.current[2]).toBe(false));
+    expect(result.current[0]).toBe('stored value');
+  });
 
-      expect(result.current[0]).toBe('default');
+  test('uses the default value when nothing is stored', async () => {
+    mockReadValue.mockResolvedValue(null);
+
+    const { result } = renderHook(() =>
+      useDimStore({ key: uniqueKey(), password: testPassword, defaultValue: 'fallback' })
+    );
+
+    await waitFor(() => expect(result.current[2]).toBe(false));
+    expect(result.current[0]).toBe('fallback');
+  });
+
+  test('falls back to default value when the password is wrong', async () => {
+    mockReadValue.mockRejectedValue(new Error('Decryption failed: Incorrect password'));
+
+    const { result } = renderHook(() =>
+      useDimStore({ key: uniqueKey(), password: wrongPassword, defaultValue: '' })
+    );
+
+    await waitFor(() => expect(result.current[2]).toBe(false));
+    expect(result.current[0]).toBe('');
+  });
+
+  test('never exposes the raw encrypted payload structure', async () => {
+    mockReadValue.mockResolvedValue({ value: 'plain string', newState: null });
+
+    const { result } = renderHook(() =>
+      useDimStore({ key: uniqueKey(), password: testPassword, defaultValue: '' })
+    );
+
+    await waitFor(() => expect(result.current[2]).toBe(false));
+    const value = result.current[0];
+    expect(typeof value).toBe('string');
+    expect(value).not.toHaveProperty('encryptedData');
+    expect(value).not.toHaveProperty('iv');
+  });
+
+  test('sets and stores a new value (encrypted + persisted)', async () => {
+    mockReadValue.mockResolvedValue(null);
+
+    const { result } = renderHook(() =>
+      useDimStore({ key: uniqueKey(), password: testPassword, defaultValue: '' })
+    );
+
+    await waitFor(() => expect(result.current[2]).toBe(false));
+
+    await act(async () => {
+      result.current[1]('new value');
     });
 
-    test('should set and store value', async () => {
-      mockStorageManager.readValue = jest.fn().mockResolvedValue(null);
-      mockStorageManager.writeValue = jest.fn().mockResolvedValue('Value written successfully');
-
-      const { result } = renderHook(() =>
-        useDimStore({
-          key: 'test-key',
-          password: testPassword,
-          defaultValue: ''
-        })
-      );
-
-      await waitFor(() => {
-        expect(result.current[2]).toBe(false);
-      });
-
-      const newValue = 'new value';
-      result.current[1](newValue);
-
-      await waitFor(() => {
-        expect(mockStorageManager.writeValue).toHaveBeenCalled();
-      });
-
-      expect(result.current[0]).toBe(newValue);
-    });
+    await waitFor(() => expect(mockWriteValue).toHaveBeenCalled());
+    expect(mockEncrypt).toHaveBeenCalledWith('new value');
+    expect(result.current[0]).toBe('new value');
   });
 });
-

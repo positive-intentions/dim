@@ -1,46 +1,23 @@
 import { define, html, css, useState, useEffect, useStyle, useViewTransition, viewTransitionStyles } from "../../core/dim.ts";
 
-const ViewTransitionsGallery = (props, { useState, useEffect, useStyle, useViewTransition, html, css }) => {
+const ViewTransitionsGallery = (props, { useState, useEffect, useStyle, useViewTransition, html, css, keyed }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   
-  // Use the new view transitions hook - transitionId is the current image index
+  // Use the new view transitions hook - transitionId is the current slide index
   const transition = useViewTransition(currentIndex.toString(), {
     duration: 500,
     autoDirection: true
   });
 
-  // Sample images for the gallery
+  // Emoji slides for the gallery. Using emoji-in-div instead of network images
+  // keeps slides instant (no load flash), which makes the slide animation easy
+  // to see and to test deterministically.
   const images = [
-    {
-      id: 1,
-      src: "https://picsum.photos/800/600?random=1",
-      alt: "Beautiful landscape 1",
-      title: "Mountain Vista"
-    },
-    {
-      id: 2,
-      src: "https://picsum.photos/800/600?random=2",
-      alt: "Beautiful landscape 2",
-      title: "Ocean Waves"
-    },
-    {
-      id: 3,
-      src: "https://picsum.photos/800/600?random=3",
-      alt: "Beautiful landscape 3",
-      title: "Forest Path"
-    },
-    {
-      id: 4,
-      src: "https://picsum.photos/800/600?random=4",
-      alt: "Beautiful landscape 4",
-      title: "Desert Sunset"
-    },
-    {
-      id: 5,
-      src: "https://picsum.photos/800/600?random=5",
-      alt: "Beautiful landscape 5",
-      title: "City Lights"
-    }
+    { id: 1, emoji: "🏔️", title: "Mountain Vista", bg: "#dbeafe" },
+    { id: 2, emoji: "🌊", title: "Ocean Waves", bg: "#cffafe" },
+    { id: 3, emoji: "🌲", title: "Forest Path", bg: "#dcfce7" },
+    { id: 4, emoji: "🏜️", title: "Desert Sunset", bg: "#fef3c7" },
+    { id: 5, emoji: "🌃", title: "City Lights", bg: "#ede9fe" },
   ];
 
   useStyle(css`
@@ -80,9 +57,17 @@ const ViewTransitionsGallery = (props, { useState, useEffect, useStyle, useViewT
       left: 0;
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       opacity: 1;
       transform: translateX(0);
+    }
+
+    .slide-emoji {
+      font-size: 9rem;
+      line-height: 1;
+      user-select: none;
     }
 
     .nav-button {
@@ -146,7 +131,11 @@ const ViewTransitionsGallery = (props, { useState, useEffect, useStyle, useViewT
     .thumbnail {
       width: 80px;
       height: 60px;
-      object-fit: cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+      background: #e9ecef;
       border-radius: 4px;
       cursor: pointer;
       border: 3px solid transparent;
@@ -274,18 +263,42 @@ const ViewTransitionsGallery = (props, { useState, useEffect, useStyle, useViewT
     return () => clearInterval(interval);
   }, [transition.isTransitioning]);
 
+  // Two-layer slide: while transitioning, show the previous image sliding out
+  // and the current image sliding in. The incoming image is never hidden.
+  const showOutgoing =
+    transition.isTransitioning &&
+    transition.previousId !== null &&
+    transition.previousId !== undefined;
+  const previousIndex = showOutgoing ? parseInt(transition.previousId, 10) : null;
+  const outgoingImage =
+    previousIndex !== null && images[previousIndex] ? images[previousIndex] : null;
+
   return html`
     <div class="gallery-container">
       <h2 class="gallery-title">🖼️ View Transitions Gallery</h2>
       
       <div class="main-image-container view-transition-container">
-        <img 
-          class="main-image view-transition-item ${transition.getTransitionClasses()}"
-          src="${images[currentIndex].src}" 
-          alt="${images[currentIndex].alt}"
-          loading="lazy"
-          style="${Object.entries(transition.getTransitionStyles()).map(([key, value]) => `${key}: ${value}`).join('; ')}"
-        />
+        ${outgoingImage ? keyed(previousIndex, html`
+          <div
+            class="${transition.getOutgoingClass('main-image')}"
+            style="background:${outgoingImage.bg}"
+            role="img"
+            aria-label="${outgoingImage.title}"
+          >
+            <span class="slide-emoji">${outgoingImage.emoji}</span>
+          </div>
+        `) : ''}
+
+        ${keyed(currentIndex, html`
+          <div
+            class="${transition.getIncomingClass('main-image')}"
+            style="background:${images[currentIndex].bg}"
+            role="img"
+            aria-label="${images[currentIndex].title}"
+          >
+            <span class="slide-emoji">${images[currentIndex].emoji}</span>
+          </div>
+        `)}
         
         <button 
           class="nav-button prev-button" 
@@ -315,13 +328,12 @@ const ViewTransitionsGallery = (props, { useState, useEffect, useStyle, useViewT
 
       <div class="thumbnail-container">
         ${images.map((image, index) => html`
-          <img 
+          <div 
             class="thumbnail ${index === currentIndex ? 'active' : ''}"
-            src="${image.src}" 
-            alt="${image.alt}"
+            role="button"
+            aria-label="${image.title}"
             @click="${() => goToImage(index)}"
-            loading="lazy"
-          />
+          >${image.emoji}</div>
         `)}
       </div>
 

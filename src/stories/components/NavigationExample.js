@@ -1,5 +1,10 @@
 import { define, html, css, useState, useEffect, useStyle } from "../../core/dim.ts";
 
+// A feature label that appears on every tab at a DIFFERENT position so we can
+// demonstrate a shared-element (FLIP) transition: when switching tabs the page
+// slides as usual, but this card glides from its old slot to its new slot.
+const SHARED_FEATURE = "Shared Component";
+
 const NavigationExample = (props, { useState, useEffect, useStyle, html, css }) => {
   const [currentPage, setCurrentPage] = useState('home');
   const [navigationHistory, setNavigationHistory] = useState(['home']);
@@ -15,6 +20,7 @@ const NavigationExample = (props, { useState, useEffect, useStyle, html, css }) 
         heading: 'Welcome Home',
         description: 'This is the main landing page of our application.',
         features: [
+          SHARED_FEATURE,
           'Beautiful design',
           'Smooth animations', 
           'Responsive layout',
@@ -33,6 +39,7 @@ const NavigationExample = (props, { useState, useEffect, useStyle, html, css }) 
         features: [
           'Founded in 2024',
           'Innovative solutions',
+          SHARED_FEATURE,
           'Customer focused',
           'Global reach'
         ]
@@ -50,7 +57,8 @@ const NavigationExample = (props, { useState, useEffect, useStyle, html, css }) 
           'Web Development',
           'Mobile Apps',
           'UI/UX Design',
-          'Consulting'
+          'Consulting',
+          SHARED_FEATURE
         ]
       }
     },
@@ -64,6 +72,7 @@ const NavigationExample = (props, { useState, useEffect, useStyle, html, css }) 
         description: 'Check out our latest projects and achievements.',
         features: [
           'E-commerce sites',
+          SHARED_FEATURE,
           'SaaS platforms',
           'Mobile applications',
           'Design systems'
@@ -82,7 +91,8 @@ const NavigationExample = (props, { useState, useEffect, useStyle, html, css }) 
           'Free consultation',
           '24/7 support',
           'Quick response',
-          'Flexible pricing'
+          'Flexible pricing',
+          SHARED_FEATURE
         ]
       }
     }
@@ -178,55 +188,6 @@ const NavigationExample = (props, { useState, useEffect, useStyle, html, css }) 
       position: relative;
       min-height: 500px;
       overflow: hidden;
-    }
-
-    .page-content {
-      padding: 3rem 2rem;
-      text-align: center;
-    }
-
-    .page-heading {
-      font-size: 2.5rem;
-      font-weight: bold;
-      margin-bottom: 1rem;
-      color: #333;
-    }
-
-    .page-description {
-      font-size: 1.125rem;
-      color: #6c757d;
-      margin-bottom: 3rem;
-      max-width: 600px;
-      margin-left: auto;
-      margin-right: auto;
-      line-height: 1.6;
-    }
-
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    .feature-card {
-      background: white;
-      padding: 1.5rem;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      border-left: 4px solid #667eea;
-      transition: transform 0.2s ease;
-    }
-
-    .feature-card:hover {
-      transform: translateY(-2px);
-    }
-
-    .feature-title {
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 0.5rem;
     }
 
     .controls {
@@ -416,7 +377,7 @@ const NavigationExample = (props, { useState, useEffect, useStyle, html, css }) 
       <div class="page-container">
         <!-- This is where the magic happens - automatic view transitions! -->
         <page-content 
-          transitionId="${currentPage}"
+          transitionId="${getCurrentPageIndex()}"
           transitionDuration="600"
           pageData="${JSON.stringify(pages[currentPage])}"
         ></page-content>
@@ -448,7 +409,7 @@ const NavigationExample = (props, { useState, useEffect, useStyle, html, css }) 
         
         <div class="code-block">
 &lt;page-content 
-  transitionId="\${currentPage}"
+  transitionId="\${pageIndex}"
   transitionDuration="600"
   pageData="\${JSON.stringify(pages[currentPage])}"
 &gt;&lt;/page-content&gt;
@@ -468,21 +429,96 @@ const NavigationExample = (props, { useState, useEffect, useStyle, html, css }) 
 };
 
 // Page content component that will get automatic view transitions
-const PageContent = (props, { html }) => {
-  const pageData = JSON.parse(props.pageData || '{}');
-  const { content, color } = pageData;
-  
+const PageContent = (props, { html, useStyle, css }) => {
+  // dim already JSON-parses object-like attributes, so pageData arrives as an
+  // object. Only parse if it is still a string; never re-parse an object.
+  const raw = props.pageData;
+  const pageData = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+  const { content = { heading: '', description: '', features: [] }, color } = pageData;
+
+  // PageContent renders inside its own shadow root, so the parent's styles do
+  // not reach it. Define them here (and give the content a real min-height) so
+  // the auto view-transition has something sized to slide.
+  useStyle(css`
+    .page-content {
+      padding: 3rem 2rem;
+      text-align: center;
+      min-height: 500px;
+      box-sizing: border-box;
+    }
+
+    .page-heading {
+      font-size: 2.5rem;
+      font-weight: bold;
+      margin-bottom: 1rem;
+      color: #333;
+    }
+
+    .page-description {
+      font-size: 1.125rem;
+      color: #6c757d;
+      margin-bottom: 3rem;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.6;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .feature-card {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      border-left: 4px solid #667eea;
+      transition: transform 0.2s ease;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-2px);
+    }
+
+    /* The shared card is visually distinct so the FLIP reposition is easy to
+       follow as it moves between tabs. */
+    .feature-card.shared-card {
+      background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+      border-left-color: #f59e0b;
+      box-shadow: 0 6px 16px rgba(245, 158, 11, 0.35);
+    }
+
+    .feature-title {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+  `);
+
   return html`
     <div class="page-content" style="background: ${color};">
       <h2 class="page-heading">${content.heading}</h2>
       <p class="page-description">${content.description}</p>
       
       <div class="features-grid">
-        ${content.features.map(feature => html`
-          <div class="feature-card">
-            <div class="feature-title">${feature}</div>
-          </div>
-        `)}
+        ${content.features.map(feature =>
+          feature === SHARED_FEATURE
+            ? html`
+                <div class="feature-card shared-card" data-vt-shared="shared-feature">
+                  <div class="feature-title">⭐ ${feature}</div>
+                </div>
+              `
+            : html`
+                <div class="feature-card">
+                  <div class="feature-title">${feature}</div>
+                </div>
+              `
+        )}
       </div>
     </div>
   `;

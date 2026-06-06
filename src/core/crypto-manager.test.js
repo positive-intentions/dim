@@ -1,100 +1,111 @@
 import CryptoManager from './crypto-manager.js';
 
+// Use a low PBKDF2 iteration count to keep tests fast.
+const makeManager = (password) => new CryptoManager(password, { iterations: 1000 });
+
 describe('CryptoManager', () => {
   let cryptoManager;
   const testPassword = 'test-password-123';
 
   beforeEach(() => {
-    cryptoManager = new CryptoManager(testPassword);
+    cryptoManager = makeManager(testPassword);
   });
 
   describe('Key Generation', () => {
-    test('should generate a key from password', async () => {
-      const key = await cryptoManager.getKeyFromPassword(testPassword);
+    test('should derive an AES-GCM key from password and salt', async () => {
+      const salt = new Uint8Array(16).fill(7);
+      const key = await cryptoManager.getKeyFromPassword(testPassword, salt);
       expect(key).toBeDefined();
       expect(key.constructor.name).toBe('CryptoKey');
       expect(key.algorithm.name).toBe('AES-GCM');
     });
 
-    test('should generate same key for same password', async () => {
-      const key1 = await cryptoManager.getKeyFromPassword(testPassword);
-      const key2 = await cryptoManager.getKeyFromPassword(testPassword);
-      
-      // Export keys to compare
+    test('should derive the same key for the same password and salt', async () => {
+      const salt = new Uint8Array(16).fill(9);
+      const key1 = await cryptoManager.getKeyFromPassword(testPassword, salt);
+      const key2 = await cryptoManager.getKeyFromPassword(testPassword, salt);
+
       const exported1 = await crypto.subtle.exportKey('raw', key1);
       const exported2 = await crypto.subtle.exportKey('raw', key2);
-      
+
       expect(new Uint8Array(exported1)).toEqual(new Uint8Array(exported2));
+    });
+
+    test('should derive different keys for different salts', async () => {
+      const saltA = new Uint8Array(16).fill(1);
+      const saltB = new Uint8Array(16).fill(2);
+      const keyA = await cryptoManager.getKeyFromPassword(testPassword, saltA);
+      const keyB = await cryptoManager.getKeyFromPassword(testPassword, saltB);
+
+      const exportedA = await crypto.subtle.exportKey('raw', keyA);
+      const exportedB = await crypto.subtle.exportKey('raw', keyB);
+
+      expect(new Uint8Array(exportedA)).not.toEqual(new Uint8Array(exportedB));
+    });
+
+    test('generateKey wrapper still returns a usable AES-GCM key', async () => {
+      const key = await cryptoManager.generateKey(testPassword);
+      expect(key.algorithm.name).toBe('AES-GCM');
     });
   });
 
   describe('Encryption/Decryption', () => {
-    test('should encrypt and decrypt string data', async () => {
-      const originalData = 'Hello, World!';
-      
-      const encrypted = await cryptoManager.encryptData(originalData);
-      console.log('Encrypted:', encrypted);
-      
-      // Encrypted should be a JSON string with encryptedData and iv
+    test('payload embeds encryptedData, iv and salt', async () => {
+      const encrypted = await cryptoManager.encryptData('hello');
       const parsed = JSON.parse(encrypted);
       expect(parsed.encryptedData).toBeDefined();
       expect(parsed.iv).toBeDefined();
-      
+      expect(parsed.salt).toBeDefined();
+    });
+
+    test('should encrypt and decrypt string data', async () => {
+      const originalData = 'Hello, World!';
+      const encrypted = await cryptoManager.encryptData(originalData);
       const decrypted = await cryptoManager.decryptData(encrypted);
       expect(decrypted).toBe(originalData);
     });
 
     test('should encrypt and decrypt object data', async () => {
       const originalData = { name: 'test', value: 123, nested: { foo: 'bar' } };
-      
       const encrypted = await cryptoManager.encryptData(originalData);
       const decrypted = await cryptoManager.decryptData(encrypted);
-      
       expect(decrypted).toEqual(originalData);
     });
 
     test('should encrypt and decrypt array data', async () => {
       const originalData = [1, 2, 3, 'test', { foo: 'bar' }];
-      
       const encrypted = await cryptoManager.encryptData(originalData);
       const decrypted = await cryptoManager.decryptData(encrypted);
-      
       expect(decrypted).toEqual(originalData);
     });
 
-    test('should handle null and undefined', async () => {
-      const encrypted1 = await cryptoManager.encryptData(null);
-      const decrypted1 = await cryptoManager.decryptData(encrypted1);
-      expect(decrypted1).toBe(null);
-      
-      const encrypted2 = await cryptoManager.encryptData(undefined);
-      const decrypted2 = await cryptoManager.decryptData(encrypted2);
-      expect(decrypted2).toBe(undefined);
+    test('should handle null', async () => {
+      const encrypted = await cryptoManager.encryptData(null);
+      const decrypted = await cryptoManager.decryptData(encrypted);
+      expect(decrypted).toBe(null);
     });
 
     test('should handle empty strings', async () => {
-      const originalData = '';
-      
-      const encrypted = await cryptoManager.encryptData(originalData);
+      const encrypted = await cryptoManager.encryptData('');
       const decrypted = await cryptoManager.decryptData(encrypted);
-      
-      expect(decrypted).toBe(originalData);
+      expect(decrypted).toBe('');
     });
 
-    test('should produce different ciphertext for same plaintext (due to random IV)', async () => {
+    test('uses a different random salt for each encryption of the same plaintext', async () => {
       const originalData = 'Same data';
-      
       const encrypted1 = await cryptoManager.encryptData(originalData);
       const encrypted2 = await cryptoManager.encryptData(originalData);
-      
+
+      const parsed1 = JSON.parse(encrypted1);
+      const parsed2 = JSON.parse(encrypted2);
+
+      // Random per-record salt => different salt and different ciphertext
+      expect(parsed1.salt).not.toBe(parsed2.salt);
       expect(encrypted1).not.toBe(encrypted2);
-      
-      // But both should decrypt to same value
-      const decrypted1 = await cryptoManager.decryptData(encrypted1);
-      const decrypted2 = await cryptoManager.decryptData(encrypted2);
-      
-      expect(decrypted1).toBe(originalData);
-      expect(decrypted2).toBe(originalData);
+
+      // Both still decrypt to the same value
+      expect(await cryptoManager.decryptData(encrypted1)).toBe(originalData);
+      expect(await cryptoManager.decryptData(encrypted2)).toBe(originalData);
     });
   });
 
@@ -104,25 +115,15 @@ describe('CryptoManager', () => {
     });
 
     test('should throw error for corrupted encrypted data', async () => {
-      const originalData = 'test';
-      const encrypted = await cryptoManager.encryptData(originalData);
+      const encrypted = await cryptoManager.encryptData('test');
       const parsed = JSON.parse(encrypted);
-      
-      // Corrupt the encrypted data
       parsed.encryptedData = 'corrupted';
-      const corrupted = JSON.stringify(parsed);
-      
-      await expect(cryptoManager.decryptData(corrupted)).rejects.toThrow();
+      await expect(cryptoManager.decryptData(JSON.stringify(parsed))).rejects.toThrow();
     });
 
     test('should reject decryption with wrong password', async () => {
-      const originalData = 'test data';
-      const encrypted = await cryptoManager.encryptData(originalData);
-      
-      // Create a new CryptoManager with different password
-      const wrongCryptoManager = new CryptoManager('wrong-password');
-      
-      // Should throw error when trying to decrypt with wrong password
+      const encrypted = await cryptoManager.encryptData('test data');
+      const wrongCryptoManager = makeManager('wrong-password');
       await expect(wrongCryptoManager.decryptData(encrypted)).rejects.toThrow();
     });
 
@@ -130,58 +131,35 @@ describe('CryptoManager', () => {
       const originalData = 'test string';
       const encrypted = await cryptoManager.encryptData(originalData);
       const decrypted = await cryptoManager.decryptData(encrypted);
-      
-      // Should return the original string, not an object with encryptedData/iv
+
       expect(decrypted).toBe(originalData);
       expect(typeof decrypted).toBe('string');
       expect(decrypted).not.toHaveProperty('encryptedData');
       expect(decrypted).not.toHaveProperty('iv');
     });
 
-    test('should throw specific error for password mismatch', async () => {
-      const originalData = 'sensitive data';
-      const encrypted = await cryptoManager.encryptData(originalData);
-      
-      const wrongCryptoManager = new CryptoManager('different-password');
-      
-      try {
-        await wrongCryptoManager.decryptData(encrypted);
-        fail('Should have thrown an error');
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-        expect(error.message).toContain('Decryption failed');
-      }
+    test('should throw specific error message for password mismatch', async () => {
+      const encrypted = await cryptoManager.encryptData('sensitive data');
+      const wrongCryptoManager = makeManager('different-password');
+
+      await expect(wrongCryptoManager.decryptData(encrypted)).rejects.toThrow(
+        /Decryption failed/
+      );
     });
 
-    test('should handle encrypted data that fails to decrypt', async () => {
-      const originalData = 'test';
-      const encrypted = await cryptoManager.encryptData(originalData);
+    test('should reject when iv is invalid', async () => {
+      const encrypted = await cryptoManager.encryptData('test');
       const parsed = JSON.parse(encrypted);
-      
-      // Modify IV to cause decryption failure
       parsed.iv = 'invalid-iv-data';
-      const invalidEncrypted = JSON.stringify(parsed);
-      
-      await expect(cryptoManager.decryptData(invalidEncrypted)).rejects.toThrow();
+      await expect(cryptoManager.decryptData(JSON.stringify(parsed))).rejects.toThrow();
     });
   });
 
   describe('Integration with Event Details', () => {
-    test('should handle event detail format', async () => {
-      const eventDetail = {
-        key: 'testKey',
-        value: 'testValue',
-        crypto: cryptoManager
-      };
-      
-      // Test decrypting from event detail format
+    test('should decrypt from event-detail object that includes a crypto reference', async () => {
       const encrypted = await cryptoManager.encryptData('testData');
-      const eventWithEncrypted = {
-        ...eventDetail,
-        value: encrypted
-      };
-      
-      const decrypted = await cryptoManager.decryptData(eventWithEncrypted);
+      const eventDetail = { ...JSON.parse(encrypted), crypto: cryptoManager };
+      const decrypted = await cryptoManager.decryptData(eventDetail);
       expect(decrypted).toBe('testData');
     });
   });

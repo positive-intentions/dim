@@ -2,10 +2,11 @@ import AsyncronousStateManager from './async-manager.js';
 import CryptoManager from './crypto-manager.js';
 import StorageManager from './storage-manager.js';
 
-// Mock debouncedDispatcher
+// Mock debouncedDispatcher (factory may only reference allowed globals like
+// `globalThis`, not `window`).
 jest.mock('./mini-lit.js', () => ({
   debouncedDispatcher: jest.fn((eventName, detail) => {
-    window.dispatchEvent(new CustomEvent(eventName, { detail }));
+    globalThis.dispatchEvent(new CustomEvent(eventName, { detail }));
   })
 }));
 
@@ -15,7 +16,8 @@ describe('AsyncronousStateManager', () => {
   const testPassword = 'test-password';
 
   beforeEach(() => {
-    cryptoManager = new CryptoManager(testPassword);
+    // Low iteration count keeps PBKDF2 fast in tests.
+    cryptoManager = new CryptoManager(testPassword, { iterations: 1000 });
     asyncManager = new AsyncronousStateManager(cryptoManager);
     
     // Clear any existing event listeners
@@ -195,6 +197,54 @@ describe('AsyncronousStateManager', () => {
 
       expect(asyncManager.db).toBe(storageManager);
       expect(storageManager.asyncManager).toBe(asyncManager);
+    });
+  });
+
+  describe('Plaintext mode (no encryption)', () => {
+    let plainManager;
+
+    beforeEach(() => {
+      plainManager = new AsyncronousStateManager(null);
+      plainManager.eventListener = [];
+    });
+
+    afterEach(() => {
+      plainManager.eventListener.forEach((listener) => {
+        window.removeEventListener(listener.eventName, listener.listener);
+      });
+    });
+
+    test('updates state from a plaintext dispatched event', async () => {
+      const mockSetValue = jest.fn();
+      plainManager.generateListener({
+        listenerId: 'plain-id',
+        key: 'plainKey',
+        value: ['initial', mockSetValue],
+      });
+
+      // No encryption: the dispatched detail is the plaintext value directly.
+      window.dispatchEvent(new CustomEvent('plainKey', { detail: 'updated' }));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(mockSetValue).toHaveBeenCalledWith('updated', true);
+      expect(plainManager.store.plainKey).toBe('updated');
+    });
+
+    test('setter dispatches plaintext (not an encrypted payload)', async () => {
+      const { debouncedDispatcher } = require('./mini-lit.js');
+      debouncedDispatcher.mockClear();
+
+      const [, setter] = plainManager.generateListener({
+        listenerId: 'plain-id-2',
+        key: 'plainKey2',
+        value: ['initial', jest.fn()],
+      });
+
+      setter('newValue');
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(debouncedDispatcher).toHaveBeenCalledWith('plainKey2', 'newValue');
     });
   });
 });

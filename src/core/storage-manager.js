@@ -1,30 +1,36 @@
 import { debouncedDispatcher } from './mini-lit.js';
 
-let db;
 const databaseName = "DimDatabase";
 const objectStoreName = "DimStore";
 
 class StorageManager {
-    constructor(crypto) {
+    constructor(crypto = null) {
         this.crypto = crypto;
         this.asyncManager = null; // Will be set by async manager
-        this.openDatabase();
+        // Per-instance database handle/connection promise. Previously this was a
+        // module-level singleton shared across every StorageManager instance,
+        // which meant multiple managers clobbered each other's connection.
+        this.db = null;
+        this._dbPromise = this.openDatabase();
     }
 
     async openDatabase() {
+        if (this.db) {
+            return this.db;
+        }
         return new Promise((resolve, reject) => {
             let request = indexedDB.open(databaseName, 1);
 
-            request.onupgradeneeded = function (event) {
-                db = event.target.result;
-                if (!db.objectStoreNames.contains(objectStoreName)) {
-                    db.createObjectStore(objectStoreName, { keyPath: "id" });
+            request.onupgradeneeded = (event) => {
+                const database = event.target.result;
+                if (!database.objectStoreNames.contains(objectStoreName)) {
+                    database.createObjectStore(objectStoreName, { keyPath: "id" });
                 }
             };
 
-            request.onsuccess = function (event) {
-                db = event.target.result;
-                resolve(db);
+            request.onsuccess = (event) => {
+                this.db = event.target.result;
+                resolve(this.db);
             };
 
             request.onerror = function (event) {
@@ -33,14 +39,17 @@ class StorageManager {
         });
     }
 
-
+    async _ready() {
+        if (!this.db) {
+            await this._dbPromise;
+        }
+        return this.db;
+    }
 
     async writeValue(id, value) {
         // Wait for database to be ready
-        if (!db) {
-            await this.openDatabase();
-        }
-        
+        const db = await this._ready();
+
         return new Promise((resolve, reject) => {
             if (!db) {
                 reject("Database not available");
@@ -65,10 +74,8 @@ class StorageManager {
 
     async readValue(id, newState) {
         // Wait for database to be ready
-        if (!db) {
-            await this.openDatabase();
-        }
-        
+        const db = await this._ready();
+
         return new Promise((resolve, reject) => {
             if (!db) {
                 resolve(null);

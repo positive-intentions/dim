@@ -13,14 +13,23 @@
  * @returns {Object} File system interface
  */
 export function useFS(options = {}, hooks) {
-  const { opfs = false, encrypt = false, encryptionPassword = 'useFS-default-password' } = options;
+  const { opfs = false, encrypt = false, encryptionPassword } = options;
   const { useState, useEffect, useStore } = hooks;
 
-  // Initialize crypto manager if encryption is enabled
+  // Initialize crypto manager if encryption is enabled. There is no default
+  // password: callers must supply an explicit `encryptionPassword` when
+  // `encrypt` is enabled.
   const [cryptoManager, setCryptoManager] = useState(null);
-  
+
   useEffect(() => {
     if (encrypt) {
+      if (!encryptionPassword) {
+        console.error(
+          'useFS: encryption enabled but no `encryptionPassword` was provided. ' +
+          'Files will NOT be encrypted. Provide an explicit key to enable encryption.'
+        );
+        return;
+      }
       // Dynamically import CryptoManager to avoid circular dependencies
       import('../core/crypto-manager.js').then(({ default: CryptoManager }) => {
         const crypto = new CryptoManager(encryptionPassword);

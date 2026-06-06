@@ -37,6 +37,8 @@ Dim is a lightweight framework that brings React's component model and hooks to 
 
 > **⚠️ Experimental**: This framework is in early development and is not production-ready. It's provided for educational and experimental purposes.
 
+> **Upgrading?** See [MIGRATION.md](MIGRATION.md) for breaking API changes (`useStore`, object attributes, `useFS`, crypto format).
+
 ## ✨ Features
 
 - 🎯 **React-like DX** - Familiar hooks API (`useState`, `useEffect`, `useMemo`, etc.)
