@@ -28,7 +28,9 @@ Dim is a lightweight framework that brings React's component model and hooks to 
 
 Check out the other stories in this Storybook to see Dim in action:
 
-- **Getting Started**: Basic examples and tutorials
+- **Getting Started**: useStore and foundational examples
+- **Demo/Shopping App**: Navigable e-commerce UI with view transitions
+- **Demo/Messaging App**: Navigable messaging UI with view transitions
 - **API Reference**: Complete hook and component documentation
 - **Styled Components**: Advanced styling patterns
 

@@ -2,6 +2,22 @@ import { keyed } from "../vendor/lit/directives/keyed.js";
 import { viewTransitionStyles } from "./view-transitions.js";
 
 /**
+ * Walk a root (and any nested shadow roots) collecting matching elements.
+ */
+function queryDeep(root, selector) {
+  const found = [];
+  const visit = (node) => {
+    if (!node?.querySelectorAll) return;
+    node.querySelectorAll(selector).forEach((el) => found.push(el));
+    node.querySelectorAll("*").forEach((el) => {
+      if (el.shadowRoot) visit(el.shadowRoot);
+    });
+  };
+  visit(root);
+  return found;
+}
+
+/**
  * Manages auto view-transition rendering (two-layer slide), shared-element
  * FLIP, and wrapper height animation for a DimComponent host.
  */
@@ -116,8 +132,27 @@ export class AutoTransitionHost {
       Object.keys(this._sharedRects).length > 0 &&
       !this._flipPlayed
     ) {
-      this._flipPlayed = true;
-      this._runSharedElementFlip(this._flipDuration, this._flipEasing);
+      const runFlip = () => {
+        if (!this._isTransitioningNow || this._flipPlayed) return false;
+        const incomingLayer = this.host.shadowRoot?.querySelector(
+          ".vt-layer.vt-incoming"
+        );
+        if (!incomingLayer) return false;
+        const hasTargets = queryDeep(incomingLayer, "[data-vt-shared]").some(
+          (el) => this._sharedRects[el.getAttribute("data-vt-shared")]
+        );
+        if (!hasTargets) return false;
+        this._flipPlayed = true;
+        this._runSharedElementFlip(this._flipDuration, this._flipEasing);
+        return true;
+      };
+
+      if (!runFlip()) {
+        // Nested child components may not have painted their shadow DOM yet.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => runFlip());
+        });
+      }
     }
   }
 
@@ -133,9 +168,9 @@ export class AutoTransitionHost {
         wrapper.classList.remove("vt-resizing");
         wrapper.style.height = "";
       }
-      root
-        .querySelectorAll(".vt-shared-hidden")
-        .forEach((el) => el.classList.remove("vt-shared-hidden"));
+      queryDeep(root, ".vt-shared-hidden").forEach((el) =>
+        el.classList.remove("vt-shared-hidden")
+      );
     }
     if (this._sharedOverlayContainer) {
       this._sharedOverlayContainer.innerHTML = "";
@@ -168,6 +203,14 @@ export class AutoTransitionHost {
     clone.style.background = cs.background;
     clone.style.boxShadow = cs.boxShadow;
     clone.style.color = cs.color;
+    clone.style.fontSize = cs.fontSize;
+    clone.style.fontWeight = cs.fontWeight;
+    clone.style.whiteSpace = cs.whiteSpace;
+    clone.style.overflow = cs.overflow;
+    clone.style.textOverflow = cs.textOverflow;
+    if (source instanceof HTMLImageElement) {
+      clone.style.objectFit = cs.objectFit || "cover";
+    }
   }
 
   _captureSharedRects() {
@@ -178,7 +221,7 @@ export class AutoTransitionHost {
       ? wrapper.getBoundingClientRect()
       : { left: 0, top: 0 };
     const rects = {};
-    root.querySelectorAll("[data-vt-shared]").forEach((el) => {
+    queryDeep(root, "[data-vt-shared]").forEach((el) => {
       const key = el.getAttribute("data-vt-shared");
       const r = el.getBoundingClientRect();
       rects[key] = {
@@ -252,7 +295,7 @@ export class AutoTransitionHost {
 
     const wrapperRect = wrapper.getBoundingClientRect();
 
-    incomingLayer.querySelectorAll("[data-vt-shared]").forEach((el) => {
+    queryDeep(incomingLayer, "[data-vt-shared]").forEach((el) => {
       const key = el.getAttribute("data-vt-shared");
       const oldRect = oldRects[key];
       if (!oldRect) return;
@@ -288,7 +331,7 @@ export class AutoTransitionHost {
       el.classList.add("vt-shared-hidden");
       const outCopy =
         outgoingLayer &&
-        outgoingLayer.querySelector(`[data-vt-shared="${key}"]`);
+        queryDeep(outgoingLayer, `[data-vt-shared="${key}"]`)[0];
       if (outCopy) outCopy.classList.add("vt-shared-hidden");
 
       if (typeof clone.animate === "function") {
