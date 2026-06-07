@@ -1,6 +1,7 @@
 import { define, html, css, useState, useStyle } from "../../../core/dim.ts";
 import { appVariables, avatarStyles } from "./sharedStyles.js";
 import { sharedKeys } from "./sharedKeys.js";
+import { renderAvatar } from "./renderAvatar.js";
 
 const ChatView = (props, { useState, useStyle, html, css }) => {
   const data = props.props || props;
@@ -195,23 +196,13 @@ const ChatView = (props, { useState, useStyle, html, css }) => {
       ? `${conversation.members || 0} members`
       : "Offline";
 
-  const renderHeaderAvatar = () => {
-    if (conversation.avatarEmoji) {
-      return html`
-        <div class="avatar avatar-sm emoji-avatar" data-vt-shared="${keys.avatar}">
-          ${conversation.avatarEmoji}
-        </div>
-      `;
-    }
-    return html`
-      <img
-        class="avatar avatar-sm"
-        src="${conversation.avatar}"
-        alt="${conversation.name}"
-        data-vt-shared="${keys.avatar}"
-      />
-    `;
-  };
+  const renderHeaderAvatar = () =>
+    renderAvatar(html, {
+      emoji: conversation.avatarEmoji,
+      className: "avatar avatar-sm",
+      vtShared: keys.avatar,
+      label: conversation.name,
+    });
 
   return html`
     <div class="chat-view">
@@ -248,13 +239,11 @@ const ChatView = (props, { useState, useStyle, html, css }) => {
             return html`
             <div class="message-row ${msg.type}">
               ${msg.type === "received"
-                ? html`
-                    <img
-                      class="avatar avatar-sm"
-                      src="${msg.avatar}"
-                      alt="${msg.username}"
-                    />
-                  `
+                ? renderAvatar(html, {
+                    emoji: msg.avatarEmoji,
+                    className: "avatar avatar-sm",
+                    label: msg.username,
+                  })
                 : ""}
               <div>
                 ${isLast

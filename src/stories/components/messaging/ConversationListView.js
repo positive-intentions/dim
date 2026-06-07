@@ -1,6 +1,7 @@
 import { define, html, css, useState, useStyle } from "../../../core/dim.ts";
 import { appVariables, avatarStyles } from "./sharedStyles.js";
 import { sharedKeys } from "./sharedKeys.js";
+import { renderAvatar } from "./renderAvatar.js";
 
 const ConversationListView = (props, { useState, useStyle, html, css }) => {
   const data = props.props || props;
@@ -185,26 +186,13 @@ const ConversationListView = (props, { useState, useStyle, html, css }) => {
     return true;
   });
 
-  const renderAvatar = (conv) => {
+  const renderConvAvatar = (conv) => {
     const keys = sharedKeys(conv.id);
-    if (conv.avatarEmoji) {
-      return html`
-        <div
-          class="avatar emoji-avatar"
-          data-vt-shared="${keys.avatar}"
-        >
-          ${conv.avatarEmoji}
-        </div>
-      `;
-    }
-    return html`
-      <img
-        class="avatar"
-        src="${conv.avatar}"
-        alt="${conv.name}"
-        data-vt-shared="${keys.avatar}"
-      />
-    `;
+    return renderAvatar(html, {
+      emoji: conv.avatarEmoji,
+      vtShared: keys.avatar,
+      label: conv.name,
+    });
   };
 
   return html`
@@ -243,7 +231,7 @@ const ConversationListView = (props, { useState, useStyle, html, css }) => {
                 @click="${() => onConversationClick?.(conv.id)}"
               >
                 <div class="avatar-wrap">
-                  ${renderAvatar(conv)}
+                  ${renderConvAvatar(conv)}
                   ${conv.isOnline
                     ? html`<span class="online-dot" data-vt-shared="${keys.online}"></span>`
                     : ""}

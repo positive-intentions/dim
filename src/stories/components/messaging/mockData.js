@@ -1,11 +1,9 @@
-export const avatarUrl = (seed) => `https://i.pravatar.cc/150?u=${encodeURIComponent(seed)}`;
-
 export const MOCK_USER = {
   id: "me",
   name: "Alex Morgan",
   email: "alex.morgan@example.com",
   phone: "+1 555 010 2000",
-  avatar: avatarUrl("alex-morgan"),
+  avatarEmoji: "🧑🏽‍💼",
   status: "Available",
 };
 
@@ -17,7 +15,6 @@ export const MOCK_CONVERSATIONS = [
     lastMessageSender: "Lenny",
     timestamp: "now",
     unreadCount: 0,
-    avatar: avatarUrl("lenny-ai"),
     avatarEmoji: "🤖",
     isOnline: true,
     isGroup: false,
@@ -32,7 +29,7 @@ export const MOCK_CONVERSATIONS = [
     lastMessageSender: "Alice",
     timestamp: "2 min ago",
     unreadCount: 3,
-    avatar: avatarUrl("design-team"),
+    avatarEmoji: "🎨",
     isOnline: true,
     isGroup: true,
     isPinned: true,
@@ -47,7 +44,7 @@ export const MOCK_CONVERSATIONS = [
     lastMessageSender: "Alice",
     timestamp: "15 min ago",
     unreadCount: 1,
-    avatar: avatarUrl("alice-johnson"),
+    avatarEmoji: "👩🏼",
     isOnline: true,
     isGroup: false,
     isPinned: false,
@@ -61,7 +58,7 @@ export const MOCK_CONVERSATIONS = [
     lastMessageSender: "Bob",
     timestamp: "1 hour ago",
     unreadCount: 0,
-    avatar: avatarUrl("project-alpha"),
+    avatarEmoji: "🚀",
     isOnline: false,
     isGroup: true,
     isPinned: true,
@@ -76,7 +73,7 @@ export const MOCK_CONVERSATIONS = [
     lastMessageSender: "Bob",
     timestamp: "3 hours ago",
     unreadCount: 0,
-    avatar: avatarUrl("bob-designer"),
+    avatarEmoji: "👨🏻‍🎨",
     isOnline: false,
     isGroup: false,
     isPinned: false,
@@ -90,7 +87,7 @@ export const MOCK_CONVERSATIONS = [
     lastMessageSender: "Charlie",
     timestamp: "5 hours ago",
     unreadCount: 2,
-    avatar: avatarUrl("charlie-smith"),
+    avatarEmoji: "👨🏾‍💻",
     isOnline: false,
     isGroup: false,
     isPinned: false,
@@ -104,7 +101,7 @@ export const MOCK_CONVERSATIONS = [
     lastMessageSender: "Dana",
     timestamp: "Yesterday",
     unreadCount: 0,
-    avatar: avatarUrl("marketing-team"),
+    avatarEmoji: "📣",
     isOnline: true,
     isGroup: true,
     isPinned: false,
@@ -120,7 +117,7 @@ export const MOCK_CONTACTS = [
     name: "Alice Johnson",
     phoneNumber: "+1 234 567 8901",
     email: "alice@example.com",
-    avatar: avatarUrl("alice-johnson"),
+    avatarEmoji: "👩🏼",
     isOnline: true,
     isFavorite: true,
   },
@@ -128,14 +125,14 @@ export const MOCK_CONTACTS = [
     id: "2",
     name: "Bob Smith",
     email: "bob.smith@example.com",
-    avatar: avatarUrl("bob-smith"),
+    avatarEmoji: "👨🏽",
     isRecent: true,
   },
   {
     id: "3",
     name: "Charlie Brown",
     phoneNumber: "+1 234 567 8903",
-    avatar: avatarUrl("charlie-brown"),
+    avatarEmoji: "👦🏻",
     isFavorite: true,
   },
   {
@@ -143,7 +140,7 @@ export const MOCK_CONTACTS = [
     name: "Diana Ross",
     phoneNumber: "+1 234 567 8904",
     email: "diana@example.com",
-    avatar: avatarUrl("diana-ross"),
+    avatarEmoji: "👩🏿",
     isOnline: true,
     isRecent: true,
   },
@@ -151,28 +148,28 @@ export const MOCK_CONTACTS = [
     id: "5",
     name: "Edward Norton",
     phoneNumber: "+1 234 567 8905",
-    avatar: avatarUrl("edward-norton"),
+    avatarEmoji: "👨🏻",
     lastSeen: "Yesterday",
   },
   {
     id: "6",
     name: "Fiona Apple",
     email: "fiona@example.com",
-    avatar: avatarUrl("fiona-apple"),
+    avatarEmoji: "👩🏼‍🎤",
     isOnline: true,
   },
   {
     id: "7",
     name: "George Michael",
     phoneNumber: "+1 234 567 8907",
-    avatar: avatarUrl("george-michael"),
+    avatarEmoji: "👨🏼",
     isRecent: true,
   },
   {
     id: "8",
     name: "Helen Hunt",
     phoneNumber: "+1 234 567 8908",
-    avatar: avatarUrl("helen-hunt"),
+    avatarEmoji: "👩🏻‍⚕️",
   },
 ];
 
@@ -181,7 +178,7 @@ export const MOCK_CALLS = [
     id: "c1",
     contactId: "2",
     name: "Alice Johnson",
-    avatar: avatarUrl("alice-johnson"),
+    avatarEmoji: "👩🏼",
     type: "incoming",
     callType: "video",
     timestamp: "10:32 AM",
@@ -191,7 +188,7 @@ export const MOCK_CALLS = [
     id: "c2",
     contactId: "4",
     name: "Bob Designer",
-    avatar: avatarUrl("bob-designer"),
+    avatarEmoji: "👨🏻‍🎨",
     type: "outgoing",
     callType: "voice",
     timestamp: "Yesterday",
@@ -201,7 +198,7 @@ export const MOCK_CALLS = [
     id: "c3",
     contactId: "5",
     name: "Charlie Smith",
-    avatar: avatarUrl("charlie-smith"),
+    avatarEmoji: "👨🏾‍💻",
     type: "missed",
     callType: "voice",
     timestamp: "Yesterday",
@@ -211,7 +208,7 @@ export const MOCK_CALLS = [
     id: "c4",
     contactId: "4",
     name: "Diana Ross",
-    avatar: avatarUrl("diana-ross"),
+    avatarEmoji: "👩🏿",
     type: "incoming",
     callType: "voice",
     timestamp: "Mon",
@@ -221,7 +218,7 @@ export const MOCK_CALLS = [
     id: "c5",
     contactId: "1",
     name: "Design Team",
-    avatar: avatarUrl("design-team"),
+    avatarEmoji: "🎨",
     type: "outgoing",
     callType: "video",
     timestamp: "Sun",
@@ -231,7 +228,7 @@ export const MOCK_CALLS = [
     id: "c6",
     contactId: "6",
     name: "Fiona Apple",
-    avatar: avatarUrl("fiona-apple"),
+    avatarEmoji: "👩🏼‍🎤",
     type: "missed",
     callType: "video",
     timestamp: "Sat",
@@ -239,14 +236,14 @@ export const MOCK_CALLS = [
   },
 ];
 
-const baseMessages = (peerName, peerAvatar) => [
+const baseMessages = (peerName, peerEmoji) => [
   {
     id: "m1",
     message: `Hey! Good to connect with you.`,
     username: peerName,
     timestamp: "9:00 AM",
     type: "received",
-    avatar: peerAvatar,
+    avatarEmoji: peerEmoji,
   },
   {
     id: "m2",
@@ -254,7 +251,7 @@ const baseMessages = (peerName, peerAvatar) => [
     username: "You",
     timestamp: "9:02 AM",
     type: "sent",
-    avatar: MOCK_USER.avatar,
+    avatarEmoji: MOCK_USER.avatarEmoji,
   },
   {
     id: "m3",
@@ -262,7 +259,7 @@ const baseMessages = (peerName, peerAvatar) => [
     username: peerName,
     timestamp: "9:05 AM",
     type: "received",
-    avatar: peerAvatar,
+    avatarEmoji: peerEmoji,
   },
   {
     id: "m4",
@@ -270,7 +267,7 @@ const baseMessages = (peerName, peerAvatar) => [
     username: "You",
     timestamp: "9:07 AM",
     type: "sent",
-    avatar: MOCK_USER.avatar,
+    avatarEmoji: MOCK_USER.avatarEmoji,
   },
   {
     id: "m5",
@@ -278,12 +275,12 @@ const baseMessages = (peerName, peerAvatar) => [
     username: peerName,
     timestamp: "9:10 AM",
     type: "received",
-    avatar: peerAvatar,
+    avatarEmoji: peerEmoji,
   },
 ];
 
 const buildThread = (conv) => {
-  const prior = baseMessages(conv.name, conv.avatar).slice(0, -1);
+  const prior = baseMessages(conv.name, conv.avatarEmoji).slice(0, -1);
   return [
     ...prior,
     {
@@ -292,7 +289,7 @@ const buildThread = (conv) => {
       timestamp: conv.timestamp,
       type: "received",
       username: conv.lastMessageSender || conv.name,
-      avatar: conv.avatar,
+      avatarEmoji: conv.avatarEmoji,
     },
   ];
 };
@@ -304,7 +301,7 @@ const buildLennyThread = (conv) => [
     username: "Lenny",
     timestamp: "now",
     type: "received",
-    avatar: avatarUrl("lenny-ai"),
+    avatarEmoji: conv.avatarEmoji,
   },
   {
     id: `m-last-${conv.id}`,
@@ -312,7 +309,7 @@ const buildLennyThread = (conv) => [
     timestamp: conv.timestamp,
     type: "received",
     username: "Lenny",
-    avatar: avatarUrl("lenny-ai"),
+    avatarEmoji: conv.avatarEmoji,
   },
 ];
 
@@ -335,7 +332,7 @@ export const getProfileForId = (id) => {
     return {
       id: conversation.id,
       name: conversation.name,
-      avatar: conversation.avatar,
+      avatarEmoji: conversation.avatarEmoji,
       isOnline: conversation.isOnline,
       isGroup: conversation.isGroup,
       phoneNumber: matchedContact?.phoneNumber,
@@ -347,4 +344,4 @@ export const getProfileForId = (id) => {
 };
 
 export const getMessagesForConversation = (id) =>
-  MOCK_MESSAGES[id] || baseMessages("Contact", avatarUrl(id));
+  MOCK_MESSAGES[id] || baseMessages("Contact", "👤");

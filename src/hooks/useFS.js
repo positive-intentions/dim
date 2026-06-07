@@ -24,11 +24,10 @@ export function useFS(options = {}, hooks) {
   useEffect(() => {
     if (encrypt) {
       if (!encryptionPassword) {
-        console.error(
+        throw new Error(
           'useFS: encryption enabled but no `encryptionPassword` was provided. ' +
-          'Files will NOT be encrypted. Provide an explicit key to enable encryption.'
+          'Pass an explicit key when `encrypt` is true.'
         );
-        return;
       }
       // Dynamically import CryptoManager to avoid circular dependencies
       import('../core/crypto-manager.js').then(({ default: CryptoManager }) => {

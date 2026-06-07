@@ -1,6 +1,7 @@
 import { define, html, css, useState, useStyle, useStore } from "../../../core/dim.ts";
 import { appVariables, avatarStyles } from "./sharedStyles.js";
 import { MOCK_USER, MOCK_CONTACTS } from "./mockData.js";
+import { renderAvatar } from "./renderAvatar.js";
 import "./NavigationView.js";
 import "./ContactsDrawer.js";
 
@@ -77,8 +78,8 @@ const MessagingAppDemo = (props, { useState, useStyle, useStore, html, css }) =>
       width: 40px;
       height: 40px;
       border-radius: 10px;
-      object-fit: cover;
       margin-bottom: 1.5rem;
+      font-size: 1.5rem;
     }
 
     .sidebar-tab {
@@ -256,11 +257,11 @@ const MessagingAppDemo = (props, { useState, useStyle, useStore, html, css }) =>
   return html`
     <div class="messaging-app">
       <nav class="sidebar">
-        <img
-          class="sidebar-logo"
-          src="${MOCK_USER.avatar}"
-          alt="Enkrypted Chat"
-        />
+        ${renderAvatar(html, {
+          emoji: "💬",
+          className: "sidebar-logo emoji-avatar",
+          label: "Enkrypted Chat",
+        })}
         ${TABS.map((tab) => renderTabButton(tab, "sidebar-tab"))}
       </nav>
 
@@ -269,11 +270,11 @@ const MessagingAppDemo = (props, { useState, useStyle, useStore, html, css }) =>
           <h1 class="app-header-title">Enkrypted Chat</h1>
           <div class="header-user">
             <span>${MOCK_USER.name}</span>
-            <img
-              class="avatar avatar-sm"
-              src="${MOCK_USER.avatar}"
-              alt="${MOCK_USER.name}"
-            />
+            ${renderAvatar(html, {
+              emoji: MOCK_USER.avatarEmoji,
+              className: "avatar avatar-sm",
+              label: MOCK_USER.name,
+            })}
           </div>
         </header>
 

@@ -1,5 +1,6 @@
 import { define, html, css, useState, useStyle } from "../../../core/dim.ts";
 import { appVariables, avatarStyles } from "./sharedStyles.js";
+import { renderAvatar } from "./renderAvatar.js";
 
 const ContactsDrawer = (props, { useState, useStyle, html, css }) => {
   const data = props.props || props;
@@ -156,11 +157,10 @@ const ContactsDrawer = (props, { useState, useStyle, html, css }) => {
                 @click="${() => onSelect?.(contact.id)}"
               >
                 <div class="avatar-wrap">
-                  <img
-                    class="avatar"
-                    src="${contact.avatar}"
-                    alt="${contact.name}"
-                  />
+                  ${renderAvatar(html, {
+                    emoji: contact.avatarEmoji,
+                    label: contact.name,
+                  })}
                   ${contact.isOnline
                     ? html`<span class="online-dot"></span>`
                     : ""}

@@ -25,7 +25,7 @@ const resolveChatTarget = (id) => {
   return {
     id: contact.id,
     name: contact.name,
-    avatar: contact.avatar,
+    avatarEmoji: contact.avatarEmoji,
     isOnline: contact.isOnline,
     isGroup: false,
   };

@@ -1,5 +1,20 @@
 import React from "react";
-import { define, html, css, useState, useEffect, useStyle, useScope, useMemo, useRef, useStore, unsafeCSS } from "../core/dim.ts";
+import {
+  define,
+  html,
+  css,
+  useState,
+  useEffect,
+  useStyle,
+  useScope,
+  useMemo,
+  useRef,
+  useStore,
+  useViewTransition,
+  viewTransitionStyles,
+  unsafeCSS,
+} from "../core/dim.ts";
+import { useDimStore } from "../hooks/useDimStore.ts";
 
 // useState Demo
 const UseStateDemo = (props, { useState, html, css, useStyle }) => {
@@ -538,6 +553,102 @@ const UseStoreDemo = (props, { html, css, useStyle, useStore, useState }) => {
   `;
 };
 
+// useViewTransition Demo
+const UseViewTransitionDemo = (props, { useState, useStyle, useViewTransition, html, css }) => {
+  const [page, setPage] = useState(0);
+  const transition = useViewTransition(page.toString(), { duration: 400 });
+
+  useStyle(css`
+    ${viewTransitionStyles}
+    .vt-demo {
+      padding: 2rem;
+      border: 2px solid #029cfd;
+      border-radius: 8px;
+      min-width: 280px;
+    }
+    .vt-panel {
+      padding: 1rem;
+      min-height: 80px;
+    }
+    .vt-nav {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    button {
+      background: #029cfd;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  `);
+
+  const titles = ["Home", "About", "Contact"];
+
+  return html`
+    <div class="vt-demo">
+      <div class="vt-nav">
+        ${titles.map(
+          (_, i) => html`
+            <button
+              ?disabled="${transition.isTransitioning}"
+              @click="${() => setPage(i)}"
+            >
+              ${titles[i]}
+            </button>
+          `
+        )}
+      </div>
+      <div class="${transition.getIncomingClass("vt-panel")}">
+        <h3>${titles[page]}</h3>
+        <p>Page index: ${page} · Direction: ${transition.direction}</p>
+      </div>
+    </div>
+  `;
+};
+
+const UseDimStoreReactDemo = () => {
+  const [note, setNote, isLoading] = useDimStore({
+    key: "api-ref-demo-note",
+    password: "api-ref-demo-key",
+    defaultValue: "",
+  });
+
+  if (isLoading) {
+    return React.createElement("p", null, "Loading encrypted store…");
+  }
+
+  return React.createElement(
+    "div",
+    {
+      style: {
+        padding: "2rem",
+        border: "2px solid #029cfd",
+        borderRadius: "8px",
+        minWidth: "280px",
+      },
+    },
+    React.createElement("p", null, "React useDimStore (encrypted IndexedDB)"),
+    React.createElement("input", {
+      value: note,
+      onChange: (e) => setNote(e.target.value),
+      placeholder: "Persisted note…",
+      style: { width: "100%", padding: "0.5rem", marginBottom: "0.5rem" },
+    }),
+    React.createElement(
+      "small",
+      null,
+      "Shares DimDatabase with useStore when keys and encryption keys match."
+    )
+  );
+};
+
 // Define components
 define({ tag: 'usestate-demo', component: UseStateDemo });
 define({ tag: 'useeffect-demo', component: UseEffectDemo });
@@ -546,6 +657,7 @@ define({ tag: 'usescope-demo', component: UseScopeDemo });
 define({ tag: 'usememo-demo', component: UseMemoDemo });
 define({ tag: 'useref-demo', component: UseRefDemo });
 define({ tag: 'usestore-demo', component: UseStoreDemo });
+define({ tag: 'useviewtransition-demo', component: UseViewTransitionDemo });
 
 export default {
   title: "API Reference",
@@ -567,6 +679,8 @@ Dim provides React-like hooks for building functional web components:
 - **useMemo** - Memoized computations
 - **useRef** - DOM references and mutable values
 - **useStore** - Global persistent state
+- **useViewTransition** - Slide transitions between UI states
+- **useDimStore** - React bridge to encrypted IndexedDB (see dedicated story)
 
 Each hook includes live examples and detailed documentation below.
         `
@@ -983,9 +1097,77 @@ const [posts, setPosts] = store.data.posts;
 1. Use for truly global state (user auth, app settings)
 2. Keep local state in useState when possible  
 3. Structure store logically by feature/domain
-4. Don't store sensitive data (it's persisted to localStorage)
+4. Don't store sensitive data without \`encryptionKey\` when persistence is enabled
+5. Loading tuples: \`[value, setter, isLoading, setIsLoading]\` on each leaf key
         `
       }
     }
   }
+};
+
+export const UseViewTransition = {
+  render: () => React.createElement("useviewtransition-demo"),
+  name: "useViewTransition",
+  parameters: {
+    docs: {
+      description: {
+        story: `
+Animates between UI states with horizontal slides. Also available declaratively via the \`transitionId\` prop on any component (see view transitions tutorial).
+
+### Manual hook
+
+\`\`\`javascript
+const transition = useViewTransition(pageIndex.toString(), {
+  duration: 400,
+  autoDirection: true,
+});
+
+return html\`
+  <div class="\${transition.getIncomingClass('panel')}">
+    \${content}
+  </div>
+\`;
+\`\`\`
+
+### Auto mode
+
+\`\`\`javascript
+html\`<screen-host transitionId="\${viewId}" .props=\${{ viewId }}></screen-host>\`
+\`\`\`
+
+Import \`viewTransitionStyles\` and pass to \`useStyle\` for base slide CSS. Pair with \`data-vt-shared\` for FLIP shared-element morphs.
+        `,
+      },
+    },
+  },
+};
+
+export const UseDimStore = {
+  render: () => React.createElement(UseDimStoreReactDemo),
+  name: "useDimStore (React)",
+  parameters: {
+    docs: {
+      description: {
+        story: `
+React hook for reading/writing Dim's encrypted IndexedDB store from non-web-component UI.
+
+### Usage
+
+\`\`\`javascript
+import { useDimStore } from '../hooks/useDimStore.ts';
+
+const [value, setValue, isLoading] = useDimStore({
+  key: 'user.name',
+  password: 'required-encryption-key',
+  defaultValue: '',
+});
+\`\`\`
+
+- **password** is required (no default)
+- **key** must match \`useStore\` leaf paths for cross-framework sync
+- Returns \`[value, setValue, isLoading]\`
+        `,
+      },
+    },
+  },
 };

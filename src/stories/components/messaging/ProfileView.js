@@ -1,5 +1,6 @@
 import { define, html, css, useStyle } from "../../../core/dim.ts";
 import { appVariables, avatarStyles } from "./sharedStyles.js";
+import { renderAvatar } from "./renderAvatar.js";
 
 const ProfileView = (props, { useStyle, html, css }) => {
   const data = props.props || props;
@@ -111,12 +112,12 @@ const ProfileView = (props, { useStyle, html, css }) => {
   return html`
     <div class="profile-view">
       <div class="profile-hero">
-        <img
-          class="avatar avatar-lg"
-          src="${user.avatar}"
-          alt="${user.name}"
-          style="margin: 0 auto;"
-        />
+        ${renderAvatar(html, {
+          emoji: user.avatarEmoji,
+          className: "avatar avatar-lg",
+          label: user.name,
+          style: "margin: 0 auto;",
+        })}
         <h2 class="profile-name">${user.name}</h2>
         <p class="profile-status">${user.status || "Available"}</p>
       </div>

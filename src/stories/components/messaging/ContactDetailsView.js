@@ -1,6 +1,7 @@
 import { define, html, css, useStyle } from "../../../core/dim.ts";
 import { appVariables, avatarStyles } from "./sharedStyles.js";
 import { sharedKeys } from "./sharedKeys.js";
+import { renderAvatar } from "./renderAvatar.js";
 
 const ContactDetailsView = (props, { useStyle, html, css }) => {
   const data = props.props || props;
@@ -126,13 +127,13 @@ const ContactDetailsView = (props, { useStyle, html, css }) => {
       </header>
 
       <div class="details-hero">
-        <img
-          class="avatar avatar-lg"
-          src="${contact.avatar}"
-          alt="${contact.name}"
-          style="margin: 0 auto;"
-          data-vt-shared="${keys.avatar}"
-        />
+        ${renderAvatar(html, {
+          emoji: contact.avatarEmoji,
+          className: "avatar avatar-lg",
+          vtShared: keys.avatar,
+          label: contact.name,
+          style: "margin: 0 auto;",
+        })}
         <h2 class="details-name" data-vt-shared="${keys.name}">${contact.name}</h2>
         <p class="details-status" data-vt-shared="${keys.status}">${statusText}</p>
       </div>

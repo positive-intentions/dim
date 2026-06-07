@@ -1,6 +1,7 @@
 import { define, html, css, useStyle } from "../../../core/dim.ts";
 import { appVariables, avatarStyles } from "./sharedStyles.js";
 import { sharedKeys } from "./sharedKeys.js";
+import { renderAvatar } from "./renderAvatar.js";
 
 const callTypeIcon = (call) => {
   if (call.type === "missed") return "📵";
@@ -124,12 +125,11 @@ const CallsListView = (props, { useStyle, html, css }) => {
               class="call-row ${call.type}"
               @click="${() => onCallClick?.(call.contactId)}"
             >
-              <img
-                class="avatar"
-                src="${call.avatar}"
-                alt="${call.name}"
-                data-vt-shared="${keys.avatar}"
-              />
+              ${renderAvatar(html, {
+                emoji: call.avatarEmoji,
+                vtShared: keys.avatar,
+                label: call.name,
+              })}
               <div class="call-body">
                 <div class="call-name" data-vt-shared="${keys.name}">${call.name}</div>
                 <div class="call-meta">

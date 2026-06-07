@@ -1,5 +1,6 @@
 import { define, html, css, useStyle } from "../../../core/dim.ts";
 import { appVariables, avatarStyles } from "./sharedStyles.js";
+import { renderAvatar } from "./renderAvatar.js";
 
 const TABS = [
   { id: 0, label: "Chats", icon: "💬" },
@@ -44,8 +45,8 @@ const AppChrome = (props, { useStyle, html, css }) => {
       width: 40px;
       height: 40px;
       border-radius: 10px;
-      object-fit: cover;
       margin-bottom: 1.5rem;
+      font-size: 1.5rem;
     }
 
     .sidebar-tab {
@@ -171,11 +172,11 @@ const AppChrome = (props, { useStyle, html, css }) => {
   return html`
     <div class="app-chrome">
       <nav class="sidebar">
-        <img
-          class="sidebar-logo"
-          src="${user.avatar}"
-          alt="${appTitle}"
-        />
+        ${renderAvatar(html, {
+          emoji: "💬",
+          className: "sidebar-logo emoji-avatar",
+          label: appTitle,
+        })}
         ${TABS.map((tab) => renderTabButton(tab, "sidebar-tab"))}
       </nav>
 
@@ -184,7 +185,11 @@ const AppChrome = (props, { useStyle, html, css }) => {
           <h1 class="app-header-title">${appTitle}</h1>
           <div class="header-user">
             <span>${user.name}</span>
-            <img class="avatar avatar-sm" src="${user.avatar}" alt="${user.name}" />
+            ${renderAvatar(html, {
+              emoji: user.avatarEmoji,
+              className: "avatar avatar-sm",
+              label: user.name,
+            })}
           </div>
         </header>
 

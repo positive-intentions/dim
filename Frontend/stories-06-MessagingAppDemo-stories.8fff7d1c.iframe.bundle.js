@@ -48,6 +48,14 @@
     background: var(--app-primary-light);
   }
 
+  .avatar.emoji-avatar.avatar-sm {
+    font-size: 1rem;
+  }
+
+  .avatar.emoji-avatar.avatar-lg {
+    font-size: 1.75rem;
+  }
+
   .online-dot {
     position: absolute;
     bottom: 1px;
@@ -58,7 +66,16 @@
     background: var(--app-online);
     border: 2px solid var(--app-surface);
   }
-`,avatarUrl=seed=>`https://i.pravatar.cc/150?u=${encodeURIComponent(seed)}`,MOCK_USER={id:"me",name:"Alex Morgan",email:"alex.morgan@example.com",phone:"+1 555 010 2000",avatar:avatarUrl("alex-morgan"),status:"Available"},MOCK_CONVERSATIONS=[{id:"lenny-ai",name:"Lenny",lastMessage:"Hello! I'm here to help.",lastMessageSender:"Lenny",timestamp:"now",unreadCount:0,avatar:avatarUrl("lenny-ai"),avatarEmoji:"🤖",isOnline:!0,isGroup:!1,isPinned:!0,isMuted:!1,type:"active"},{id:"1",name:"Design Team",lastMessage:"The new mockups look amazing! 🎨",lastMessageSender:"Alice",timestamp:"2 min ago",unreadCount:3,avatar:avatarUrl("design-team"),isOnline:!0,isGroup:!0,isPinned:!0,isMuted:!1,members:8,type:"active"},{id:"2",name:"Alice Johnson",lastMessage:"Can we schedule the meeting for tomorrow?",lastMessageSender:"Alice",timestamp:"15 min ago",unreadCount:1,avatar:avatarUrl("alice-johnson"),isOnline:!0,isGroup:!1,isPinned:!1,isMuted:!1,type:"active"},{id:"3",name:"Project Alpha",lastMessage:"Documentation has been updated",lastMessageSender:"Bob",timestamp:"1 hour ago",unreadCount:0,avatar:avatarUrl("project-alpha"),isOnline:!1,isGroup:!0,isPinned:!0,isMuted:!0,members:12,type:"active"},{id:"4",name:"Bob Designer",lastMessage:"Thanks for the feedback! 👍",lastMessageSender:"Bob",timestamp:"3 hours ago",unreadCount:0,avatar:avatarUrl("bob-designer"),isOnline:!1,isGroup:!1,isPinned:!1,isMuted:!1,type:"active"},{id:"5",name:"Charlie Smith",lastMessage:"I'll send the files by EOD.",lastMessageSender:"Charlie",timestamp:"5 hours ago",unreadCount:2,avatar:avatarUrl("charlie-smith"),isOnline:!1,isGroup:!1,isPinned:!1,isMuted:!1,type:"active"},{id:"6",name:"Marketing Team",lastMessage:"Campaign launch is tomorrow 🚀",lastMessageSender:"Dana",timestamp:"Yesterday",unreadCount:0,avatar:avatarUrl("marketing-team"),isOnline:!0,isGroup:!0,isPinned:!1,isMuted:!1,members:6,type:"active"}],MOCK_CONTACTS=[{id:"1",name:"Alice Johnson",phoneNumber:"+1 234 567 8901",email:"alice@example.com",avatar:avatarUrl("alice-johnson"),isOnline:!0,isFavorite:!0},{id:"2",name:"Bob Smith",email:"bob.smith@example.com",avatar:avatarUrl("bob-smith"),isRecent:!0},{id:"3",name:"Charlie Brown",phoneNumber:"+1 234 567 8903",avatar:avatarUrl("charlie-brown"),isFavorite:!0},{id:"4",name:"Diana Ross",phoneNumber:"+1 234 567 8904",email:"diana@example.com",avatar:avatarUrl("diana-ross"),isOnline:!0,isRecent:!0},{id:"5",name:"Edward Norton",phoneNumber:"+1 234 567 8905",avatar:avatarUrl("edward-norton"),lastSeen:"Yesterday"},{id:"6",name:"Fiona Apple",email:"fiona@example.com",avatar:avatarUrl("fiona-apple"),isOnline:!0},{id:"7",name:"George Michael",phoneNumber:"+1 234 567 8907",avatar:avatarUrl("george-michael"),isRecent:!0},{id:"8",name:"Helen Hunt",phoneNumber:"+1 234 567 8908",avatar:avatarUrl("helen-hunt")}],MOCK_CALLS=[{id:"c1",contactId:"2",name:"Alice Johnson",avatar:avatarUrl("alice-johnson"),type:"incoming",callType:"video",timestamp:"10:32 AM",duration:"12:45"},{id:"c2",contactId:"4",name:"Bob Designer",avatar:avatarUrl("bob-designer"),type:"outgoing",callType:"voice",timestamp:"Yesterday",duration:"3:21"},{id:"c3",contactId:"5",name:"Charlie Smith",avatar:avatarUrl("charlie-smith"),type:"missed",callType:"voice",timestamp:"Yesterday",duration:null},{id:"c4",contactId:"4",name:"Diana Ross",avatar:avatarUrl("diana-ross"),type:"incoming",callType:"voice",timestamp:"Mon",duration:"8:02"},{id:"c5",contactId:"1",name:"Design Team",avatar:avatarUrl("design-team"),type:"outgoing",callType:"video",timestamp:"Sun",duration:"45:10"},{id:"c6",contactId:"6",name:"Fiona Apple",avatar:avatarUrl("fiona-apple"),type:"missed",callType:"video",timestamp:"Sat",duration:null}],baseMessages=(peerName,peerAvatar)=>[{id:"m1",message:"Hey! Good to connect with you.",username:peerName,timestamp:"9:00 AM",type:"received",avatar:peerAvatar},{id:"m2",message:"Hi! How are things going on your end?",username:"You",timestamp:"9:02 AM",type:"sent",avatar:MOCK_USER.avatar},{id:"m3",message:"Pretty busy but making good progress on the project.",username:peerName,timestamp:"9:05 AM",type:"received",avatar:peerAvatar},{id:"m4",message:"That's great to hear. Let me know if you need anything.",username:"You",timestamp:"9:07 AM",type:"sent",avatar:MOCK_USER.avatar},{id:"m5",message:"Will do — thanks! 👍",username:peerName,timestamp:"9:10 AM",type:"received",avatar:peerAvatar}],buildThread=conv=>[...baseMessages(conv.name,conv.avatar).slice(0,-1),{id:`m-last-${conv.id}`,message:conv.lastMessage,timestamp:conv.timestamp,type:"received",username:conv.lastMessageSender||conv.name,avatar:conv.avatar}],buildLennyThread=conv=>[{id:"la1",message:"Hello! I'm Lenny, your AI assistant.",username:"Lenny",timestamp:"now",type:"received",avatar:avatarUrl("lenny-ai")},{id:`m-last-${conv.id}`,message:conv.lastMessage,timestamp:conv.timestamp,type:"received",username:"Lenny",avatar:avatarUrl("lenny-ai")}],MOCK_MESSAGES=Object.fromEntries(MOCK_CONVERSATIONS.map((conv=>[conv.id,"lenny-ai"===conv.id?buildLennyThread(conv):buildThread(conv)]))),getConversationById=id=>MOCK_CONVERSATIONS.find((c=>c.id===id)),getContactById=id=>MOCK_CONTACTS.find((c=>c.id===id)),sharedKeys=id=>({avatar:`avatar-${id}`,name:`name-${id}`,lastMessage:`lastMessage-${id}`,timestamp:`timestamp-${id}`,status:`status-${id}`,online:`online-${id}`}),ConversationListView=(props,{useState,useStyle,html,css})=>{const data=props.props||props,{conversations=[],onConversationClick,onOpenContacts}=data,[search,setSearch]=useState(""),[filter,setFilter]=useState("all");useStyle(css`
+`,MOCK_USER={id:"me",name:"Alex Morgan",email:"alex.morgan@example.com",phone:"+1 555 010 2000",avatarEmoji:"🧑🏽‍💼",status:"Available"},MOCK_CONVERSATIONS=[{id:"lenny-ai",name:"Lenny",lastMessage:"Hello! I'm here to help.",lastMessageSender:"Lenny",timestamp:"now",unreadCount:0,avatarEmoji:"🤖",isOnline:!0,isGroup:!1,isPinned:!0,isMuted:!1,type:"active"},{id:"1",name:"Design Team",lastMessage:"The new mockups look amazing! 🎨",lastMessageSender:"Alice",timestamp:"2 min ago",unreadCount:3,avatarEmoji:"🎨",isOnline:!0,isGroup:!0,isPinned:!0,isMuted:!1,members:8,type:"active"},{id:"2",name:"Alice Johnson",lastMessage:"Can we schedule the meeting for tomorrow?",lastMessageSender:"Alice",timestamp:"15 min ago",unreadCount:1,avatarEmoji:"👩🏼",isOnline:!0,isGroup:!1,isPinned:!1,isMuted:!1,type:"active"},{id:"3",name:"Project Alpha",lastMessage:"Documentation has been updated",lastMessageSender:"Bob",timestamp:"1 hour ago",unreadCount:0,avatarEmoji:"🚀",isOnline:!1,isGroup:!0,isPinned:!0,isMuted:!0,members:12,type:"active"},{id:"4",name:"Bob Designer",lastMessage:"Thanks for the feedback! 👍",lastMessageSender:"Bob",timestamp:"3 hours ago",unreadCount:0,avatarEmoji:"👨🏻‍🎨",isOnline:!1,isGroup:!1,isPinned:!1,isMuted:!1,type:"active"},{id:"5",name:"Charlie Smith",lastMessage:"I'll send the files by EOD.",lastMessageSender:"Charlie",timestamp:"5 hours ago",unreadCount:2,avatarEmoji:"👨🏾‍💻",isOnline:!1,isGroup:!1,isPinned:!1,isMuted:!1,type:"active"},{id:"6",name:"Marketing Team",lastMessage:"Campaign launch is tomorrow 🚀",lastMessageSender:"Dana",timestamp:"Yesterday",unreadCount:0,avatarEmoji:"📣",isOnline:!0,isGroup:!0,isPinned:!1,isMuted:!1,members:6,type:"active"}],MOCK_CONTACTS=[{id:"1",name:"Alice Johnson",phoneNumber:"+1 234 567 8901",email:"alice@example.com",avatarEmoji:"👩🏼",isOnline:!0,isFavorite:!0},{id:"2",name:"Bob Smith",email:"bob.smith@example.com",avatarEmoji:"👨🏽",isRecent:!0},{id:"3",name:"Charlie Brown",phoneNumber:"+1 234 567 8903",avatarEmoji:"👦🏻",isFavorite:!0},{id:"4",name:"Diana Ross",phoneNumber:"+1 234 567 8904",email:"diana@example.com",avatarEmoji:"👩🏿",isOnline:!0,isRecent:!0},{id:"5",name:"Edward Norton",phoneNumber:"+1 234 567 8905",avatarEmoji:"👨🏻",lastSeen:"Yesterday"},{id:"6",name:"Fiona Apple",email:"fiona@example.com",avatarEmoji:"👩🏼‍🎤",isOnline:!0},{id:"7",name:"George Michael",phoneNumber:"+1 234 567 8907",avatarEmoji:"👨🏼",isRecent:!0},{id:"8",name:"Helen Hunt",phoneNumber:"+1 234 567 8908",avatarEmoji:"👩🏻‍⚕️"}],MOCK_CALLS=[{id:"c1",contactId:"2",name:"Alice Johnson",avatarEmoji:"👩🏼",type:"incoming",callType:"video",timestamp:"10:32 AM",duration:"12:45"},{id:"c2",contactId:"4",name:"Bob Designer",avatarEmoji:"👨🏻‍🎨",type:"outgoing",callType:"voice",timestamp:"Yesterday",duration:"3:21"},{id:"c3",contactId:"5",name:"Charlie Smith",avatarEmoji:"👨🏾‍💻",type:"missed",callType:"voice",timestamp:"Yesterday",duration:null},{id:"c4",contactId:"4",name:"Diana Ross",avatarEmoji:"👩🏿",type:"incoming",callType:"voice",timestamp:"Mon",duration:"8:02"},{id:"c5",contactId:"1",name:"Design Team",avatarEmoji:"🎨",type:"outgoing",callType:"video",timestamp:"Sun",duration:"45:10"},{id:"c6",contactId:"6",name:"Fiona Apple",avatarEmoji:"👩🏼‍🎤",type:"missed",callType:"video",timestamp:"Sat",duration:null}],baseMessages=(peerName,peerEmoji)=>[{id:"m1",message:"Hey! Good to connect with you.",username:peerName,timestamp:"9:00 AM",type:"received",avatarEmoji:peerEmoji},{id:"m2",message:"Hi! How are things going on your end?",username:"You",timestamp:"9:02 AM",type:"sent",avatarEmoji:MOCK_USER.avatarEmoji},{id:"m3",message:"Pretty busy but making good progress on the project.",username:peerName,timestamp:"9:05 AM",type:"received",avatarEmoji:peerEmoji},{id:"m4",message:"That's great to hear. Let me know if you need anything.",username:"You",timestamp:"9:07 AM",type:"sent",avatarEmoji:MOCK_USER.avatarEmoji},{id:"m5",message:"Will do — thanks! 👍",username:peerName,timestamp:"9:10 AM",type:"received",avatarEmoji:peerEmoji}],buildThread=conv=>[...baseMessages(conv.name,conv.avatarEmoji).slice(0,-1),{id:`m-last-${conv.id}`,message:conv.lastMessage,timestamp:conv.timestamp,type:"received",username:conv.lastMessageSender||conv.name,avatarEmoji:conv.avatarEmoji}],buildLennyThread=conv=>[{id:"la1",message:"Hello! I'm Lenny, your AI assistant.",username:"Lenny",timestamp:"now",type:"received",avatarEmoji:conv.avatarEmoji},{id:`m-last-${conv.id}`,message:conv.lastMessage,timestamp:conv.timestamp,type:"received",username:"Lenny",avatarEmoji:conv.avatarEmoji}],MOCK_MESSAGES=Object.fromEntries(MOCK_CONVERSATIONS.map((conv=>[conv.id,"lenny-ai"===conv.id?buildLennyThread(conv):buildThread(conv)]))),getConversationById=id=>MOCK_CONVERSATIONS.find((c=>c.id===id)),getContactById=id=>MOCK_CONTACTS.find((c=>c.id===id)),renderAvatar=(html,{emoji="👤",className="avatar",vtShared,label,style})=>html`
+  <div
+    class="${className} emoji-avatar"
+    ${vtShared?html`data-vt-shared="${vtShared}"`:""}
+    ${label?html`aria-label="${label}" role="img"`:""}
+    ${style?html`style="${style}"`:""}
+  >
+    ${emoji}
+  </div>
+`,sharedKeys=id=>({avatar:`avatar-${id}`,name:`name-${id}`,lastMessage:`lastMessage-${id}`,timestamp:`timestamp-${id}`,status:`status-${id}`,online:`online-${id}`}),ConversationListView=(props,{useState,useStyle,html,css})=>{const data=props.props||props,{conversations=[],onConversationClick,onOpenContacts}=data,[search,setSearch]=useState(""),[filter,setFilter]=useState("all");useStyle(css`
     ${appVariables}
     ${avatarStyles}
 
@@ -246,21 +263,7 @@
                 @click="${()=>onConversationClick?.(conv.id)}"
               >
                 <div class="avatar-wrap">
-                  ${(conv=>{const keys=sharedKeys(conv.id);return conv.avatarEmoji?html`
-        <div
-          class="avatar emoji-avatar"
-          data-vt-shared="${keys.avatar}"
-        >
-          ${conv.avatarEmoji}
-        </div>
-      `:html`
-      <img
-        class="avatar"
-        src="${conv.avatar}"
-        alt="${conv.name}"
-        data-vt-shared="${keys.avatar}"
-      />
-    `})(conv)}
+                  ${(conv=>{const keys=sharedKeys(conv.id);return renderAvatar(html,{emoji:conv.avatarEmoji,vtShared:keys.avatar,label:conv.name})})(conv)}
                   ${conv.isOnline?html`<span class="online-dot" data-vt-shared="${keys.online}"></span>`:""}
                 </div>
                 <div class="conv-body">
@@ -460,18 +463,7 @@
           @click="${()=>onAvatarClick?.(conversation.id)}"
         >
           <div class="avatar-wrap">
-            ${conversation.avatarEmoji?html`
-        <div class="avatar avatar-sm emoji-avatar" data-vt-shared="${keys.avatar}">
-          ${conversation.avatarEmoji}
-        </div>
-      `:html`
-      <img
-        class="avatar avatar-sm"
-        src="${conversation.avatar}"
-        alt="${conversation.name}"
-        data-vt-shared="${keys.avatar}"
-      />
-    `}
+            ${renderAvatar(html,{emoji:conversation.avatarEmoji,className:"avatar avatar-sm",vtShared:keys.avatar,label:conversation.name})}
             ${conversation.isOnline?html`<span class="online-dot" data-vt-shared="${keys.online}"></span>`:""}
           </div>
         </button>
@@ -489,13 +481,7 @@
       <div class="messages">
         ${messages.map(((msg,index)=>{const isLast=index===messages.length-1;return html`
             <div class="message-row ${msg.type}">
-              ${"received"===msg.type?html`
-                    <img
-                      class="avatar avatar-sm"
-                      src="${msg.avatar}"
-                      alt="${msg.username}"
-                    />
-                  `:""}
+              ${"received"===msg.type?renderAvatar(html,{emoji:msg.avatarEmoji,className:"avatar avatar-sm",label:msg.username}):""}
               <div>
                 ${isLast?html`
                       <div class="bubble" data-vt-shared="${keys.lastMessage}">
@@ -626,12 +612,7 @@
               class="call-row ${call.type}"
               @click="${()=>onCallClick?.(call.contactId)}"
             >
-              <img
-                class="avatar"
-                src="${call.avatar}"
-                alt="${call.name}"
-                data-vt-shared="${keys.avatar}"
-              />
+              ${renderAvatar(html,{emoji:call.avatarEmoji,vtShared:keys.avatar,label:call.name})}
               <div class="call-body">
                 <div class="call-name" data-vt-shared="${keys.name}">${call.name}</div>
                 <div class="call-meta">
@@ -752,12 +733,7 @@
   `),html`
     <div class="profile-view">
       <div class="profile-hero">
-        <img
-          class="avatar avatar-lg"
-          src="${user.avatar}"
-          alt="${user.name}"
-          style="margin: 0 auto;"
-        />
+        ${renderAvatar(html,{emoji:user.avatarEmoji,className:"avatar avatar-lg",label:user.name,style:"margin: 0 auto;"})}
         <h2 class="profile-name">${user.name}</h2>
         <p class="profile-status">${user.status||"Available"}</p>
       </div>
@@ -899,13 +875,7 @@
       </header>
 
       <div class="details-hero">
-        <img
-          class="avatar avatar-lg"
-          src="${contact.avatar}"
-          alt="${contact.name}"
-          style="margin: 0 auto;"
-          data-vt-shared="${keys.avatar}"
-        />
+        ${renderAvatar(html,{emoji:contact.avatarEmoji,className:"avatar avatar-lg",vtShared:keys.avatar,label:contact.name,style:"margin: 0 auto;"})}
         <h2 class="details-name" data-vt-shared="${keys.name}">${contact.name}</h2>
         <p class="details-status" data-vt-shared="${keys.status}">${statusText}</p>
       </div>
@@ -980,16 +950,16 @@
   `);const top=navStack[navStack.length-1]||"list";if(top.startsWith("contact:")){return html`
       <div class="nav-view-root">
         <contact-details-view
-          .props="${{contact:(id=>{const conversation=getConversationById(id);if(conversation){const matchedContact=MOCK_CONTACTS.find((c=>c.name===conversation.name));return{id:conversation.id,name:conversation.name,avatar:conversation.avatar,isOnline:conversation.isOnline,isGroup:conversation.isGroup,phoneNumber:matchedContact?.phoneNumber,email:matchedContact?.email,lastSeen:matchedContact?.lastSeen}}return getContactById(id)})(top.split(":")[1]),onBack:onContactBack,onMessage:onContactMessage}}"
+          .props="${{contact:(id=>{const conversation=getConversationById(id);if(conversation){const matchedContact=MOCK_CONTACTS.find((c=>c.name===conversation.name));return{id:conversation.id,name:conversation.name,avatarEmoji:conversation.avatarEmoji,isOnline:conversation.isOnline,isGroup:conversation.isGroup,phoneNumber:matchedContact?.phoneNumber,email:matchedContact?.email,lastSeen:matchedContact?.lastSeen}}return getContactById(id)})(top.split(":")[1]),onBack:onContactBack,onMessage:onContactMessage}}"
         ></contact-details-view>
       </div>
-    `}if(top.startsWith("chat:")){const chatId=top.split(":")[1],conversation=(id=>{const conversation=getConversationById(id);if(conversation)return conversation;const contact=getContactById(id);return contact?{id:contact.id,name:contact.name,avatar:contact.avatar,isOnline:contact.isOnline,isGroup:!1}:null})(chatId);return html`
+    `}if(top.startsWith("chat:")){const chatId=top.split(":")[1],conversation=(id=>{const conversation=getConversationById(id);if(conversation)return conversation;const contact=getContactById(id);return contact?{id:contact.id,name:contact.name,avatarEmoji:contact.avatarEmoji,isOnline:contact.isOnline,isGroup:!1}:null})(chatId);return html`
       <div class="nav-view-root">
         <chat-view
-          .props="${{conversation,messages:MOCK_MESSAGES[id=chatId]||baseMessages("Contact",avatarUrl(id)),onBack,onAvatarClick}}"
+          .props="${{conversation,messages:MOCK_MESSAGES[chatId]||baseMessages("Contact","👤"),onBack,onAvatarClick}}"
         ></chat-view>
       </div>
-    `}var id;return 1===activeTab?html`
+    `}return 1===activeTab?html`
       <div class="nav-view-root">
         <calls-list-view
           .props="${{calls:MOCK_CALLS,onCallClick}}"
@@ -1142,11 +1112,7 @@
                 @click="${()=>onSelect?.(contact.id)}"
               >
                 <div class="avatar-wrap">
-                  <img
-                    class="avatar"
-                    src="${contact.avatar}"
-                    alt="${contact.name}"
-                  />
+                  ${renderAvatar(html,{emoji:contact.avatarEmoji,label:contact.name})}
                   ${contact.isOnline?html`<span class="online-dot"></span>`:""}
                 </div>
                 <div>
@@ -1188,8 +1154,8 @@
       width: 40px;
       height: 40px;
       border-radius: 10px;
-      object-fit: cover;
       margin-bottom: 1.5rem;
+      font-size: 1.5rem;
     }
 
     .sidebar-tab {
@@ -1315,11 +1281,7 @@
   `;return html`
     <div class="messaging-app">
       <nav class="sidebar">
-        <img
-          class="sidebar-logo"
-          src="${MOCK_USER.avatar}"
-          alt="Enkrypted Chat"
-        />
+        ${renderAvatar(html,{emoji:"💬",className:"sidebar-logo emoji-avatar",label:"Enkrypted Chat"})}
         ${TABS.map((tab=>renderTabButton(tab,"sidebar-tab")))}
       </nav>
 
@@ -1328,11 +1290,7 @@
           <h1 class="app-header-title">Enkrypted Chat</h1>
           <div class="header-user">
             <span>${MOCK_USER.name}</span>
-            <img
-              class="avatar avatar-sm"
-              src="${MOCK_USER.avatar}"
-              alt="${MOCK_USER.name}"
-            />
+            ${renderAvatar(html,{emoji:MOCK_USER.avatarEmoji,className:"avatar avatar-sm",label:MOCK_USER.name})}
           </div>
         </header>
 
@@ -1356,4 +1314,4 @@
       ></contacts-drawer>
     </div>
   `};(0,dim.E8)({tag:"messaging-app-demo",component:MessagingAppDemo});const _06_MessagingAppDemo_stories={title:"Demo/Messaging App",parameters:{layout:"fullscreen",docs:{description:{component:"\n# Messaging App Demo\n\nA navigable messaging app UI built with the Dim framework, modeled after glitr-chat.\nAll data is hardcoded — no real messaging, P2P, or backend.\n\n## Features\n\n- **Conversation list** with search and filters\n- **Chat view** with exhaustive shared-element transitions\n- **Contacts drawer** for starting new conversations\n- **Calls** and **Profile** tabs\n- **Contact details** overlay from chat header\n\n## Page transitions\n\nUses Dim's automatic `transitionId` prop on `navigation-view` for page slides (right = forward, left = back).\n\n## Shared-element transitions (`data-vt-shared`)\n\nPer-conversation keys via `sharedKeys(id)`:\n\n| Key | List row | Chat | Calls row | Contact details |\n|-----|----------|------|-----------|-----------------|\n| `avatar-{id}` | Row avatar | Header avatar | Call avatar | Hero avatar |\n| `name-{id}` | Row name | Header name | Call name | Hero name |\n| `lastMessage-{id}` | Preview text | Last bubble | — | — |\n| `timestamp-{id}` | Row time | Last bubble time | — | — |\n| `online-{id}` | Online dot | Header dot | — | — |\n| `status-{id}` | — | Header status | — | Hero status |\n\n### Routes with shared morphs\n\n- **Chat list → Chat**: avatar, name, lastMessage, timestamp, online\n- **Calls → Chat**: avatar, name\n- **Chat → Contact details**: avatar, name, status\n- **Back navigation**: reverse FLIP on all of the above\n\nContacts drawer opens outside `navigation-view`, so drawer row → chat does not FLIP (list → chat transition runs instead).\n        "}}},tags:["autodocs"]},LiveDemo={render:()=>react.createElement("messaging-app-demo"),name:"Live Demo",parameters:{docs:{description:{story:"\nClick a conversation to open the chat — watch the avatar, name, preview message, and timestamp morph into the header and last bubble.\nUse the Calls tab or contact details for additional shared transitions. Use the pencil button for contacts.\n        "}}}},__namedExportsOrder=["LiveDemo"];LiveDemo.parameters={...LiveDemo.parameters,docs:{...LiveDemo.parameters?.docs,source:{originalSource:'{\n  render: () => React.createElement("messaging-app-demo"),\n  name: "Live Demo",\n  parameters: {\n    docs: {\n      description: {\n        story: `\nClick a conversation to open the chat — watch the avatar, name, preview message, and timestamp morph into the header and last bubble.\nUse the Calls tab or contact details for additional shared transitions. Use the pencil button for contacts.\n        `\n      }\n    }\n  }\n}',...LiveDemo.parameters?.docs?.source}}}}}]);
-//# sourceMappingURL=stories-06-MessagingAppDemo-stories.913aec32.iframe.bundle.js.map
+//# sourceMappingURL=stories-06-MessagingAppDemo-stories.8fff7d1c.iframe.bundle.js.map

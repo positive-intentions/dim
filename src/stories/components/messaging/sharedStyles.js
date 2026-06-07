@@ -52,6 +52,14 @@ export const avatarStyles = css`
     background: var(--app-primary-light);
   }
 
+  .avatar.emoji-avatar.avatar-sm {
+    font-size: 1rem;
+  }
+
+  .avatar.emoji-avatar.avatar-lg {
+    font-size: 1.75rem;
+  }
+
   .online-dot {
     position: absolute;
     bottom: 1px;
