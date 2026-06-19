@@ -5,6 +5,9 @@
  * - File System Access API (with user permission)
  * - Origin Private File System (OPFS) as fallback
  * 
+ * FSA mode persists the last granted root directory in IndexedDB and restores
+ * it on load (see loadRootDirectoryHandle).
+ * 
  * @param {Object} options - Configuration options
  * @param {boolean} options.opfs - Force OPFS usage instead of trying File System Access API
  * @param {boolean} options.encrypt - Enable encryption for file content
@@ -12,6 +15,12 @@
  * @param {Object} hooks - Hook dependencies (useState, useEffect, useStore)
  * @returns {Object} File system interface
  */
+import {
+  clearRootDirectoryHandle,
+  loadRootDirectoryHandle,
+  saveRootDirectoryHandle,
+} from '../utils/nativeFsHandlePersistence.js';
+
 export function useFS(options = {}, hooks) {
   const { opfs = false, encrypt = false, encryptionPassword } = options;
   const { useState, useEffect, useStore } = hooks;
@@ -62,40 +71,66 @@ export function useFS(options = {}, hooks) {
 
   // Initialize the file system based on mode and stored state
   useEffect(() => {
-    const initializeFS = async () => {
-      try {
-        setError(null);
-        
-        if (opfs || preferredMode === 'opfs' || !isFileSystemAccessSupported()) {
-          // Use OPFS
-          setFsMode('opfs');
-          setIsInitialized(true);
-          console.log('useFS: Initialized with OPFS');
-        } else {
-          // Try to restore previous directory handle if we have permission
-          if (hasPermission && selectedDirectoryName) {
-            // File System Access API doesn't provide a way to restore handles
-            // User will need to re-select directory after page reload
-            console.log('useFS: Previous directory access lost, user needs to re-select');
-            setHasPermission(false);
-            setSelectedDirectoryName('');
-          }
-          setFsMode('fsa');
-          setIsInitialized(true);
-          console.log('useFS: Initialized with File System Access API');
-        }
-      } catch (err) {
-        console.error('useFS: Initialization failed:', err);
-        setError(err);
-        // Fallback to OPFS on initialization failure
-        setFsMode('opfs');
-        setIsInitialized(true);
-      }
+    if (isInitialized) return;
+    let cancelled = false;
+
+    const applyFsaRestore = (handle) => {
+      setPreferredMode('fsa');
+      setFsMode('fsa');
+      setDirectoryHandle(handle);
+      setSelectedDirectoryName(handle.name);
+      setHasPermission(true);
+      setError(null);
+      setIsInitialized(true);
+      console.log('useFS: Restored directory with write permissions:', handle.name);
     };
 
-    if (!isInitialized) {
-      initializeFS();
-    }
+    const applyDefaultMode = () => {
+      if (opfs || preferredMode === 'opfs' || !isFileSystemAccessSupported()) {
+        setFsMode('opfs');
+        console.log('useFS: Initialized with OPFS');
+      } else {
+        if (hasPermission && selectedDirectoryName) {
+          setHasPermission(false);
+          setSelectedDirectoryName('');
+        }
+        setFsMode('fsa');
+        console.log('useFS: Initialized with File System Access API');
+      }
+      setIsInitialized(true);
+    };
+
+    void (async () => {
+      try {
+        setError(null);
+        if (isFileSystemAccessSupported()) {
+          try {
+            const h = await loadRootDirectoryHandle();
+            if (h && !cancelled) {
+              const perm = await h.requestPermission({ mode: 'readwrite' });
+              if (!cancelled && perm === 'granted') {
+                applyFsaRestore(h);
+                return;
+              }
+            }
+          } catch {
+            /* restore is best-effort */
+          }
+        }
+        if (!cancelled) applyDefaultMode();
+      } catch (err) {
+        if (!cancelled) {
+          console.error('useFS: Initialization failed:', err);
+          setError(err);
+          setFsMode('opfs');
+          setIsInitialized(true);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isInitialized, opfs, preferredMode]);
 
   // Request permission to access file system (FSA only)
@@ -150,6 +185,7 @@ export function useFS(options = {}, hooks) {
       setSelectedDirectoryName(handle.name);
       setHasPermission(true);
       setError(null);
+      void saveRootDirectoryHandle(handle);
       console.log('useFS: Directory selected with write permissions:', handle.name);
       return true;
     } catch (err) {
@@ -158,6 +194,40 @@ export function useFS(options = {}, hooks) {
         return false;
       }
       console.error('useFS: Directory selection failed:', err);
+      setError(err);
+      return false;
+    }
+  };
+
+  /** Always opens the native folder picker and transitions to FSA on success. */
+  const pickLocalDirectory = async () => {
+    try {
+      if (!isFileSystemAccessSupported()) {
+        throw new Error('File System Access API not supported');
+      }
+
+      const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+      const permissionStatus = await handle.requestPermission({ mode: 'readwrite' });
+      if (permissionStatus !== 'granted') {
+        throw new Error('Write permission denied');
+      }
+
+      setPreferredMode('fsa');
+      setFsMode('fsa');
+      setIsInitialized(true);
+      setDirectoryHandle(handle);
+      setSelectedDirectoryName(handle.name);
+      setHasPermission(true);
+      setError(null);
+      void saveRootDirectoryHandle(handle);
+      console.log('useFS: Local directory mounted with write permissions:', handle.name);
+      return true;
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log('useFS: Local directory selection cancelled');
+        return false;
+      }
+      console.error('useFS: Local directory selection failed:', err);
       setError(err);
       return false;
     }
@@ -327,6 +397,37 @@ export function useFS(options = {}, hooks) {
     }
   };
 
+  /** Directory handle for `path` under the volume root, with FSA write permission when needed. */
+  const resolveTargetDirectoryForWrite = async (path = '') => {
+    const dirHandle = await getCurrentDirectoryHandle();
+
+    if (fsMode === 'fsa') {
+      const permissionStatus = await dirHandle.requestPermission({ mode: 'readwrite' });
+      if (permissionStatus !== 'granted') {
+        throw new Error('Write permission required. Please re-select the directory and grant write access.');
+      }
+    }
+
+    let targetHandle = dirHandle;
+
+    if (path) {
+      const pathParts = path.split('/').filter(Boolean);
+      for (const part of pathParts) {
+        try {
+          targetHandle = await targetHandle.getDirectoryHandle(part);
+        } catch (err) {
+          if (err.name === 'NotFoundError') {
+            targetHandle = await targetHandle.getDirectoryHandle(part, { create: true });
+          } else {
+            throw err;
+          }
+        }
+      }
+    }
+
+    return targetHandle;
+  };
+
   // Remove file
   const removeFile = async (fileName, path = '') => {
     try {
@@ -381,37 +482,22 @@ export function useFS(options = {}, hooks) {
       }
 
       const fileName = targetFileName || file.name;
-      
-      // For binary files, convert to base64, for text files use text content
-      let content;
-      if (file.type.startsWith('text/') || 
+
+      if (file.type.startsWith('text/') ||
           file.type === 'application/json' ||
           file.type === 'application/javascript' ||
           file.name.match(/\.(txt|md|json|js|ts|css|html|xml|csv)$/i)) {
-        // Read as text for text-based files
-        content = await file.text();
+        const content = await file.text();
+        await writeFile(fileName, content, path);
       } else {
-        // Read as base64 for binary files (images, etc.)
-        const arrayBuffer = await file.arrayBuffer();
-        const bytes = new Uint8Array(arrayBuffer);
-        let binaryString = '';
-        const chunkSize = 8192;
-        
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-          const chunk = bytes.subarray(i, i + chunkSize);
-          binaryString += String.fromCharCode.apply(null, chunk);
-        }
-        
-        content = JSON.stringify({
-          type: 'binary',
-          mimeType: file.type,
-          data: btoa(binaryString)
-        });
+        // Write raw bytes so archives, images, office docs, etc. remain valid on disk.
+        const targetHandle = await resolveTargetDirectoryForWrite(path);
+        const fileHandle = await targetHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(await file.arrayBuffer());
+        await writable.close();
       }
-      
-      // Use the existing writeFile method which handles encryption automatically
-      await writeFile(fileName, content, path);
-      
+
       console.log('useFS: File uploaded successfully' + (encrypt ? ' (encrypted)' : '') + ':', fileName);
       return { success: true, fileName, size: file.size, type: file.type };
     } catch (err) {
@@ -494,6 +580,7 @@ export function useFS(options = {}, hooks) {
       setDirectoryHandle(null);
       setHasPermission(false);
       setSelectedDirectoryName('');
+      void clearRootDirectoryHandle();
     },
     
     switchToFSA: () => {
@@ -507,6 +594,8 @@ export function useFS(options = {}, hooks) {
         throw new Error('File System Access API not supported');
       }
     },
+
+    pickLocalDirectory,
     
     // Clear error
     clearError: () => setError(null)
