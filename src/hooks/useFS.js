@@ -52,6 +52,7 @@ export function useFS(options = {}, hooks) {
   const [fsMode, setFsMode] = useState(null); // 'fsa' or 'opfs'
   const [directoryHandle, setDirectoryHandle] = useState(null);
   const [error, setError] = useState(null);
+  const [pendingFolderReconnect, setPendingFolderReconnect] = useState(null);
   
   // Persistent state using useStore
   const store = useStore({
@@ -75,6 +76,7 @@ export function useFS(options = {}, hooks) {
     let cancelled = false;
 
     const applyFsaRestore = (handle) => {
+      setPendingFolderReconnect(null);
       setPreferredMode('fsa');
       setFsMode('fsa');
       setDirectoryHandle(handle);
@@ -83,6 +85,18 @@ export function useFS(options = {}, hooks) {
       setError(null);
       setIsInitialized(true);
       console.log('useFS: Restored directory with write permissions:', handle.name);
+    };
+
+    const applyPendingReconnect = (handle) => {
+      setPendingFolderReconnect({ name: handle.name });
+      setPreferredMode('fsa');
+      setFsMode('fsa');
+      setDirectoryHandle(null);
+      setSelectedDirectoryName(handle.name);
+      setHasPermission(false);
+      setError(null);
+      setIsInitialized(true);
+      console.log('useFS: Persisted folder requires reconnect:', handle.name);
     };
 
     const applyDefaultMode = () => {
@@ -107,9 +121,13 @@ export function useFS(options = {}, hooks) {
           try {
             const h = await loadRootDirectoryHandle();
             if (h && !cancelled) {
-              const perm = await h.requestPermission({ mode: 'readwrite' });
+              const perm = await h.queryPermission({ mode: 'readwrite' });
               if (!cancelled && perm === 'granted') {
                 applyFsaRestore(h);
+                return;
+              }
+              if (!cancelled && (perm === 'prompt' || perm === 'denied')) {
+                applyPendingReconnect(h);
                 return;
               }
             }
@@ -132,6 +150,45 @@ export function useFS(options = {}, hooks) {
       cancelled = true;
     };
   }, [isInitialized, opfs, preferredMode]);
+
+  /** Re-grant access to the persisted root folder (requires user gesture). */
+  const reconnectLocalDirectory = async () => {
+    try {
+      if (!isFileSystemAccessSupported()) {
+        throw new Error('File System Access API not supported');
+      }
+
+      const handle = await loadRootDirectoryHandle();
+      if (!handle) {
+        setPendingFolderReconnect(null);
+        return false;
+      }
+
+      const permissionStatus = await handle.requestPermission({ mode: 'readwrite' });
+      if (permissionStatus !== 'granted') {
+        return false;
+      }
+
+      setPendingFolderReconnect(null);
+      setPreferredMode('fsa');
+      setFsMode('fsa');
+      setDirectoryHandle(handle);
+      setSelectedDirectoryName(handle.name);
+      setHasPermission(true);
+      setError(null);
+      setIsInitialized(true);
+      console.log('useFS: Reconnected to directory:', handle.name);
+      return true;
+    } catch (err) {
+      console.error('useFS: Folder reconnect failed:', err);
+      setError(err);
+      return false;
+    }
+  };
+
+  const clearPendingFolderReconnect = () => {
+    setPendingFolderReconnect(null);
+  };
 
   // Request permission to access file system (FSA only)
   const requestPermission = async () => {
@@ -212,6 +269,7 @@ export function useFS(options = {}, hooks) {
         throw new Error('Write permission denied');
       }
 
+      setPendingFolderReconnect(null);
       setPreferredMode('fsa');
       setFsMode('fsa');
       setIsInitialized(true);
@@ -575,6 +633,7 @@ export function useFS(options = {}, hooks) {
     
     // Mode switching
     switchToOPFS: () => {
+      setPendingFolderReconnect(null);
       setPreferredMode('opfs');
       setIsInitialized(false);
       setDirectoryHandle(null);
@@ -596,7 +655,10 @@ export function useFS(options = {}, hooks) {
     },
 
     pickLocalDirectory,
-    
+    reconnectLocalDirectory,
+    pendingFolderReconnect,
+    clearPendingFolderReconnect,
+
     // Clear error
     clearError: () => setError(null)
   };
