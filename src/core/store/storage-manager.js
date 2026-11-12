@@ -175,17 +175,29 @@ class StorageManager {
                                     console.error('Failed to encrypt for dispatch:', error);
                                 }
                             } else {
-                                // No value in DB, set loading to false
-                                if (this.asyncManager?.loadingSetters[`${path}${key}`]) {
-                                    this.asyncManager.loadingSetters[`${path}${key}`](false);
+                                // No value in DB — clear loading for every subscriber.
+                                const k = `${path}${key}`;
+                                if (this.asyncManager?.clearLoading) {
+                                    this.asyncManager.clearLoading(k);
+                                } else if (
+                                    typeof this.asyncManager?.loadingSetters?.[k] ===
+                                    "function"
+                                ) {
+                                    this.asyncManager.loadingSetters[k](false);
                                 }
                             }
                         })
                         .catch((error) => {
                             console.error(error);
-                            // Set loading to false on error
-                            if (this.asyncManager?.loadingSetters[`${path}${key}`]) {
-                                this.asyncManager.loadingSetters[`${path}${key}`](false);
+                            // Clear loading for every subscriber on error.
+                            const k = `${path}${key}`;
+                            if (this.asyncManager?.clearLoading) {
+                                this.asyncManager.clearLoading(k);
+                            } else if (
+                                typeof this.asyncManager?.loadingSetters?.[k] ===
+                                "function"
+                            ) {
+                                this.asyncManager.loadingSetters[k](false);
                             }
                         });
                 }

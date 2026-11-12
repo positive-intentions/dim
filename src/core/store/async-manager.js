@@ -1,10 +1,11 @@
 import StorageManager from "./storage-manager";
 import { debouncedDispatcher } from "./events.js";
-// import CryptoManager from "./crypto-manager.js";
 
 class AsyncronousStateManager {
     constructor(crypto = null) {
         this.store = {};
+        // Per-key list of { id, setIsLoading }. Legacy tests may assign a
+        // single function; clearLoading() accepts both shapes.
         this.loadingSetters = {};
         this.eventListener = [];
         this.crypto = crypto;
@@ -12,8 +13,68 @@ class AsyncronousStateManager {
         this.db.asyncManager = this; // Connect storage manager back to this
     }
 
+    /**
+     * Notify every loading subscriber for `key` (or a legacy single function).
+     */
+    clearLoading(key) {
+        const entry = this.loadingSetters?.[key];
+        if (!entry) return;
+        if (typeof entry === "function") {
+            entry(false);
+            return;
+        }
+        if (Array.isArray(entry)) {
+            entry.forEach((item) => {
+                const setter =
+                    typeof item === "function" ? item : item?.setIsLoading;
+                if (typeof setter === "function") setter(false);
+            });
+        }
+    }
+
+    /**
+     * Register (or replace) a loading setter for a subscriber id on `key`.
+     */
+    addLoadingSetter(key, id, setIsLoading) {
+        this.loadingSetters = this.loadingSetters || {};
+        const existing = this.loadingSetters[key];
+        if (typeof existing === "function") {
+            // Promote legacy single-function shape to a list.
+            this.loadingSetters[key] = [
+                { id: "__legacy", setIsLoading: existing },
+            ];
+        } else if (!Array.isArray(this.loadingSetters[key])) {
+            this.loadingSetters[key] = [];
+        }
+        this.loadingSetters[key] = this.loadingSetters[key].filter(
+            (item) => item?.id !== id
+        );
+        this.loadingSetters[key].push({ id, setIsLoading });
+    }
+
+    /**
+     * Drop loading setters registered under `listenerId`.
+     */
+    removeLoadingSetters(listenerId) {
+        if (!this.loadingSetters) return;
+        Object.keys(this.loadingSetters).forEach((key) => {
+            const entry = this.loadingSetters[key];
+            if (!Array.isArray(entry)) return;
+            this.loadingSetters[key] = entry.filter(
+                (item) => item?.id !== listenerId
+            );
+            if (this.loadingSetters[key].length === 0) {
+                delete this.loadingSetters[key];
+            }
+        });
+    }
+
     generateListener(listener) {
         const { listenerId, key, value } = listener;
+
+        // Capture the real useState setter BEFORE we wrap the slot.
+        // (value may already be a length-4 [value, set, loading, setLoading].)
+        const originalSetter = value[1];
 
         // Remove existing event listeners if they exist
         const existingListeners = this.eventListener.filter(
@@ -59,20 +120,13 @@ class AsyncronousStateManager {
                 // Update the component state directly without triggering another event
                 const currentState = value[0];
                 if (JSON.stringify(currentState) !== JSON.stringify(finalValue)) {
-                    // Call the setter with isInternalUpdate flag to prevent loop
-                    value[1](finalValue, true);
+                    originalSetter(finalValue);
                 }
                 
-                // Update loading state if we have a setter
-                if (this.loadingSetters[key]) {
-                    this.loadingSetters[key](false);
-                }
+                this.clearLoading(key);
             } catch (error) {
                 console.error('Failed to process event data:', error);
-                // Update loading state on error
-                if (this.loadingSetters[key]) {
-                    this.loadingSetters[key](false);
-                }
+                this.clearLoading(key);
             }
         };
 
@@ -99,17 +153,23 @@ class AsyncronousStateManager {
         });
 
         const newSetter = (newValue, isInternalUpdate = false) => {
-            // Store reference to original setter for internal use
-            if (!newSetter.__originalSetter) {
-                newSetter.__originalSetter = value[1];
-            }
-            
-            // If this is an internal update from the event listener, skip processing
+            // Internal updates from our own event listener: only touch local state.
             if (isInternalUpdate) {
-                newSetter.__originalSetter(newValue);
+                originalSetter(newValue);
                 return;
             }
-            
+
+            // Keep the manager cache in sync before re-render. Otherwise the next
+            // generateListener() overwrites value[0] with a stale this.store[key]
+            // (truthy empty/restored arrays beat the fresh useState value via ||).
+            this.store = {
+                ...this.store,
+                [key]: newValue,
+            };
+
+            // User updates: update UI immediately, then persist + broadcast.
+            originalSetter(newValue);
+
             const storeToDB = async () => {
                 try {
                     // When encryption is enabled, persist the serialized ciphertext;
@@ -142,7 +202,9 @@ class AsyncronousStateManager {
             dispatchUpdate(listenerName, newValue);
         };
 
-        const newState = this.store[key] || value[0];
+        // Prefer cache when present — including empty arrays (do not use ||).
+        const newState =
+            this.store[key] !== undefined ? this.store[key] : value[0];
 
         return [newState, newSetter];
     }
@@ -162,6 +224,8 @@ class AsyncronousStateManager {
         this.eventListener = this.eventListener.filter(
             (listener) => listener.listenerId !== listenerId
         );
+
+        this.removeLoadingSetters(listenerId);
     }
 
     createListeners = (store, listenerId) => {

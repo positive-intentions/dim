@@ -70,7 +70,7 @@ describe('AsyncronousStateManager', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Check if setter was called with decrypted value
-      expect(mockSetValue).toHaveBeenCalledWith(newValue, true);
+      expect(mockSetValue).toHaveBeenCalledWith(newValue);
       expect(asyncManager.store.testKey).toBe(newValue);
     });
 
@@ -103,7 +103,7 @@ describe('AsyncronousStateManager', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Check if state was updated
-      expect(mockSetValue).toHaveBeenCalledWith('loadedValue', true);
+      expect(mockSetValue).toHaveBeenCalledWith('loadedValue');
       expect(mockSetLoading).toHaveBeenCalledWith(false);
     });
 
@@ -227,7 +227,7 @@ describe('AsyncronousStateManager', () => {
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      expect(mockSetValue).toHaveBeenCalledWith('updated', true);
+      expect(mockSetValue).toHaveBeenCalledWith('updated');
       expect(plainManager.store.plainKey).toBe('updated');
     });
 
@@ -245,6 +245,79 @@ describe('AsyncronousStateManager', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(debouncedDispatcher).toHaveBeenCalledWith('plainKey2', 'newValue');
+    });
+
+    test('wrapped setter updates original useState immediately', () => {
+      const mockSetValue = jest.fn();
+      const [, setter] = plainManager.generateListener({
+        listenerId: 'immediate-id',
+        key: 'immediateKey',
+        value: ['initial', mockSetValue],
+      });
+
+      setter('right-away');
+
+      // Must not wait on the debounced CustomEvent — first call is synchronous.
+      expect(mockSetValue).toHaveBeenCalled();
+      expect(mockSetValue.mock.calls[0]).toEqual(['right-away']);
+    });
+
+    test('user setter syncs manager cache so re-generateListener is not stale', () => {
+      const oldList = [{ id: 'old' }];
+      const newList = [{ id: 'new' }, { id: 'old' }];
+      plainManager.store.staleKey = oldList;
+
+      const mockSetValue = jest.fn();
+      const [, setter] = plainManager.generateListener({
+        listenerId: 'stale-id',
+        key: 'staleKey',
+        value: [oldList, mockSetValue],
+      });
+
+      setter(newList);
+      expect(plainManager.store.staleKey).toBe(newList);
+
+      // Next render path: generateListener again with the useState tuple still
+      // holding oldList at value[0] — cache must win with the new list.
+      const [state] = plainManager.generateListener({
+        listenerId: 'stale-id',
+        key: 'staleKey',
+        value: [oldList, mockSetValue],
+      });
+      expect(state).toBe(newList);
+      expect(state).not.toBe(oldList);
+    });
+
+    test('clearLoading notifies every multicast subscriber', () => {
+      const a = jest.fn();
+      const b = jest.fn();
+      plainManager.addLoadingSetter('sharedKey', 'sub-a', a);
+      plainManager.addLoadingSetter('sharedKey', 'sub-b', b);
+
+      plainManager.clearLoading('sharedKey');
+
+      expect(a).toHaveBeenCalledWith(false);
+      expect(b).toHaveBeenCalledWith(false);
+    });
+
+    test('clearLoading still supports a legacy single-function setter', () => {
+      const setLoading = jest.fn();
+      plainManager.loadingSetters.legacyKey = setLoading;
+      plainManager.clearLoading('legacyKey');
+      expect(setLoading).toHaveBeenCalledWith(false);
+    });
+
+    test('removeListeners drops that subscriber loading setters only', () => {
+      const a = jest.fn();
+      const b = jest.fn();
+      plainManager.addLoadingSetter('sharedKey', 'sub-a', a);
+      plainManager.addLoadingSetter('sharedKey', 'sub-b', b);
+
+      plainManager.removeListeners('sub-a');
+      plainManager.clearLoading('sharedKey');
+
+      expect(a).not.toHaveBeenCalled();
+      expect(b).toHaveBeenCalledWith(false);
     });
   });
 });

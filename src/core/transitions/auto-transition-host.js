@@ -295,6 +295,8 @@ export class AutoTransitionHost {
   _runSharedElementFlip(duration, easing) {
     const root = this.host.shadowRoot;
     if (!root) return;
+    // Guard teardown / non-DOM environments (e.g. jsdom after test cleanup).
+    if (typeof document === "undefined" || !document.createElement) return;
     const wrapper = root.querySelector(".auto-transition-wrapper");
     const incomingLayer = root.querySelector(".vt-layer.vt-incoming");
     if (!wrapper || !incomingLayer) return;

@@ -5,7 +5,9 @@ export function useState(initialState) {
   const hookIndex = component.hookIndex++;
   const hookName = `hook-${hookIndex}`;
 
-  if (!component.hooks[hookName]) {
+  // Use `in` — falsy values (false, 0, "", null) are valid state and must
+  // not be treated as "uninitialized" on the next render.
+  if (!(hookName in component.hooks)) {
     component.hooks[hookName] = initialState;
   }
 

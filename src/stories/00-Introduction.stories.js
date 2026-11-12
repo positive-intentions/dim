@@ -107,7 +107,8 @@ export const Welcome = {
         React.createElement('h2', { key: 'start-title' }, '🚀 Getting Started'),
         React.createElement('p', { key: 'start-desc' }, 'Check out the other stories in this Storybook to see Dim in action:'),
         React.createElement('ul', { key: 'start-list' }, [
-          React.createElement('li', { key: 's1' }, React.createElement('strong', null, 'Getting Started'), ': Basic examples and tutorials'),
+          React.createElement('li', { key: 's1' }, React.createElement('strong', null, 'Getting Started'), ': Basic examples'),
+          React.createElement('li', { key: 's1b' }, React.createElement('strong', null, 'Tutorial'), ': A beginner path from web components to a notes app'),
           React.createElement('li', { key: 's2' }, React.createElement('strong', null, 'API Reference'), ': Complete hook and component documentation'),
           React.createElement('li', { key: 's3' }, React.createElement('strong', null, 'Styled Components'), ': Advanced styling patterns')
         ])

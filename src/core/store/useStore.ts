@@ -12,6 +12,13 @@ const cryptoManagerMap = new Map();
 // Shared singleton manager used when encryption is not enabled.
 const plaintextStateManager = new AsyncronousStateManager(null);
 
+function listenerIdKey(randomId) {
+  if (randomId instanceof Uint8Array) {
+    return Array.from(randomId).join(",");
+  }
+  return String(randomId);
+}
+
 /**
  * Bottom-up reactive store.
  *
@@ -28,6 +35,7 @@ export const useStore = (
     typeof options === "string" ? options : options?.encryptionKey;
 
   const [randomId] = useState(crypto.getRandomValues(new Uint8Array(8)));
+  const subscriberId = listenerIdKey(randomId);
 
   let stateManager;
   if (encryptionKey) {
@@ -57,22 +65,22 @@ export const useStore = (
         // Replace the store entry with enhanced version that includes loading state
         obj[key] = [value, setValue, isLoading, setIsLoading];
 
-        // Store the loading setter for the async manager
+        // Multicast: every subscriber for this key gets isLoading cleared.
         const fullKey = `${path}${key}`;
-        stateManager.loadingSetters = stateManager.loadingSetters || {};
-        stateManager.loadingSetters[fullKey] = setIsLoading;
+        stateManager.addLoadingSetter(fullKey, subscriberId, setIsLoading);
       }
     });
   };
 
   enhanceStoreWithLoading(store);
-  stateManager.createListeners(store, randomId);
+  // Use the same string id for listeners + loading setters so cleanup matches.
+  stateManager.createListeners(store, subscriberId);
 
   useEffect(() => {
     // The async manager owns its StorageManager instance (stateManager.db).
-    stateManager.db.loadFromDatabase(store, randomId);
+    stateManager.db.loadFromDatabase(store, subscriberId);
     return () => {
-      stateManager.removeListeners(randomId);
+      stateManager.removeListeners(subscriberId);
     };
   }, []);
 

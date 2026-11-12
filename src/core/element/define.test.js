@@ -48,6 +48,23 @@ describe('Dim hooks', () => {
 
       expect(renderCount).toBe(before);
     });
+
+    test('preserves falsy state (false) across re-renders', async () => {
+      const Flag = () => {
+        const [on, setOn] = useState(true);
+        return html`
+          <button id="tog" @click=${() => setOn((v) => !v)}>tog</button>
+          <span id="flag">${on ? 'yes' : 'no'}</span>
+        `;
+      };
+      define({ tag: 'us-flag', component: Flag });
+      const el = await mount('us-flag');
+      expect(text(el)).toContain('yes');
+      el.shadowRoot.querySelector('#tog').click();
+      await el.updateComplete;
+      expect(text(el)).toContain('no');
+      expect(el.hooks['hook-0']).toBe(false);
+    });
   });
 
   describe('useEffect', () => {

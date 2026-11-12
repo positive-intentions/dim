@@ -17,7 +17,15 @@ const preview = {
     options: {
       showPanel: false,
       storySort: {
-        order: ['Introduction', 'Getting Started', 'Crash Course', 'API Reference', 'Demo', '*'],
+        order: [
+          'Introduction',
+          'Getting Started',
+          'Tutorial',
+          ['Overview', '1. Basics', '2. Building an app', '3. Advanced'],
+          'API Reference',
+          'Demo',
+          '*',
+        ],
       },
     },
   },

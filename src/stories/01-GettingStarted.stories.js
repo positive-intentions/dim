@@ -14,6 +14,7 @@ Dim is a web components framework with a React-like API — \`useState\`, \`useE
 
 ## Where to go next
 
+- **Tutorial** — Beginner path: web components, Dim Notes, then advanced topics
 - **Demo/Shopping App** — Full navigable e-commerce demo with view transitions, persistent cart, and checkout flow
 - **Demo/Messaging App** — Navigable messaging UI with shared-element transitions
 - **API Reference** — Complete hook and component documentation

@@ -112,8 +112,30 @@ export class DimElement extends HTMLElement {
     if (!queue || !queue.length) return;
     const root = this.shadowRoot || this.renderRoot;
     if (!root) return;
+    // Remember adopted sheets per hook so later cssText changes can
+    // replaceSync instead of leaving a stale sheet + a competing <style>.
+    this.__adoptedSheets = this.__adoptedSheets || {};
     for (const entry of queue) {
       const { hookName, cssText, cssResult, preferAdopted } = entry;
+      const existingAdopted = this.__adoptedSheets[hookName];
+      if (existingAdopted) {
+        try {
+          existingAdopted.replaceSync(cssText);
+        } catch {
+          // Fall through to a style tag if replaceSync is unavailable.
+          let styleElement = root.querySelector(
+            `[data-style-hook="${hookName}"]`
+          );
+          if (!styleElement) {
+            styleElement = document.createElement("style");
+            styleElement.setAttribute("data-style-hook", hookName);
+            root.appendChild(styleElement);
+          }
+          styleElement.textContent = cssText;
+        }
+        continue;
+      }
+
       let styleElement = root.querySelector(
         `[data-style-hook="${hookName}"]`
       );
@@ -127,6 +149,7 @@ export class DimElement extends HTMLElement {
             ...root.adoptedStyleSheets,
             cssResult.styleSheet,
           ];
+          this.__adoptedSheets[hookName] = cssResult.styleSheet;
           continue;
         }
         styleElement = document.createElement("style");
