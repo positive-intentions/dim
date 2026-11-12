@@ -1,8 +1,12 @@
-import { LitElement, html as litHtml } from "../vendor/lit/index.js";
-import { unsafeHTML } from "../vendor/lit/directives/unsafe-html.js";
-import { keyed } from "../vendor/lit/directives/keyed.js";
 import AsyncronousStateManager from "./async-manager";
-import { css, unsafeCSS } from "./mini-lit";
+import {
+  css,
+  unsafeCSS,
+  html,
+  keyed,
+  renderChildren,
+  DimElement,
+} from "./mini-lit";
 import StorageManager from "./storage-manager";
 import CryptoManager from "./crypto-manager";
 import {
@@ -12,146 +16,8 @@ import {
 } from "./view-transitions.js";
 import { AutoTransitionHost } from "./auto-transition-host.js";
 
-// Enhanced html function that supports React-like syntax
-export const html = (strings, ...values) => {
-  // If this is a proper template literal, strings will have a 'raw' property
-  if (!strings || !strings.raw) {
-    // If called as a function instead of template literal, create proper structure
-    if (typeof strings === "string") {
-      const templateStrings = [strings];
-      templateStrings.raw = [strings];
-      return litHtml(templateStrings, ...values);
-    }
-    return litHtml(strings, ...values);
-  }
-
-  // Process templates to support object attributes like todo={{ ... }}
-  const processedTemplate = processReactLikeSyntax(strings, values);
-
-  // Ensure the processed strings array has the raw property
-  if (processedTemplate.strings && !processedTemplate.strings.raw) {
-    processedTemplate.strings.raw = [...processedTemplate.strings];
-  }
-
-  return litHtml(processedTemplate.strings, ...processedTemplate.values);
-};
-
-function processReactLikeSyntax(strings, values) {
-  // Join template to analyze, preserving the original structure
-  let fullTemplate = strings[0];
-  for (let i = 0; i < values.length; i++) {
-    fullTemplate += `__VALUE_${i}__` + strings[i + 1];
-  }
-
-  // Look for object attribute patterns like todo={{ ... }}
-  const objectAttrRegex = /(\w+)=\{\{([^}]+)\}\}/g;
-  let hasReplacements = false;
-
-  // Check if we have any object attributes to process
-  if (!objectAttrRegex.test(fullTemplate)) {
-    // No processing needed, return original
-    return { strings, values };
-  }
-
-  // Reset regex
-  objectAttrRegex.lastIndex = 0;
-  let match;
-  let replacements = [];
-
-  while ((match = objectAttrRegex.exec(fullTemplate)) !== null) {
-    const [fullMatch, attrName, attrValue] = match;
-
-    // Parse the object literal as JSON instead of evaluating arbitrary code.
-    // This avoids the security/perf cost of `new Function`. Object attributes
-    // that are not valid JSON (e.g. containing function references) should be
-    // passed via the `.props` property instead.
-    try {
-      const objValue = JSON.parse("{" + attrValue + "}");
-      const jsonString = JSON.stringify(objValue);
-
-      // Replace with JSON string
-      replacements.push({
-        from: fullMatch,
-        to: `${attrName}='${jsonString}'`,
-      });
-      hasReplacements = true;
-    } catch (e) {
-      console.warn(
-        "Failed to parse object attribute as JSON (use .props for functions/non-JSON values):",
-        attrValue
-      );
-    }
-  }
-
-  if (!hasReplacements) {
-    return { strings, values };
-  }
-
-  // Apply replacements
-  let processedTemplate = fullTemplate;
-  replacements.forEach((replacement) => {
-    processedTemplate = processedTemplate.replace(
-      replacement.from,
-      replacement.to
-    );
-  });
-
-  // Split back into strings and values arrays
-  const parts = processedTemplate.split(/__VALUE_(\d+)__/);
-  const newStrings = [];
-  const newValues = [];
-
-  // Rebuild strings array
-  newStrings.push(parts[0]);
-  for (let i = 1; i < parts.length; i += 2) {
-    const valueIndex = parseInt(parts[i]);
-    if (valueIndex < values.length) {
-      newValues.push(values[valueIndex]);
-    }
-    newStrings.push(parts[i + 1] || "");
-  }
-
-  // Ensure we have the right number of strings (should be values.length + 1)
-  while (newStrings.length < newValues.length + 1) {
-    newStrings.push("");
-  }
-
-  // Add raw property to maintain template literal structure
-  newStrings.raw = [...newStrings];
-
-  return {
-    strings: newStrings,
-    values: newValues,
-  };
-}
-
-// Helper to render children content
-export const renderChildren = (children) => {
-  if (!children) return litHtml``;
-
-  // If children is a string (innerHTML), check if it contains custom elements
-  if (typeof children === "string") {
-    // If the string contains custom elements (with hyphens), use slot rendering
-    // This allows the custom elements to be properly processed by lit-html
-    if (
-      children.includes("-") &&
-      children.includes("<") &&
-      children.includes(">")
-    ) {
-      return litHtml`<slot></slot>`;
-    }
-    // For simple text content, use unsafeHTML
-    return litHtml`${unsafeHTML(children)}`;
-  }
-
-  // If children is an array of elements, render them
-  if (Array.isArray(children)) {
-    return litHtml`<slot></slot>`;
-  }
-
-  // Default slot for any other content
-  return litHtml`<slot></slot>`;
-};
+// Re-export the public template / style API from mini-lit (single source of truth)
+export { html, css, unsafeCSS, keyed, renderChildren, DimElement };
 
 let currentInstance = null;
 
@@ -168,13 +34,12 @@ function getCurrentInstance() {
   return currentInstance;
 }
 
+/**
+ * Register a functional component as a custom element.
+ * Stamps `component.tag = tag` and returns the component for useScope({ Comp }).
+ */
 export function define({ tag, component: CustomFunctionalComponent }) {
-  class DimComponent extends LitElement {
-    static get properties() {
-      return {
-        props: { type: Object },
-      };
-    }
+  class DimComponent extends DimElement {
     constructor() {
       super();
       this.hookIndex = 0;
@@ -189,19 +54,17 @@ export function define({ tag, component: CustomFunctionalComponent }) {
 
     connectedCallback() {
       super.connectedCallback();
-      // Capture child nodes before they're moved to shadow DOM
+      // Capture child nodes before light-DOM composition is consumed
       if (!this._childNodesCaptured) {
         this._childNodes = Array.from(this.childNodes);
         this._slotContent = this.innerHTML;
         this._childNodesCaptured = true;
       }
 
-      // dim renders from the host's attributes (see render()), but LitElement
-      // only re-renders on reactive property changes. Watch attribute mutations
-      // so plain-attribute APIs (e.g. transitionId="${id}") trigger a re-render.
+      // dim renders from the host's attributes (see render()). Watch attribute
+      // mutations so plain-attribute APIs (e.g. transitionId="${id}") re-render.
       // Safe from loops: render() writes only to the shadow root and we never
-      // reflect props back to host attributes, so this only fires for external
-      // (parent-driven) attribute changes.
+      // reflect props back to host attributes.
       if (!this._attributeObserver) {
         this._attributeObserver = new MutationObserver(() => {
           if (!this._attributeUpdateScheduled) {
@@ -249,7 +112,10 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         return acc;
       }, {});
 
-      this.props = this.props || {};
+      // Ensure props object exists without going through the reactive setter
+      // (which would schedule another update mid-render).
+      if (!this._props) this._props = {};
+      const hostProps = this._props;
 
       // HTML lowercases attribute names (e.g. `transitionId` is stored as
       // `transitionid`), so camelCase lookups must be case-insensitive.
@@ -264,7 +130,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
       let autoTransition = null;
       const transitionId =
         readProp(attributes, "transitionId") ??
-        readProp(this.props, "transitionId");
+        readProp(hostProps, "transitionId");
       if (transitionId !== undefined && transitionId !== null) {
         autoTransition = useViewTransition(transitionId.toString(), {
           duration: parseInt(readProp(attributes, "transitionDuration")) || 500,
@@ -290,6 +156,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         return _useFS(options, { useState, useEffect, useStore });
       };
 
+      // Injected deps match named exports (same html, keyed, renderChildren, …)
       const sharedDependencies = {
         useState,
         useEffect,
@@ -299,7 +166,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         useStore,
         useFS,
         useViewTransition,
-        html: litHtml,
+        html,
         css,
         unsafeCSS,
         useRef,
@@ -322,7 +189,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
       // names lowercased (`pagedata`).
       const rawProps = {
         ...attributes,
-        ...this.props,
+        ...hostProps,
         children,
         childElements,
       };
@@ -353,7 +220,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         return this._transitionHost.wrapRender(
           autoTransition,
           result,
-          litHtml
+          html
         );
       }
 
@@ -368,7 +235,13 @@ export function define({ tag, component: CustomFunctionalComponent }) {
     }
   }
 
-  window.customElements.define(tag, DimComponent);
+  if (!customElements.get(tag)) {
+    window.customElements.define(tag, DimComponent);
+  }
+
+  // Stamp tag on the functional component for useScope({ Comp }) DX
+  CustomFunctionalComponent.tag = tag;
+  return CustomFunctionalComponent;
 }
 
 export function useState(initialState) {
@@ -419,8 +292,6 @@ export function useEffect(effect, dependencies) {
   }
 
   // Register the disconnect-cleanup controller only ONCE per hook slot.
-  // Previously this ran on every render, accumulating a new controller each
-  // time and causing cleanups to run multiple times / leak.
   if (!component.hooks[hookName].controllerRegistered) {
     component.hooks[hookName].controllerRegistered = true;
     component.addController({
@@ -455,13 +326,28 @@ export function useMemo(calculation, dependencies) {
   return component.hooks[hookName].value;
 }
 
+/**
+ * Register child components in scope.
+ * Supports:
+ *   useScope({ "child-tag": ChildFn })
+ *   useScope({ ChildFn })  // uses ChildFn.tag stamped by define()
+ */
 export function useScope(elements) {
   Object.keys(elements).forEach((key) => {
-    const elementClass = elements[key];
+    const component = elements[key];
+    const tag =
+      (typeof component === "function" && component.tag) ||
+      (key.includes("-") ? key : null);
 
-    // Define the custom element with a unique tag per component instance
-    if (!customElements.get(key)) {
-      define({ tag: key, component: elementClass });
+    if (!tag) {
+      console.warn(
+        `useScope: cannot resolve tag for "${key}". Use a hyphenated tag key or call define() on the component first.`
+      );
+      return;
+    }
+
+    if (!customElements.get(tag)) {
+      define({ tag, component });
     }
   });
 }
@@ -475,39 +361,18 @@ export function useStyle(styles: any) {
   const cssResult = typeof styles === "string" ? unsafeCSS(styles) : styles;
   const cssText = cssResult.cssText;
 
-  // Check if styles have changed
+  // Check if styles have changed — queue for flush after render commit
+  // so the first render's container clear does not wipe style nodes.
   const prevStyles = component.hooks[hookName];
   if (prevStyles !== cssText) {
     component.hooks[hookName] = cssText;
-
-    // Create or update style element
-    let styleElement = component.shadowRoot.querySelector(
-      `[data-style-hook="${hookName}"]`
-    );
-
-    if (!styleElement) {
-      // Use adoptedStyleSheets when available for static styles
-      if (
-        component.shadowRoot.adoptedStyleSheets !== undefined &&
-        cssResult.styleSheet &&
-        !prevStyles
-      ) {
-        component.shadowRoot.adoptedStyleSheets = [
-          ...component.shadowRoot.adoptedStyleSheets,
-          cssResult.styleSheet,
-        ];
-      } else {
-        // Use style element for dynamic styles or fallback
-        styleElement = document.createElement("style");
-        styleElement.setAttribute("data-style-hook", hookName);
-        component.shadowRoot.appendChild(styleElement);
-      }
-    }
-
-    // Update style content if using style element
-    if (styleElement) {
-      styleElement.textContent = cssText;
-    }
+    component.__styleQueue = component.__styleQueue || [];
+    component.__styleQueue.push({
+      hookName,
+      cssText,
+      cssResult,
+      preferAdopted: !prevStyles,
+    });
   }
 }
 
@@ -621,18 +486,12 @@ export const useStore = (
 // Import custom hooks
 import { useFS as _useFS } from "../hooks/useFS.js";
 
-// Re-export utilities from mini-lit (already imported above for internal use)
-export { css, unsafeCSS };
-
 // Re-export hooks
 export { useFS } from "../hooks/useFS.js";
 export { useDimStore } from "../hooks/useDimStore.ts";
 
 // Re-export view transitions (already imported above for internal use)
 export { useViewTransition, viewTransitionStyles };
-
-// Re-export the keyed directive (already imported above for internal use)
-export { keyed };
 
 // Re-export core managers for external use (already imported above for internal use)
 export { default as CryptoManager } from "./crypto-manager";

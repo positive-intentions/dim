@@ -538,6 +538,15 @@ describe('view transitions', () => {
         background: 'white',
         boxShadow: 'none',
         color: 'rgb(0, 0, 0)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        alignContent: 'normal',
+        flexDirection: 'row',
+        flexWrap: 'nowrap',
+        gap: '0px',
+        rowGap: '0px',
+        columnGap: '0px',
       }));
 
       const hadAnimate = typeof Element.prototype.animate === 'function';
@@ -566,15 +575,23 @@ describe('view transitions', () => {
         expect(overlay.style.transform).toContain('scale(');
         expect(overlay.style.transform).toContain('translate(');
         expect(overlay.style.textAlign).toBe('center');
-        expect(overlay.style.transformOrigin).toBe('top left');
+        expect(overlay.style.transformOrigin).toBe('center center');
+        // Layout styles must be inlined so flex centering survives leaving the
+        // child shadow where .product-image / .feature-card CSS lives.
+        expect(overlay.style.display).toBe('flex');
+        expect(overlay.style.alignItems).toBe('center');
+        expect(overlay.style.justifyContent).toBe('center');
 
         expect(animateSpy).toHaveBeenCalled();
         const keyframes = animateSpy.mock.calls[0][0];
         const options = animateSpy.mock.calls[0][1];
         expect(keyframes[0].transform).toBe(overlay.style.transform);
-        expect(keyframes[0].transform).toContain('scale(');
-        expect(keyframes[0].transform).toContain('translate(');
-        expect(keyframes[1].transform).toBe('translate(0px, 0px) scale(1, 1)');
+        // Center invert: old center (110,60) vs new (200,170) => translate(-90,-110).
+        // Uniform height scale: 80/100 => scale(0.8).
+        expect(keyframes[0].transform).toBe(
+          'translate(-90px, -110px) scale(0.8)'
+        );
+        expect(keyframes[1].transform).toBe('translate(0px, 0px) scale(1)');
         expect(options.fill).toBe('both');
       } finally {
         Element.prototype.getBoundingClientRect = gbcr;
@@ -726,6 +743,17 @@ describe('view transitions', () => {
 
         const overlays = queryDeep(navView.shadowRoot, '.vt-shared-overlay');
         expect(overlays.length).toBeGreaterThanOrEqual(3);
+
+        // Nested product-detail-view shadow: class-only hide would not apply;
+        // inline visibility must hide the in-layer destination copies.
+        const incomingShared = queryDeep(
+          navView.shadowRoot.querySelector('.vt-layer.vt-incoming'),
+          '[data-vt-shared]'
+        );
+        const hiddenIncoming = incomingShared.filter(
+          (el) => el.style.visibility === 'hidden'
+        );
+        expect(hiddenIncoming.length).toBeGreaterThanOrEqual(3);
       } finally {
         Element.prototype.getBoundingClientRect = gbcr;
         if (!hadAnimate) {
@@ -796,6 +824,15 @@ describe('view transitions', () => {
 
         const overlays = queryDeep(navView.shadowRoot, '.vt-shared-overlay');
         expect(overlays.length).toBeGreaterThanOrEqual(3);
+
+        const incomingShared = queryDeep(
+          navView.shadowRoot.querySelector('.vt-layer.vt-incoming'),
+          '[data-vt-shared]'
+        );
+        const hiddenIncoming = incomingShared.filter(
+          (el) => el.style.visibility === 'hidden'
+        );
+        expect(hiddenIncoming.length).toBeGreaterThanOrEqual(3);
       } finally {
         Element.prototype.getBoundingClientRect = gbcr;
         if (!hadAnimate) {

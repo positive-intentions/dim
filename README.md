@@ -44,8 +44,8 @@ Dim is a lightweight framework that brings React's component model and hooks to 
 - 🎯 **React-like DX** - Familiar hooks API (`useState`, `useEffect`, `useMemo`, etc.)
 - 🔧 **Web Standards** - Built on native Web Components and Shadow DOM
 - 🎨 **Scoped Styling** - CSS-in-JS with automatic style isolation
-- 📦 **Zero Dependencies** - Pure JavaScript, no build step required
-- 🚀 **Lightweight** - Minimal overhead on top of native APIs
+- 📦 **Zero runtime deps** - Own `mini-lit` renderer (no Lit); pure JS, no build step required for the core
+- 🚀 **Lightweight** - Parts-based updates preserve focus, selection, and child state
 - 💾 **State Persistence** - Built-in global state management with `useStore`
 
 ## 🚀 Getting Started
@@ -126,9 +126,14 @@ useStyle(css`
 #### `useScope` - Component Composition
 
 ```javascript
+// Hyphenated tag keys
 useScope({
   "child-component": ChildComponent,
 });
+
+// Or tagged functions after define() stamped `.tag`
+define({ tag: "child-component", component: ChildComponent });
+useScope({ ChildComponent });
 ```
 
 #### `useMemo` - Memoized Values

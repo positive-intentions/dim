@@ -3,8 +3,6 @@ module.exports = {
     setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
     moduleNameMapper: {
       '\\.(css|less|scss)$': 'identity-obj-proxy',
-      '^lit$': '<rootDir>/node_modules/lit',
-      '^lit/(.*)$': '<rootDir>/node_modules/lit/$1',
     },
     collectCoverage: true,
     coverageReporters: ['lcov', 'text'],
@@ -12,7 +10,7 @@ module.exports = {
         "^.+\\.(ts|tsx|js|jsx)$": "babel-jest"
       },
     transformIgnorePatterns: [
-      'node_modules/(?!(lit|@lit|lit-element|lit-html)/)'
+      '/node_modules/'
     ],
     collectCoverageFrom: ['src/stories/components/*.{js,jsx,ts,tsx}', 'src/core/*.{js,jsx,ts,tsx}'],
     moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],

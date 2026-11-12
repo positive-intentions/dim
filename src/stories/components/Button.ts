@@ -1,8 +1,7 @@
-import { html } from "../../vendor/lit/index.js";
-import { useEffect, useMemo, useState } from "../../core/dim.ts";
+import { html, useEffect, useMemo, useState } from "../../core/dim.ts";
 
-const Button = function ({ children, initialstate = 0 }) {
-  const [count, setCount] = useState(parseInt(initialstate), "test-state");
+const Button = function ({ children, initialstate = 0 }, { html: h = html }) {
+  const [count, setCount] = useState(parseInt(initialstate, 10) || 0);
 
   useEffect(() => {
     console.log("Button mounted");
@@ -13,17 +12,17 @@ const Button = function ({ children, initialstate = 0 }) {
 
   useEffect(() => {
     console.log("count effect triggered");
-  }, [count()]);
+  }, [count]);
 
   const someCalculation = useMemo(() => {
-    const result = count() * 2;
+    const result = count * 2;
     console.log("memo calculation triggered:", result);
     return result;
-  }, [count()]);
+  }, [count]);
 
-  return html`
-    <button @click="${() => setCount(count() + 1)}">
-      ${children} ${count()} ${someCalculation}
+  return h`
+    <button @click="${() => setCount(count + 1)}">
+      ${children} ${count} ${someCalculation}
     </button>
   `;
 };

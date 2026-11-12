@@ -1,4 +1,4 @@
-import { keyed } from "../vendor/lit/directives/keyed.js";
+import { keyed, setSkipFocusRestore } from "./mini-lit.js";
 import { viewTransitionStyles } from "./view-transitions.js";
 
 /**
@@ -38,24 +38,28 @@ export class AutoTransitionHost {
   }
 
   /**
-   * Build the lit template for an auto-transition component render, or null if
-   * the caller should use the default (non-wrapped) result path.
+   * Build the template for an auto-transition component render.
+   * @param {object} autoTransition
+   * @param {*} result
+   * @param {Function} html - Dim html tagged template (same as public export)
    */
-  wrapRender(autoTransition, result, litHtml) {
+  wrapRender(autoTransition, result, html) {
     const transitionStyles = autoTransition.getTransitionStyles();
     const styleString = Object.entries(transitionStyles)
       .map(([key, value]) => `${key}: ${value}`)
       .join("; ");
 
-    const wrapperStyles = litHtml`
-      <style>
-        ${viewTransitionStyles}
+    const styleText = `${viewTransitionStyles}
         .auto-transition-wrapper {
           position: relative;
           overflow: hidden;
           width: 100%;
           height: 100%;
-        }
+        }`;
+
+    const wrapperStyles = html`
+      <style>
+        ${styleText}
       </style>
     `;
 
@@ -67,6 +71,9 @@ export class AutoTransitionHost {
       const incomingClass = autoTransition.getIncomingClass("vt-layer");
       const outgoingClass = autoTransition.getOutgoingClass("vt-layer");
       const previousResult = this._previousRenderResult;
+
+      // Two-layer commit: don't restore focus onto outgoing clones
+      setSkipFocusRestore(true);
 
       this._isTransitioningNow = true;
       this._flipDuration = autoTransition.options?.duration ?? 500;
@@ -86,7 +93,7 @@ export class AutoTransitionHost {
         this._containerResizePlayed = false;
       }
 
-      return litHtml`
+      return html`
         ${wrapperStyles}
         <div class="auto-transition-wrapper view-transition-container">
           <div class="${incomingClass} vt-incoming" style="${styleString}">
@@ -99,10 +106,11 @@ export class AutoTransitionHost {
       `;
     }
 
+    setSkipFocusRestore(false);
     this._isTransitioningNow = false;
     this.cleanupTransitionEffects();
     this._previousRenderResult = result;
-    return litHtml`
+    return html`
       ${wrapperStyles}
       <div class="auto-transition-wrapper view-transition-container">
         <div class="view-transition-item" style="${styleString}">
@@ -168,9 +176,12 @@ export class AutoTransitionHost {
         wrapper.classList.remove("vt-resizing");
         wrapper.style.height = "";
       }
-      queryDeep(root, ".vt-shared-hidden").forEach((el) =>
-        el.classList.remove("vt-shared-hidden")
-      );
+      queryDeep(root, ".vt-shared-hidden").forEach((el) => {
+        el.classList.remove("vt-shared-hidden");
+        // Inline visibility is used so nested-shadow shared nodes hide even
+        // when the host's .vt-shared-hidden stylesheet does not apply.
+        el.style.visibility = "";
+      });
     }
     if (this._sharedOverlayContainer) {
       this._sharedOverlayContainer.innerHTML = "";
@@ -208,8 +219,21 @@ export class AutoTransitionHost {
     clone.style.whiteSpace = cs.whiteSpace;
     clone.style.overflow = cs.overflow;
     clone.style.textOverflow = cs.textOverflow;
+    // Clone is lifted into the host overlay and loses child-shadow CSS
+    // (e.g. .product-image { display:flex; align-items:center }). Copy layout
+    // so centered content does not jump to the top-left during FLIP.
+    clone.style.display = cs.display;
+    clone.style.alignItems = cs.alignItems;
+    clone.style.justifyContent = cs.justifyContent;
+    clone.style.alignContent = cs.alignContent;
+    clone.style.flexDirection = cs.flexDirection;
+    clone.style.flexWrap = cs.flexWrap;
+    clone.style.gap = cs.gap;
+    if (cs.rowGap) clone.style.rowGap = cs.rowGap;
+    if (cs.columnGap) clone.style.columnGap = cs.columnGap;
     if (source instanceof HTMLImageElement) {
       clone.style.objectFit = cs.objectFit || "cover";
+      clone.style.objectPosition = cs.objectPosition || "center";
     }
   }
 
@@ -317,28 +341,45 @@ export class AutoTransitionHost {
       clone.style.top = `${newRect.top}px`;
       clone.style.width = `${newRect.width}px`;
       clone.style.height = `${newRect.height}px`;
-      clone.style.transformOrigin = "top left";
+      // Center-to-center invert so full-width centered titles travel from the
+      // details midpoint to the card (top-left invert has ~0 horizontal delta).
+      clone.style.transformOrigin = "center center";
 
-      const dx = oldRect.left - newRect.left;
-      const dy = oldRect.top - newRect.top;
+      const dx =
+        oldRect.left +
+        oldRect.width / 2 -
+        (newRect.left + newRect.width / 2);
+      const dy =
+        oldRect.top +
+        oldRect.height / 2 -
+        (newRect.top + newRect.height / 2);
+      // Uniform scale from height so full-width block text (and images) do not
+      // stretch anamorphically when old/new aspect ratios differ (esp. back-nav).
       const sx = newRect.width > 0 ? oldRect.width / newRect.width : 1;
       const sy = newRect.height > 0 ? oldRect.height / newRect.height : 1;
-      const initialTransform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+      const s = newRect.height > 0 ? sy : sx;
+      const initialTransform = `translate(${dx}px, ${dy}px) scale(${s})`;
       clone.style.transform = initialTransform;
       container.appendChild(clone);
       void clone.offsetWidth;
 
+      // Class for same-shadow hosts; inline visibility for nested shadows
+      // where the host's .vt-shared-hidden rule does not apply.
       el.classList.add("vt-shared-hidden");
+      el.style.visibility = "hidden";
       const outCopy =
         outgoingLayer &&
         queryDeep(outgoingLayer, `[data-vt-shared="${key}"]`)[0];
-      if (outCopy) outCopy.classList.add("vt-shared-hidden");
+      if (outCopy) {
+        outCopy.classList.add("vt-shared-hidden");
+        outCopy.style.visibility = "hidden";
+      }
 
       if (typeof clone.animate === "function") {
         clone.animate(
           [
             { transform: initialTransform },
-            { transform: "translate(0px, 0px) scale(1, 1)" },
+            { transform: "translate(0px, 0px) scale(1)" },
           ],
           { duration, easing, fill: "both" }
         );

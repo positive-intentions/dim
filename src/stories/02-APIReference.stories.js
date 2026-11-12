@@ -568,6 +568,10 @@ Dim provides React-like hooks for building functional web components:
 - **useRef** - DOM references and mutable values
 - **useStore** - Global persistent state
 
+Import from \`../core/dim.ts\` (or inject the same helpers via the component’s second argument — injected \`html\` matches the named export).
+
+Controlled inputs: use \`.value\` + \`@input\`. The mini-lit renderer preserves focus/caret across re-renders.
+
 Each hook includes live examples and detailed documentation below.
         `
       }
