@@ -38,7 +38,7 @@ describe('Dim Framework Tests', () => {
   it('should run the individual module tests', () => {
     // This test file serves as an entry point
     // The actual tests are in separate files:
-    // - mini-lit.test.js
+    // - renderer.test.js
     // - async-manager.test.js
     // - storage-manager.test.js
     // - dim.test.js (to be created)

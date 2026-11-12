@@ -244,14 +244,15 @@ npm run build
 dim/
 ├── src/
 │   ├── core/
-│   │   ├── dim.ts          # Main framework code
-│   │   ├── mini-lit.js     # Lit wrapper
-│   │   └── storage-manager.js
-│   └── stories/
-│       ├── *.stories.js    # Main documentation
-│       ├── hooks/          # Hook examples
-│       ├── advanced/       # Advanced patterns
-│       └── tutorial/       # Step-by-step guides
+│   │   ├── index.ts        # Public API
+│   │   ├── dim.ts          # Compatibility shim (re-exports index)
+│   │   ├── renderer/       # html/css tagged templates, parts, render()
+│   │   ├── element/        # DimElement, define(), props helpers
+│   │   ├── hooks/          # useState, useEffect, useMemo, useRef, useStyle, useScope
+│   │   ├── store/          # useStore, crypto/storage/async managers
+│   │   ├── transitions/    # view transitions + AutoTransitionHost
+│   │   └── fs/             # useFS + File System Access handle persistence
+│   └── stories/            # Storybook docs and demo apps
 ├── public/
 └── README.md
 ```
@@ -263,7 +264,7 @@ This project is licensed under the GNU General Public License v3.0 (GPL-3.0) - s
 ## 🙏 Acknowledgments
 
 - Inspired by React's component model and hooks
-- Built on top of [Lit](https://lit.dev/) for reactive Web Components
+- Built on native Web Components with Dim's own template renderer
 - Community feedback
 
 ---
