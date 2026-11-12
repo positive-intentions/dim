@@ -1908,7 +1908,7 @@ The \`useFS\` hook provides a unified interface for file system operations, supp
 ## 📝 Basic Usage
 
 \`\`\`javascript
-import { useFS } from '../hooks/useFS';
+import { useFS } from '../core/dim.ts';
 
 const MyComponent = (props, { useFS, html }) => {
   const { 

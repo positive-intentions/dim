@@ -1,4 +1,4 @@
-import { buttonStyles, layoutStyles } from '../../core/shared-styles';
+import { buttonStyles, layoutStyles } from '../shared-styles';
 
 export const StyledButton = ({ 
   onClick, 
