@@ -7,11 +7,12 @@
 
 // Renderer / template
 export {
-  html,
-  css,
-  unsafeCSS,
-  keyed,
-  renderChildren,
+    html,
+    css,
+    unsafeCSS,
+    keyed,
+    unsafeHTML,
+    renderChildren,
 } from "./renderer/index.js";
 export { DimElement } from "./element/dim-element.js";
 
