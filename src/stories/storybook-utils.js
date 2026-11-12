@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, HTML_RESULT } from './mini-lit.js';
+import { render, HTML_RESULT } from '../core/renderer/index.js';
 
 /**
  * Component that renders a Dim html template
@@ -21,15 +21,12 @@ function DimHtmlRenderer({ template }) {
  * @param {Function} renderFn - Function that returns a Dim TemplateResult
  * @returns {Function} A function that returns either a React element or the original result
  */
-export function wrapLitHtmlStory(renderFn) {
+export function wrapDimHtmlStory(renderFn) {
   return (args) => {
     const result = renderFn(args);
 
-    // Check if the result is a Dim (or legacy lit) template
-    if (
-      result &&
-      (result._$dimType$ === HTML_RESULT || result._$litType$ !== undefined)
-    ) {
+    // Check if the result is a Dim template
+    if (result && result._$dimType$ === HTML_RESULT) {
       return React.createElement(DimHtmlRenderer, { template: result });
     }
 

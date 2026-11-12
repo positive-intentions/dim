@@ -2,9 +2,9 @@ import {
   clearRootDirectoryHandle,
   loadRootDirectoryHandle,
   saveRootDirectoryHandle,
-} from './nativeFsHandlePersistence.js';
+} from './handle-persistence.js';
 
-describe('nativeFsHandlePersistence', () => {
+describe('handle-persistence', () => {
   it('loadRootDirectoryHandle resolves without throwing', async () => {
     const result = await loadRootDirectoryHandle();
     expect(result === null || result?.kind === 'directory').toBe(true);

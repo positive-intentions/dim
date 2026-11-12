@@ -1,4 +1,4 @@
-import { debouncedDispatcher } from './mini-lit.js';
+import { debouncedDispatcher } from "./events.js";
 
 const databaseName = "DimDatabase";
 const objectStoreName = "DimStore";

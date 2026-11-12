@@ -44,7 +44,7 @@ Dim is a lightweight framework that brings React's component model and hooks to 
 - 🎯 **React-like DX** - Familiar hooks API (`useState`, `useEffect`, `useMemo`, etc.)
 - 🔧 **Web Standards** - Built on native Web Components and Shadow DOM
 - 🎨 **Scoped Styling** - CSS-in-JS with automatic style isolation
-- 📦 **Zero runtime deps** - Own `mini-lit` renderer (no Lit); pure JS, no build step required for the core
+- 📦 **Zero runtime deps** - Own template renderer; pure JS, no build step required for the core
 - 🚀 **Lightweight** - Parts-based updates preserve focus, selection, and child state
 - 💾 **State Persistence** - Built-in global state management with `useStore`
 
@@ -258,14 +258,15 @@ npm run build
 dim/
 ├── src/
 │   ├── core/
-│   │   ├── dim.ts          # Main framework code
-│   │   ├── mini-lit.js     # Lit wrapper
-│   │   └── storage-manager.js
-│   └── stories/
-│       ├── *.stories.js    # Main documentation
-│       ├── hooks/          # Hook examples
-│       ├── advanced/       # Advanced patterns
-│       └── tutorial/       # Step-by-step guides
+│   │   ├── index.ts        # Public API
+│   │   ├── dim.ts          # Compatibility shim (re-exports index)
+│   │   ├── renderer/       # html/css tagged templates, parts, render()
+│   │   ├── element/        # DimElement, define(), props helpers
+│   │   ├── hooks/          # useState, useEffect, useMemo, useRef, useStyle, useScope
+│   │   ├── store/          # useStore, crypto/storage/async managers
+│   │   ├── transitions/    # view transitions + AutoTransitionHost
+│   │   └── fs/             # useFS + File System Access handle persistence
+│   └── stories/            # Storybook docs and demo apps
 ├── public/
 └── README.md
 ```
@@ -277,7 +278,7 @@ This project is licensed under the GNU General Public License v3.0 (GPL-3.0) - s
 ## 🙏 Acknowledgments
 
 - Inspired by React's component model and hooks
-- Built on top of [Lit](https://lit.dev/) for reactive Web Components
+- Built on native Web Components with Dim's own template renderer
 - Community feedback
 
 ---

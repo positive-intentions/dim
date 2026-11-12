@@ -12,7 +12,7 @@ module.exports = {
     transformIgnorePatterns: [
       '/node_modules/'
     ],
-    collectCoverageFrom: ['src/stories/components/*.{js,jsx,ts,tsx}', 'src/core/*.{js,jsx,ts,tsx}'],
+    collectCoverageFrom: ['src/stories/components/*.{js,jsx,ts,tsx}', 'src/core/**/*.{js,jsx,ts,tsx}'],
     moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
     testMatch: [
       "**/__tests__/**/*.[jt]s?(x)",

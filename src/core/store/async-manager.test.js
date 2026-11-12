@@ -4,7 +4,7 @@ import StorageManager from './storage-manager.js';
 
 // Mock debouncedDispatcher (factory may only reference allowed globals like
 // `globalThis`, not `window`).
-jest.mock('./mini-lit.js', () => ({
+jest.mock('./events.js', () => ({
   debouncedDispatcher: jest.fn((eventName, detail) => {
     globalThis.dispatchEvent(new CustomEvent(eventName, { detail }));
   })
@@ -232,7 +232,7 @@ describe('AsyncronousStateManager', () => {
     });
 
     test('setter dispatches plaintext (not an encrypted payload)', async () => {
-      const { debouncedDispatcher } = require('./mini-lit.js');
+      const { debouncedDispatcher } = require('./events.js');
       debouncedDispatcher.mockClear();
 
       const [, setter] = plainManager.generateListener({

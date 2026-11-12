@@ -1,4 +1,4 @@
-import { css } from './mini-lit';
+import { css } from '../core/dim.ts';
 
 // Shared button styles with custom properties
 export const buttonStyles = css`

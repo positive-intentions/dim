@@ -1,4 +1,4 @@
-import { define, html, useState, useEffect, useMemo, useRef } from './dim.ts';
+import { define, html, useState, useEffect, useMemo, useRef } from '../dim.ts';
 
 // Mount a defined custom element and wait for its first render to complete.
 async function mount(tag) {

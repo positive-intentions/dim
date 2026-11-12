@@ -19,7 +19,7 @@ import {
   clearRootDirectoryHandle,
   loadRootDirectoryHandle,
   saveRootDirectoryHandle,
-} from '../utils/nativeFsHandlePersistence.js';
+} from './handle-persistence.js';
 
 export function useFS(options = {}, hooks) {
   const { opfs = false, encrypt = false, encryptionPassword } = options;
@@ -40,7 +40,7 @@ export function useFS(options = {}, hooks) {
         return;
       }
       // Dynamically import CryptoManager to avoid circular dependencies
-      import('../core/crypto-manager.js').then(({ default: CryptoManager }) => {
+      import('../store/crypto-manager.js').then(({ default: CryptoManager }) => {
         const crypto = new CryptoManager(encryptionPassword);
         setCryptoManager(crypto);
       });

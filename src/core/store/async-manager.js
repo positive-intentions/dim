@@ -1,5 +1,5 @@
 import StorageManager from "./storage-manager";
-import {debouncedDispatcher} from './mini-lit.js';
+import { debouncedDispatcher } from "./events.js";
 // import CryptoManager from "./crypto-manager.js";
 
 class AsyncronousStateManager {

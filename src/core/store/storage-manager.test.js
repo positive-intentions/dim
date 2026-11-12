@@ -2,11 +2,11 @@ import StorageManager from './storage-manager.js';
 import CryptoManager from './crypto-manager.js';
 
 // Mock debouncedDispatcher so we can assert dispatched initial-load events.
-jest.mock('./mini-lit.js', () => ({
+jest.mock('./events.js', () => ({
   debouncedDispatcher: jest.fn()
 }));
 
-import { debouncedDispatcher } from './mini-lit.js';
+import { debouncedDispatcher } from './events.js';
 
 // Low iteration count keeps PBKDF2 fast in tests.
 const makeCrypto = (password) => new CryptoManager(password, { iterations: 1000 });

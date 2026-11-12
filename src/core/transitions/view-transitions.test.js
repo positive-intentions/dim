@@ -1,14 +1,14 @@
-import { define, html, useState, useViewTransition } from './dim.ts';
+import { define, html, useState, useViewTransition } from '../dim.ts';
 
 // Registers the <view-transitions-gallery> custom element used by the
 // regression test below.
-import '../stories/components/ViewTransitionsGallery.js';
+import '../../stories/components/ViewTransitionsGallery.js';
 // Registers <simple-gallery> / <simple-image> for the auto-transition test.
-import '../stories/components/SimpleGallery.js';
+import '../../stories/components/SimpleGallery.js';
 // Registers <navigation-example> / <page-content> for the pageData test.
-import '../stories/components/NavigationExample.js';
-import '../stories/components/messaging/MessagingAppDemo.js';
-import '../stories/components/shopping/ShoppingAppDemo.js';
+import '../../stories/components/NavigationExample.js';
+import '../../stories/components/messaging/MessagingAppDemo.js';
+import '../../stories/components/shopping/ShoppingAppDemo.js';
 
 async function mount(tag) {
   const el = document.createElement(tag);

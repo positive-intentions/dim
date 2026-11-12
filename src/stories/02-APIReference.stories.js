@@ -570,7 +570,7 @@ Dim provides React-like hooks for building functional web components:
 
 Import from \`../core/dim.ts\` (or inject the same helpers via the component’s second argument — injected \`html\` matches the named export).
 
-Controlled inputs: use \`.value\` + \`@input\`. The mini-lit renderer preserves focus/caret across re-renders.
+Controlled inputs: use \`.value\` + \`@input\`. The Dim renderer preserves focus/caret across re-renders.
 
 Each hook includes live examples and detailed documentation below.
         `

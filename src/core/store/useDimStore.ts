@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import CryptoManager from '../core/crypto-manager.js';
-import StorageManager from '../core/storage-manager.js';
-import { debouncedDispatcher } from '../core/mini-lit.js';
+import CryptoManager from './crypto-manager.js';
+import StorageManager from './storage-manager.js';
+import { debouncedDispatcher } from './events.js';
 
 // Global instances map to reuse crypto/storage managers per password
 const cryptoManagerMap = new Map<string, CryptoManager>();

@@ -11,6 +11,9 @@ module.exports = {
         path: __dirname + '/dist',
         publicPath: 'auto',
     },
+    resolve: {
+        extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
+    },
     devServer: {
         static: path.resolve(__dirname, "/dist"),
         //   watchContentBase: true,
@@ -81,7 +84,7 @@ module.exports = {
             name: 'dim',
             filename: 'remoteEntry.js',
             exposes: {
-                '.': './src/core/dim.ts',
+                '.': './src/core/index.ts',
             },
             shared: { react: { singleton: true }, "react-dom": { singleton: true } }
         }),

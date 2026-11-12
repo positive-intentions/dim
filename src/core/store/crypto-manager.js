@@ -36,7 +36,11 @@ class CryptoManager {
         for (let i = 0; i < len; i++) {
             bytes[i] = binaryString.charCodeAt(i);
         }
-        return bytes.buffer;
+        // Return the TypedArray, not `.buffer`. jsdom's ArrayBuffer is a
+        // different realm from Node's webcrypto, which rejects it as a
+        // BufferSource; Uint8Array is accepted. Passing the view is also
+        // correct if the underlying buffer is ever larger than the view.
+        return bytes;
     }
 
     // Derive the deterministic fallback salt for a password (legacy behaviour).

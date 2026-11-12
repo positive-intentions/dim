@@ -1,5 +1,6 @@
-import { keyed, setSkipFocusRestore } from "./mini-lit.js";
-import { viewTransitionStyles } from "./view-transitions.js";
+import { keyed } from "../renderer/index.js";
+import { setSkipFocusRestore } from "../renderer/focus.js";
+import { viewTransitionStyles } from "./styles.js";
 
 /**
  * Walk a root (and any nested shadow roots) collecting matching elements.

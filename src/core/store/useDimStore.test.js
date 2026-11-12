@@ -6,7 +6,7 @@ const mockWriteValue = jest.fn();
 const mockEncrypt = jest.fn(async (v) => JSON.stringify({ encryptedData: 'x', iv: 'y', salt: 'z' }));
 const mockDecrypt = jest.fn(async (v) => v);
 
-jest.mock('../core/crypto-manager.js', () => ({
+jest.mock('./crypto-manager.js', () => ({
   __esModule: true,
   default: jest.fn().mockImplementation(() => ({
     encryptData: (...args) => mockEncrypt(...args),
@@ -14,7 +14,7 @@ jest.mock('../core/crypto-manager.js', () => ({
   })),
 }));
 
-jest.mock('../core/storage-manager.js', () => ({
+jest.mock('./storage-manager.js', () => ({
   __esModule: true,
   default: jest.fn().mockImplementation(() => ({
     readValue: (...args) => mockReadValue(...args),
@@ -22,7 +22,7 @@ jest.mock('../core/storage-manager.js', () => ({
   })),
 }));
 
-jest.mock('../core/mini-lit.js', () => ({
+jest.mock('./events.js', () => ({
   debouncedDispatcher: jest.fn(),
 }));
 

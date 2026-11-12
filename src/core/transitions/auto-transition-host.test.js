@@ -1,5 +1,5 @@
 import { AutoTransitionHost } from './auto-transition-host.js';
-import { html } from './dim.ts';
+import { html } from '../dim.ts';
 
 function makeHost() {
   const host = document.createElement('div');

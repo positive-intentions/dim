@@ -3,9 +3,9 @@ import {
   render,
   keyed,
   unsafeHTML,
-  DimElement,
   css,
-} from "./mini-lit.js";
+} from "./index.js";
+import { DimElement } from "../element/dim-element.js";
 
 function mount() {
   const container = document.createElement("div");
@@ -13,7 +13,7 @@ function mount() {
   return container;
 }
 
-describe("mini-lit html/render", () => {
+describe("html/render", () => {
   afterEach(() => {
     document.body.innerHTML = "";
   });
