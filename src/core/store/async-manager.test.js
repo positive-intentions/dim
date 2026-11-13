@@ -1,196 +1,196 @@
-import AsyncronousStateManager from './async-manager.js';
-import CryptoManager from './crypto-manager.js';
-import StorageManager from './storage-manager.js';
+import AsyncronousStateManager from "./async-manager.js";
+import CryptoManager from "./crypto-manager.js";
+import StorageManager from "./storage-manager.js";
 
 // Mock debouncedDispatcher (factory may only reference allowed globals like
 // `globalThis`, not `window`).
-jest.mock('./events.js', () => ({
+jest.mock("./events.js", () => ({
   debouncedDispatcher: jest.fn((eventName, detail) => {
     globalThis.dispatchEvent(new CustomEvent(eventName, { detail }));
-  })
+  }),
 }));
 
-describe('AsyncronousStateManager', () => {
+describe("AsyncronousStateManager", () => {
   let asyncManager;
   let cryptoManager;
-  const testPassword = 'test-password';
+  const testPassword = "test-password";
 
   beforeEach(() => {
     // Low iteration count keeps PBKDF2 fast in tests.
     cryptoManager = new CryptoManager(testPassword, { iterations: 1000 });
     asyncManager = new AsyncronousStateManager(cryptoManager);
-    
+
     // Clear any existing event listeners
     asyncManager.eventListener = [];
   });
 
   afterEach(() => {
     // Clean up event listeners
-    asyncManager.eventListener.forEach(listener => {
+    asyncManager.eventListener.forEach((listener) => {
       window.removeEventListener(listener.eventName, listener.listener);
     });
   });
 
-  describe('State Management', () => {
-    test('should create listeners for state values', () => {
+  describe("State Management", () => {
+    test("should create listeners for state values", () => {
       const mockSetValue = jest.fn();
       const listener = {
-        listenerId: 'test-id',
-        key: 'testKey',
-        value: ['initialValue', mockSetValue]
+        listenerId: "test-id",
+        key: "testKey",
+        value: ["initialValue", mockSetValue],
       };
 
       asyncManager.generateListener(listener);
 
       expect(asyncManager.eventListener.length).toBe(2); // Regular + initial load listener
-      expect(asyncManager.eventListener[0].key).toBe('testKey');
+      expect(asyncManager.eventListener[0].key).toBe("testKey");
     });
 
-    test('should update state when event is dispatched', async () => {
+    test("should update state when event is dispatched", async () => {
       const mockSetValue = jest.fn();
       const listener = {
-        listenerId: 'test-id',
-        key: 'testKey',
-        value: ['initialValue', mockSetValue]
+        listenerId: "test-id",
+        key: "testKey",
+        value: ["initialValue", mockSetValue],
       };
 
       asyncManager.generateListener(listener);
 
       // Encrypt data before dispatching
-      const newValue = 'updatedValue';
+      const newValue = "updatedValue";
       const encryptedValue = await cryptoManager.encryptData(newValue);
 
       // Dispatch event
-      const event = new CustomEvent('testKey', {
-        detail: JSON.parse(encryptedValue)
+      const event = new CustomEvent("testKey", {
+        detail: JSON.parse(encryptedValue),
       });
       window.dispatchEvent(event);
 
       // Wait for async operations
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Check if setter was called with decrypted value
       expect(mockSetValue).toHaveBeenCalledWith(newValue);
       expect(asyncManager.store.testKey).toBe(newValue);
     });
 
-    test('should handle initial load events', async () => {
+    test("should handle initial load events", async () => {
       const mockSetValue = jest.fn();
       const mockSetLoading = jest.fn();
-      
+
       asyncManager.loadingSetters = {
-        'testKey': mockSetLoading
+        testKey: mockSetLoading,
       };
 
       const listener = {
-        listenerId: 'test-id',
-        key: 'testKey',
-        value: ['initialValue', mockSetValue]
+        listenerId: "test-id",
+        key: "testKey",
+        value: ["initialValue", mockSetValue],
       };
 
       asyncManager.generateListener(listener);
 
       // Dispatch initial load event (already decrypted)
-      const event = new CustomEvent('testKey-initialLoad-test-id', {
+      const event = new CustomEvent("testKey-initialLoad-test-id", {
         detail: {
-          value: 'loadedValue',
-          _isInitialLoad: true
-        }
+          value: "loadedValue",
+          _isInitialLoad: true,
+        },
       });
       window.dispatchEvent(event);
 
       // Wait for async operations
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Check if state was updated
-      expect(mockSetValue).toHaveBeenCalledWith('loadedValue');
+      expect(mockSetValue).toHaveBeenCalledWith("loadedValue");
       expect(mockSetLoading).toHaveBeenCalledWith(false);
     });
 
-    test('should handle errors gracefully', async () => {
+    test("should handle errors gracefully", async () => {
       const mockSetValue = jest.fn();
       const mockSetLoading = jest.fn();
-      
+
       asyncManager.loadingSetters = {
-        'testKey': mockSetLoading
+        testKey: mockSetLoading,
       };
 
       const listener = {
-        listenerId: 'test-id',
-        key: 'testKey',
-        value: ['initialValue', mockSetValue]
+        listenerId: "test-id",
+        key: "testKey",
+        value: ["initialValue", mockSetValue],
       };
 
       asyncManager.generateListener(listener);
 
       // Dispatch invalid event
-      const event = new CustomEvent('testKey', {
-        detail: 'invalid-data'
+      const event = new CustomEvent("testKey", {
+        detail: "invalid-data",
       });
       window.dispatchEvent(event);
 
       // Wait for async operations
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Loading should be set to false even on error
       expect(mockSetLoading).toHaveBeenCalledWith(false);
     });
   });
 
-  describe('createListeners', () => {
-    test('should create listeners for all store properties', () => {
+  describe("createListeners", () => {
+    test("should create listeners for all store properties", () => {
       const store = {
-        prop1: ['value1', jest.fn()],
+        prop1: ["value1", jest.fn()],
         nested: {
-          prop2: ['value2', jest.fn()]
-        }
+          prop2: ["value2", jest.fn()],
+        },
       };
 
-      asyncManager.createListeners(store, 'test-listener-id');
+      asyncManager.createListeners(store, "test-listener-id");
 
       // Should create listeners for prop1 and nested.prop2
       expect(asyncManager.eventListener.length).toBe(4); // 2 properties x 2 listeners each
     });
 
-    test('should handle event dispatching with encryption', async () => {
+    test("should handle event dispatching with encryption", async () => {
       const mockSetValue = jest.fn();
       const store = {
-        testProp: ['initial', mockSetValue]
+        testProp: ["initial", mockSetValue],
       };
 
-      asyncManager.createListeners(store, 'test-listener-id');
+      asyncManager.createListeners(store, "test-listener-id");
 
       // Simulate an update through the wrapped setter
       const wrappedSetter = asyncManager.generateListener({
-        listenerId: 'test-listener-id',
-        key: 'testProp',
-        value: store.testProp
+        listenerId: "test-listener-id",
+        key: "testProp",
+        value: store.testProp,
       });
 
       // The setter should be wrapped
       expect(store.testProp[1]).toBeDefined();
-      expect(typeof store.testProp[1]).toBe('function');
+      expect(typeof store.testProp[1]).toBe("function");
     });
   });
 
-  describe('removeListeners', () => {
-    test('should remove all listeners for a given listenerId', () => {
+  describe("removeListeners", () => {
+    test("should remove all listeners for a given listenerId", () => {
       const store = {
-        prop1: ['value1', jest.fn()],
-        prop2: ['value2', jest.fn()]
+        prop1: ["value1", jest.fn()],
+        prop2: ["value2", jest.fn()],
       };
 
-      asyncManager.createListeners(store, 'test-listener-id');
+      asyncManager.createListeners(store, "test-listener-id");
       const initialCount = asyncManager.eventListener.length;
 
-      asyncManager.removeListeners('test-listener-id');
+      asyncManager.removeListeners("test-listener-id");
 
       expect(asyncManager.eventListener.length).toBe(0);
     });
   });
 
-  describe('Integration with StorageManager', () => {
-    test('should connect storage manager', () => {
+  describe("Integration with StorageManager", () => {
+    test("should connect storage manager", () => {
       const storageManager = new StorageManager(cryptoManager);
       asyncManager.db = storageManager;
       storageManager.asyncManager = asyncManager;
@@ -200,7 +200,7 @@ describe('AsyncronousStateManager', () => {
     });
   });
 
-  describe('Plaintext mode (no encryption)', () => {
+  describe("Plaintext mode (no encryption)", () => {
     let plainManager;
 
     beforeEach(() => {
@@ -214,63 +214,63 @@ describe('AsyncronousStateManager', () => {
       });
     });
 
-    test('updates state from a plaintext dispatched event', async () => {
+    test("updates state from a plaintext dispatched event", async () => {
       const mockSetValue = jest.fn();
       plainManager.generateListener({
-        listenerId: 'plain-id',
-        key: 'plainKey',
-        value: ['initial', mockSetValue],
+        listenerId: "plain-id",
+        key: "plainKey",
+        value: ["initial", mockSetValue],
       });
 
       // No encryption: the dispatched detail is the plaintext value directly.
-      window.dispatchEvent(new CustomEvent('plainKey', { detail: 'updated' }));
+      window.dispatchEvent(new CustomEvent("plainKey", { detail: "updated" }));
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      expect(mockSetValue).toHaveBeenCalledWith('updated');
-      expect(plainManager.store.plainKey).toBe('updated');
+      expect(mockSetValue).toHaveBeenCalledWith("updated");
+      expect(plainManager.store.plainKey).toBe("updated");
     });
 
-    test('setter dispatches plaintext (not an encrypted payload)', async () => {
-      const { debouncedDispatcher } = require('./events.js');
+    test("setter dispatches plaintext (not an encrypted payload)", async () => {
+      const { debouncedDispatcher } = require("./events.js");
       debouncedDispatcher.mockClear();
 
       const [, setter] = plainManager.generateListener({
-        listenerId: 'plain-id-2',
-        key: 'plainKey2',
-        value: ['initial', jest.fn()],
+        listenerId: "plain-id-2",
+        key: "plainKey2",
+        value: ["initial", jest.fn()],
       });
 
-      setter('newValue');
+      setter("newValue");
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      expect(debouncedDispatcher).toHaveBeenCalledWith('plainKey2', 'newValue');
+      expect(debouncedDispatcher).toHaveBeenCalledWith("plainKey2", "newValue");
     });
 
-    test('wrapped setter updates original useState immediately', () => {
+    test("wrapped setter updates original useState immediately", () => {
       const mockSetValue = jest.fn();
       const [, setter] = plainManager.generateListener({
-        listenerId: 'immediate-id',
-        key: 'immediateKey',
-        value: ['initial', mockSetValue],
+        listenerId: "immediate-id",
+        key: "immediateKey",
+        value: ["initial", mockSetValue],
       });
 
-      setter('right-away');
+      setter("right-away");
 
       // Must not wait on the debounced CustomEvent — first call is synchronous.
       expect(mockSetValue).toHaveBeenCalled();
-      expect(mockSetValue.mock.calls[0]).toEqual(['right-away']);
+      expect(mockSetValue.mock.calls[0]).toEqual(["right-away"]);
     });
 
-    test('user setter syncs manager cache so re-generateListener is not stale', () => {
-      const oldList = [{ id: 'old' }];
-      const newList = [{ id: 'new' }, { id: 'old' }];
+    test("user setter syncs manager cache so re-generateListener is not stale", () => {
+      const oldList = [{ id: "old" }];
+      const newList = [{ id: "new" }, { id: "old" }];
       plainManager.store.staleKey = oldList;
 
       const mockSetValue = jest.fn();
       const [, setter] = plainManager.generateListener({
-        listenerId: 'stale-id',
-        key: 'staleKey',
+        listenerId: "stale-id",
+        key: "staleKey",
         value: [oldList, mockSetValue],
       });
 
@@ -280,41 +280,41 @@ describe('AsyncronousStateManager', () => {
       // Next render path: generateListener again with the useState tuple still
       // holding oldList at value[0] — cache must win with the new list.
       const [state] = plainManager.generateListener({
-        listenerId: 'stale-id',
-        key: 'staleKey',
+        listenerId: "stale-id",
+        key: "staleKey",
         value: [oldList, mockSetValue],
       });
       expect(state).toBe(newList);
       expect(state).not.toBe(oldList);
     });
 
-    test('clearLoading notifies every multicast subscriber', () => {
+    test("clearLoading notifies every multicast subscriber", () => {
       const a = jest.fn();
       const b = jest.fn();
-      plainManager.addLoadingSetter('sharedKey', 'sub-a', a);
-      plainManager.addLoadingSetter('sharedKey', 'sub-b', b);
+      plainManager.addLoadingSetter("sharedKey", "sub-a", a);
+      plainManager.addLoadingSetter("sharedKey", "sub-b", b);
 
-      plainManager.clearLoading('sharedKey');
+      plainManager.clearLoading("sharedKey");
 
       expect(a).toHaveBeenCalledWith(false);
       expect(b).toHaveBeenCalledWith(false);
     });
 
-    test('clearLoading still supports a legacy single-function setter', () => {
+    test("clearLoading still supports a legacy single-function setter", () => {
       const setLoading = jest.fn();
       plainManager.loadingSetters.legacyKey = setLoading;
-      plainManager.clearLoading('legacyKey');
+      plainManager.clearLoading("legacyKey");
       expect(setLoading).toHaveBeenCalledWith(false);
     });
 
-    test('removeListeners drops that subscriber loading setters only', () => {
+    test("removeListeners drops that subscriber loading setters only", () => {
       const a = jest.fn();
       const b = jest.fn();
-      plainManager.addLoadingSetter('sharedKey', 'sub-a', a);
-      plainManager.addLoadingSetter('sharedKey', 'sub-b', b);
+      plainManager.addLoadingSetter("sharedKey", "sub-a", a);
+      plainManager.addLoadingSetter("sharedKey", "sub-b", b);
 
-      plainManager.removeListeners('sub-a');
-      plainManager.clearLoading('sharedKey');
+      plainManager.removeListeners("sub-a");
+      plainManager.clearLoading("sharedKey");
 
       expect(a).not.toHaveBeenCalled();
       expect(b).toHaveBeenCalledWith(false);

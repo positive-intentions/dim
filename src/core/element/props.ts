@@ -37,7 +37,7 @@ export function createComponentProps(
   attributes,
   hostProps,
   children,
-  childElements
+  childElements,
 ) {
   const rawProps = {
     ...attributes,
@@ -50,7 +50,7 @@ export function createComponentProps(
       if (typeof key === "string" && !(key in target)) {
         const lower = key.toLowerCase();
         const match = Object.keys(target).find(
-          (k) => k.toLowerCase() === lower
+          (k) => k.toLowerCase() === lower,
         );
         if (match !== undefined) return target[match];
       }

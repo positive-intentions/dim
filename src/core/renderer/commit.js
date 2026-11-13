@@ -14,11 +14,7 @@ import {
   prepareTemplate,
   createInstance,
 } from "./prepare.js";
-import {
-  captureFocus,
-  restoreFocus,
-  isFormControl,
-} from "./focus.js";
+import { captureFocus, restoreFocus, isFormControl } from "./focus.js";
 
 const containerState = new WeakMap();
 
@@ -72,10 +68,7 @@ function setChildValue(part, value, container) {
   // Handle keyed: remount when key changes
   if (isKeyed(value)) {
     const prev = part.committed;
-    const keyChanged =
-      !prev ||
-      !isKeyed(prev) ||
-      prev.key !== value.key;
+    const keyChanged = !prev || !isKeyed(prev) || prev.key !== value.key;
     if (keyChanged) {
       clearNodesBetween(part.start, part.end);
       part.childState = undefined;
@@ -94,7 +87,11 @@ function setChildValue(part, value, container) {
 
   if (isUnsafeHTML(value)) {
     const htmlString = value.value == null ? "" : String(value.value);
-    if (part.committed && isUnsafeHTML(part.committed) && part.committed.value === htmlString) {
+    if (
+      part.committed &&
+      isUnsafeHTML(part.committed) &&
+      part.committed.value === htmlString
+    ) {
       return;
     }
     clearNodesBetween(part.start, part.end);

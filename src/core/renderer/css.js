@@ -18,7 +18,7 @@ export class CSSResult {
     this["_$cssResult$"] = true;
     if (safeToken !== constructionToken) {
       throw new Error(
-        "CSSResult is not constructable. Use `unsafeCSS` or `css` instead."
+        "CSSResult is not constructable. Use `unsafeCSS` or `css` instead.",
       );
     }
     this.cssText = cssText;
@@ -34,7 +34,7 @@ export class CSSResult {
       }
       if (styleSheet === undefined) {
         (this._styleSheet = styleSheet = new CSSStyleSheet()).replaceSync(
-          this.cssText
+          this.cssText,
         );
         if (cacheable) {
           cssTagCache.set(strings, styleSheet);
@@ -57,7 +57,7 @@ const textFromCSSResult = (value) => {
     throw new Error(
       `Value passed to 'css' function must be a 'css' function result: ` +
         `${value}. Use 'unsafeCSS' to pass non-literal values, but take care ` +
-        `to ensure page security.`
+        `to ensure page security.`,
     );
   }
 };
@@ -66,7 +66,7 @@ export const unsafeCSS = (value) =>
   new CSSResult(
     typeof value === "string" ? value : String(value),
     undefined,
-    constructionToken
+    constructionToken,
   );
 
 export const css = (strings, ...values) => {
@@ -75,7 +75,7 @@ export const css = (strings, ...values) => {
       ? strings[0]
       : values.reduce(
           (acc, v, idx) => acc + textFromCSSResult(v) + strings[idx + 1],
-          strings[0]
+          strings[0],
         );
   return new CSSResult(cssText, strings, constructionToken);
 };

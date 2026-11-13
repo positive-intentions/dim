@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import CryptoManager from './crypto-manager.js';
-import StorageManager from './storage-manager.js';
-import { debouncedDispatcher } from './events.js';
+import { useState, useEffect, useRef } from "react";
+import CryptoManager from "./crypto-manager.js";
+import StorageManager from "./storage-manager.js";
+import { debouncedDispatcher } from "./events.js";
 
 // Global instances map to reuse crypto/storage managers per password
 const cryptoManagerMap = new Map<string, CryptoManager>();
@@ -46,11 +46,11 @@ interface UseDimStoreOptions {
 export function useDimStore({
   key,
   password,
-  defaultValue = ""
+  defaultValue = "",
 }: UseDimStoreOptions): [string, (newValue: string) => void, boolean] {
   if (!password) {
     throw new Error(
-      "useDimStore: an explicit `password` (encryption key) is required."
+      "useDimStore: an explicit `password` (encryption key) is required.",
     );
   }
 
@@ -59,7 +59,9 @@ export function useDimStore({
   const { cryptoManager, storageManager } = getManagers(password);
   const mountedRef = useRef(true);
   const eventListenerRef = useRef<((event: CustomEvent) => void) | null>(null);
-  const instanceIdRef = useRef<string>(Math.random().toString(36).substring(2, 15));
+  const instanceIdRef = useRef<string>(
+    Math.random().toString(36).substring(2, 15),
+  );
   const isSettingValueRef = useRef<boolean>(false);
   const hasLoadedRef = useRef<boolean>(false);
 
@@ -77,9 +79,15 @@ export function useDimStore({
         if (result && result.value !== null && result.value !== undefined) {
           const value = result.value;
           // Check if value looks like an encrypted payload structure (shouldn't happen)
-          if (typeof value === 'object' && value !== null && 
-              value.encryptedData && value.iv) {
-            console.error('useDimStore: Received encrypted payload structure instead of decrypted value - password may be incorrect');
+          if (
+            typeof value === "object" &&
+            value !== null &&
+            value.encryptedData &&
+            value.iv
+          ) {
+            console.error(
+              "useDimStore: Received encrypted payload structure instead of decrypted value - password may be incorrect",
+            );
             // Password is wrong - use default value
             if (!hasLoadedRef.current && !isSettingValueRef.current) {
               setValue(defaultValue);
@@ -102,20 +110,28 @@ export function useDimStore({
             setValue(defaultValue);
           }
           hasLoadedRef.current = true;
-        } else if (hasLoadedRef.current && result && result.value !== null && result.value !== undefined) {
+        } else if (
+          hasLoadedRef.current &&
+          result &&
+          result.value !== null &&
+          result.value !== undefined
+        ) {
           // If we've already loaded but got a new value (from another instance), update it
           setValue(result.value);
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error('Failed to load from storage:', error);
-        
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        console.error("Failed to load from storage:", error);
+
         // If it's a password error, use default value and log warning
-        if (errorMessage.includes('Incorrect password') || 
-            errorMessage.includes('Decryption failed')) {
-          console.warn('useDimStore: Password mismatch - using default value');
+        if (
+          errorMessage.includes("Incorrect password") ||
+          errorMessage.includes("Decryption failed")
+        ) {
+          console.warn("useDimStore: Password mismatch - using default value");
         }
-        
+
         if (mountedRef.current && !hasLoadedRef.current) {
           setValue(defaultValue);
           hasLoadedRef.current = true;
@@ -148,15 +164,21 @@ export function useDimStore({
         // decryptData expects an object with encryptedData and iv properties (from JSON.parse of encrypted string)
         const decryptedValue = await cryptoManager.decryptData({
           ...event.detail,
-          crypto: cryptoManager
+          crypto: cryptoManager,
         });
 
         if (!mountedRef.current) return;
 
         // Validate that decryptedValue is not an encrypted payload structure
-        if (decryptedValue && typeof decryptedValue === 'object' && 
-            decryptedValue.encryptedData && decryptedValue.iv) {
-          console.error('useDimStore: Event decryption returned encrypted payload structure - password may be incorrect');
+        if (
+          decryptedValue &&
+          typeof decryptedValue === "object" &&
+          decryptedValue.encryptedData &&
+          decryptedValue.iv
+        ) {
+          console.error(
+            "useDimStore: Event decryption returned encrypted payload structure - password may be incorrect",
+          );
           return; // Don't update with encrypted structure
         }
 
@@ -169,12 +191,17 @@ export function useDimStore({
           return currentValue;
         });
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        if (errorMessage.includes('Incorrect password') || 
-            errorMessage.includes('Decryption failed')) {
-          console.warn('useDimStore: Failed to process event data - password mismatch');
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        if (
+          errorMessage.includes("Incorrect password") ||
+          errorMessage.includes("Decryption failed")
+        ) {
+          console.warn(
+            "useDimStore: Failed to process event data - password mismatch",
+          );
         } else {
-          console.error('Failed to process event data:', error);
+          console.error("Failed to process event data:", error);
         }
       }
     };
@@ -187,12 +214,14 @@ export function useDimStore({
       mountedRef.current = false;
       // Clean up event listener
       if (eventListenerRef.current) {
-        window.removeEventListener(key, eventListenerRef.current as EventListener);
+        window.removeEventListener(
+          key,
+          eventListenerRef.current as EventListener,
+        );
         eventListenerRef.current = null;
       }
     };
     // Note: cryptoManager and storageManager are stable (cached per password), so we only need password in deps
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, password, defaultValue]);
 
   // Save to IndexedDB and dispatch encrypted event whenever value changes
@@ -220,10 +249,10 @@ export function useDimStore({
         encryptedObject._instanceId = instanceIdRef.current;
         debouncedDispatcher(key, encryptedObject);
       } catch (error) {
-        console.error('Failed to dispatch event:', error);
+        console.error("Failed to dispatch event:", error);
       }
     } catch (error) {
-      console.error('Failed to store value:', error);
+      console.error("Failed to store value:", error);
     } finally {
       // Reset flag after a short delay to allow event to be dispatched
       setTimeout(() => {
@@ -234,4 +263,3 @@ export function useDimStore({
 
   return [value, setValueAndStore, isLoading];
 }
-

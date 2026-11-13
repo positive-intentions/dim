@@ -101,13 +101,13 @@ export function define({ tag, component: CustomFunctionalComponent }) {
       }
 
       const querySelector = this.shadowRoot?.querySelector.bind(
-        this.shadowRoot
+        this.shadowRoot,
       );
       const getRef = (ref) => {
         const component = querySelector(ref);
         const refHookName =
           Object.keys(component.hooks).find(
-            (o) => !!component.hooks[o].current
+            (o) => !!component.hooks[o].current,
           ) || "";
         return component.hooks[refHookName].current;
       };
@@ -142,20 +142,20 @@ export function define({ tag, component: CustomFunctionalComponent }) {
       const childElements = this._childNodes.filter(
         (node) =>
           node.nodeType === Node.ELEMENT_NODE ||
-          (node.nodeType === Node.TEXT_NODE && node.textContent.trim())
+          (node.nodeType === Node.TEXT_NODE && node.textContent.trim()),
       );
 
       const componentProps = createComponentProps(
         attributes,
         hostProps,
         children,
-        childElements
+        childElements,
       );
 
       // Call the functional component
       const result = CustomFunctionalComponent(
         componentProps,
-        sharedDependencies
+        sharedDependencies,
       );
 
       // Clear the current instance context
@@ -163,11 +163,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
 
       // Auto-wrap result with view transitions if transitionId is present
       if (autoTransition) {
-        return this._transitionHost.wrapRender(
-          autoTransition,
-          result,
-          html
-        );
+        return this._transitionHost.wrapRender(autoTransition, result, html);
       }
 
       // Cache the latest render so a future transitionId can animate from it.

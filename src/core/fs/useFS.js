@@ -1,13 +1,13 @@
 /**
  * useFS Hook - File System Access with OPFS fallback
- * 
+ *
  * Provides unified interface for file system operations using either:
  * - File System Access API (with user permission)
  * - Origin Private File System (OPFS) as fallback
- * 
+ *
  * FSA mode persists the last granted root directory in IndexedDB and restores
  * it on load (see loadRootDirectoryHandle).
- * 
+ *
  * @param {Object} options - Configuration options
  * @param {boolean} options.opfs - Force OPFS usage instead of trying File System Access API
  * @param {boolean} options.encrypt - Enable encryption for file content
@@ -19,7 +19,7 @@ import {
   clearRootDirectoryHandle,
   loadRootDirectoryHandle,
   saveRootDirectoryHandle,
-} from './handle-persistence.js';
+} from "./handle-persistence.js";
 
 export function useFS(options = {}, hooks) {
   const { opfs = false, encrypt = false, encryptionPassword } = options;
@@ -34,16 +34,18 @@ export function useFS(options = {}, hooks) {
     if (encrypt) {
       if (!encryptionPassword) {
         console.error(
-          'useFS: encryption enabled but no `encryptionPassword` was provided. ' +
-          'Files will NOT be encrypted. Provide an explicit key to enable encryption.'
+          "useFS: encryption enabled but no `encryptionPassword` was provided. " +
+            "Files will NOT be encrypted. Provide an explicit key to enable encryption.",
         );
         return;
       }
       // Dynamically import CryptoManager to avoid circular dependencies
-      import('../store/crypto-manager.js').then(({ default: CryptoManager }) => {
-        const crypto = new CryptoManager(encryptionPassword);
-        setCryptoManager(crypto);
-      });
+      import("../store/crypto-manager.js").then(
+        ({ default: CryptoManager }) => {
+          const crypto = new CryptoManager(encryptionPassword);
+          setCryptoManager(crypto);
+        },
+      );
     }
   }, [encrypt, encryptionPassword]);
 
@@ -53,21 +55,22 @@ export function useFS(options = {}, hooks) {
   const [directoryHandle, setDirectoryHandle] = useState(null);
   const [error, setError] = useState(null);
   const [pendingFolderReconnect, setPendingFolderReconnect] = useState(null);
-  
+
   // Persistent state using useStore
   const store = useStore({
-    selectedDirectoryName: useState(''),
+    selectedDirectoryName: useState(""),
     hasPermission: useState(false),
-    preferredMode: useState(opfs ? 'opfs' : 'fsa'),
+    preferredMode: useState(opfs ? "opfs" : "fsa"),
   });
 
-  const [selectedDirectoryName, setSelectedDirectoryName] = store.selectedDirectoryName;
+  const [selectedDirectoryName, setSelectedDirectoryName] =
+    store.selectedDirectoryName;
   const [hasPermission, setHasPermission] = store.hasPermission;
   const [preferredMode, setPreferredMode] = store.preferredMode;
 
   // Check if File System Access API is supported
   const isFileSystemAccessSupported = () => {
-    return 'showDirectoryPicker' in window;
+    return "showDirectoryPicker" in window;
   };
 
   // Initialize the file system based on mode and stored state
@@ -77,39 +80,42 @@ export function useFS(options = {}, hooks) {
 
     const applyFsaRestore = (handle) => {
       setPendingFolderReconnect(null);
-      setPreferredMode('fsa');
-      setFsMode('fsa');
+      setPreferredMode("fsa");
+      setFsMode("fsa");
       setDirectoryHandle(handle);
       setSelectedDirectoryName(handle.name);
       setHasPermission(true);
       setError(null);
       setIsInitialized(true);
-      console.log('useFS: Restored directory with write permissions:', handle.name);
+      console.log(
+        "useFS: Restored directory with write permissions:",
+        handle.name,
+      );
     };
 
     const applyPendingReconnect = (handle) => {
       setPendingFolderReconnect({ name: handle.name });
-      setPreferredMode('fsa');
-      setFsMode('fsa');
+      setPreferredMode("fsa");
+      setFsMode("fsa");
       setDirectoryHandle(null);
       setSelectedDirectoryName(handle.name);
       setHasPermission(false);
       setError(null);
       setIsInitialized(true);
-      console.log('useFS: Persisted folder requires reconnect:', handle.name);
+      console.log("useFS: Persisted folder requires reconnect:", handle.name);
     };
 
     const applyDefaultMode = () => {
-      if (opfs || preferredMode === 'opfs' || !isFileSystemAccessSupported()) {
-        setFsMode('opfs');
-        console.log('useFS: Initialized with OPFS');
+      if (opfs || preferredMode === "opfs" || !isFileSystemAccessSupported()) {
+        setFsMode("opfs");
+        console.log("useFS: Initialized with OPFS");
       } else {
         if (hasPermission && selectedDirectoryName) {
           setHasPermission(false);
-          setSelectedDirectoryName('');
+          setSelectedDirectoryName("");
         }
-        setFsMode('fsa');
-        console.log('useFS: Initialized with File System Access API');
+        setFsMode("fsa");
+        console.log("useFS: Initialized with File System Access API");
       }
       setIsInitialized(true);
     };
@@ -121,12 +127,12 @@ export function useFS(options = {}, hooks) {
           try {
             const h = await loadRootDirectoryHandle();
             if (h && !cancelled) {
-              const perm = await h.queryPermission({ mode: 'readwrite' });
-              if (!cancelled && perm === 'granted') {
+              const perm = await h.queryPermission({ mode: "readwrite" });
+              if (!cancelled && perm === "granted") {
                 applyFsaRestore(h);
                 return;
               }
-              if (!cancelled && (perm === 'prompt' || perm === 'denied')) {
+              if (!cancelled && (perm === "prompt" || perm === "denied")) {
                 applyPendingReconnect(h);
                 return;
               }
@@ -138,9 +144,9 @@ export function useFS(options = {}, hooks) {
         if (!cancelled) applyDefaultMode();
       } catch (err) {
         if (!cancelled) {
-          console.error('useFS: Initialization failed:', err);
+          console.error("useFS: Initialization failed:", err);
           setError(err);
-          setFsMode('opfs');
+          setFsMode("opfs");
           setIsInitialized(true);
         }
       }
@@ -155,7 +161,7 @@ export function useFS(options = {}, hooks) {
   const reconnectLocalDirectory = async () => {
     try {
       if (!isFileSystemAccessSupported()) {
-        throw new Error('File System Access API not supported');
+        throw new Error("File System Access API not supported");
       }
 
       const handle = await loadRootDirectoryHandle();
@@ -164,23 +170,25 @@ export function useFS(options = {}, hooks) {
         return false;
       }
 
-      const permissionStatus = await handle.requestPermission({ mode: 'readwrite' });
-      if (permissionStatus !== 'granted') {
+      const permissionStatus = await handle.requestPermission({
+        mode: "readwrite",
+      });
+      if (permissionStatus !== "granted") {
         return false;
       }
 
       setPendingFolderReconnect(null);
-      setPreferredMode('fsa');
-      setFsMode('fsa');
+      setPreferredMode("fsa");
+      setFsMode("fsa");
       setDirectoryHandle(handle);
       setSelectedDirectoryName(handle.name);
       setHasPermission(true);
       setError(null);
       setIsInitialized(true);
-      console.log('useFS: Reconnected to directory:', handle.name);
+      console.log("useFS: Reconnected to directory:", handle.name);
       return true;
     } catch (err) {
-      console.error('useFS: Folder reconnect failed:', err);
+      console.error("useFS: Folder reconnect failed:", err);
       setError(err);
       return false;
     }
@@ -192,21 +200,21 @@ export function useFS(options = {}, hooks) {
 
   // Request permission to access file system (FSA only)
   const requestPermission = async () => {
-    if (fsMode === 'opfs') {
+    if (fsMode === "opfs") {
       // OPFS doesn't require explicit permission
       return true;
     }
 
     try {
       if (!isFileSystemAccessSupported()) {
-        throw new Error('File System Access API not supported');
+        throw new Error("File System Access API not supported");
       }
 
       // For FSA, permission is granted through directory selection
       // This is a placeholder that indicates user should call selectDirectory
       return hasPermission;
     } catch (err) {
-      console.error('useFS: Permission request failed:', err);
+      console.error("useFS: Permission request failed:", err);
       setError(err);
       return false;
     }
@@ -214,43 +222,48 @@ export function useFS(options = {}, hooks) {
 
   // Select a directory (FSA only, OPFS uses root)
   const selectDirectory = async () => {
-    if (fsMode === 'opfs') {
+    if (fsMode === "opfs") {
       // OPFS doesn't have directory selection, use root
       const root = await navigator.storage.getDirectory();
       setDirectoryHandle(root);
-      setSelectedDirectoryName('OPFS Root');
+      setSelectedDirectoryName("OPFS Root");
       setHasPermission(true);
       return true;
     }
 
     try {
       if (!isFileSystemAccessSupported()) {
-        throw new Error('File System Access API not supported');
+        throw new Error("File System Access API not supported");
       }
 
       const handle = await window.showDirectoryPicker({
-        mode: 'readwrite'
+        mode: "readwrite",
       });
-      
+
       // Verify we have write permissions by requesting them explicitly
-      const permissionStatus = await handle.requestPermission({ mode: 'readwrite' });
-      if (permissionStatus !== 'granted') {
-        throw new Error('Write permission denied');
+      const permissionStatus = await handle.requestPermission({
+        mode: "readwrite",
+      });
+      if (permissionStatus !== "granted") {
+        throw new Error("Write permission denied");
       }
-      
+
       setDirectoryHandle(handle);
       setSelectedDirectoryName(handle.name);
       setHasPermission(true);
       setError(null);
       void saveRootDirectoryHandle(handle);
-      console.log('useFS: Directory selected with write permissions:', handle.name);
+      console.log(
+        "useFS: Directory selected with write permissions:",
+        handle.name,
+      );
       return true;
     } catch (err) {
-      if (err.name === 'AbortError') {
-        console.log('useFS: Directory selection cancelled');
+      if (err.name === "AbortError") {
+        console.log("useFS: Directory selection cancelled");
         return false;
       }
-      console.error('useFS: Directory selection failed:', err);
+      console.error("useFS: Directory selection failed:", err);
       setError(err);
       return false;
     }
@@ -260,32 +273,37 @@ export function useFS(options = {}, hooks) {
   const pickLocalDirectory = async () => {
     try {
       if (!isFileSystemAccessSupported()) {
-        throw new Error('File System Access API not supported');
+        throw new Error("File System Access API not supported");
       }
 
-      const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-      const permissionStatus = await handle.requestPermission({ mode: 'readwrite' });
-      if (permissionStatus !== 'granted') {
-        throw new Error('Write permission denied');
+      const handle = await window.showDirectoryPicker({ mode: "readwrite" });
+      const permissionStatus = await handle.requestPermission({
+        mode: "readwrite",
+      });
+      if (permissionStatus !== "granted") {
+        throw new Error("Write permission denied");
       }
 
       setPendingFolderReconnect(null);
-      setPreferredMode('fsa');
-      setFsMode('fsa');
+      setPreferredMode("fsa");
+      setFsMode("fsa");
       setIsInitialized(true);
       setDirectoryHandle(handle);
       setSelectedDirectoryName(handle.name);
       setHasPermission(true);
       setError(null);
       void saveRootDirectoryHandle(handle);
-      console.log('useFS: Local directory mounted with write permissions:', handle.name);
+      console.log(
+        "useFS: Local directory mounted with write permissions:",
+        handle.name,
+      );
       return true;
     } catch (err) {
-      if (err.name === 'AbortError') {
-        console.log('useFS: Local directory selection cancelled');
+      if (err.name === "AbortError") {
+        console.log("useFS: Local directory selection cancelled");
         return false;
       }
-      console.error('useFS: Local directory selection failed:', err);
+      console.error("useFS: Local directory selection failed:", err);
       setError(err);
       return false;
     }
@@ -297,24 +315,24 @@ export function useFS(options = {}, hooks) {
       return directoryHandle;
     }
 
-    if (fsMode === 'opfs') {
+    if (fsMode === "opfs") {
       const root = await navigator.storage.getDirectory();
       setDirectoryHandle(root);
       return root;
     }
 
-    throw new Error('No directory selected. Call selectDirectory() first.');
+    throw new Error("No directory selected. Call selectDirectory() first.");
   };
 
   // List files and directories
-  const listDirectory = async (path = '') => {
+  const listDirectory = async (path = "") => {
     try {
       const dirHandle = await getCurrentDirectoryHandle();
       let targetHandle = dirHandle;
 
       // Navigate to subdirectory if path is provided
       if (path) {
-        const pathParts = path.split('/').filter(Boolean);
+        const pathParts = path.split("/").filter(Boolean);
         for (const part of pathParts) {
           targetHandle = await targetHandle.getDirectoryHandle(part);
         }
@@ -325,33 +343,33 @@ export function useFS(options = {}, hooks) {
         entries.push({
           name,
           kind: handle.kind, // 'file' or 'directory'
-          handle
+          handle,
         });
       }
 
       return entries.sort((a, b) => {
         // Directories first, then files, both alphabetically
         if (a.kind !== b.kind) {
-          return a.kind === 'directory' ? -1 : 1;
+          return a.kind === "directory" ? -1 : 1;
         }
         return a.name.localeCompare(b.name);
       });
     } catch (err) {
-      console.error('useFS: Failed to list directory:', err);
+      console.error("useFS: Failed to list directory:", err);
       setError(err);
       throw err;
     }
   };
 
   // Read file content
-  const readFile = async (fileName, path = '') => {
+  const readFile = async (fileName, path = "") => {
     try {
       const dirHandle = await getCurrentDirectoryHandle();
       let targetHandle = dirHandle;
 
       // Navigate to subdirectory if path is provided
       if (path) {
-        const pathParts = path.split('/').filter(Boolean);
+        const pathParts = path.split("/").filter(Boolean);
         for (const part of pathParts) {
           targetHandle = await targetHandle.getDirectoryHandle(part);
         }
@@ -371,21 +389,24 @@ export function useFS(options = {}, hooks) {
           }
         } catch (decryptErr) {
           // If decryption fails or content is not encrypted JSON, return as-is
-          console.warn('useFS: Failed to decrypt file content, returning as plain text:', decryptErr.message);
+          console.warn(
+            "useFS: Failed to decrypt file content, returning as plain text:",
+            decryptErr.message,
+          );
         }
       }
 
       // Check if this is a binary file stored in our format
       try {
         const parsed = JSON.parse(content);
-        if (parsed.type === 'binary' && parsed.data && parsed.mimeType) {
+        if (parsed.type === "binary" && parsed.data && parsed.mimeType) {
           // Return metadata about binary file rather than raw data
           return {
-            type: 'binary',
+            type: "binary",
             mimeType: parsed.mimeType,
-            size: Math.ceil(parsed.data.length * 3 / 4), // Approximate original size
+            size: Math.ceil((parsed.data.length * 3) / 4), // Approximate original size
             data: parsed.data, // Base64 data
-            preview: `Binary file (${parsed.mimeType})`
+            preview: `Binary file (${parsed.mimeType})`,
           };
         }
       } catch (e) {
@@ -394,36 +415,42 @@ export function useFS(options = {}, hooks) {
 
       return content;
     } catch (err) {
-      console.error('useFS: Failed to read file:', err);
+      console.error("useFS: Failed to read file:", err);
       setError(err);
       throw err;
     }
   };
 
   // Write file content
-  const writeFile = async (fileName, content, path = '') => {
+  const writeFile = async (fileName, content, path = "") => {
     try {
       const dirHandle = await getCurrentDirectoryHandle();
-      
+
       // Check write permissions for FSA mode
-      if (fsMode === 'fsa') {
-        const permissionStatus = await dirHandle.requestPermission({ mode: 'readwrite' });
-        if (permissionStatus !== 'granted') {
-          throw new Error('Write permission required. Please re-select the directory and grant write access.');
+      if (fsMode === "fsa") {
+        const permissionStatus = await dirHandle.requestPermission({
+          mode: "readwrite",
+        });
+        if (permissionStatus !== "granted") {
+          throw new Error(
+            "Write permission required. Please re-select the directory and grant write access.",
+          );
         }
       }
-      
+
       let targetHandle = dirHandle;
 
       // Navigate to subdirectory if path is provided, create if needed
       if (path) {
-        const pathParts = path.split('/').filter(Boolean);
+        const pathParts = path.split("/").filter(Boolean);
         for (const part of pathParts) {
           try {
             targetHandle = await targetHandle.getDirectoryHandle(part);
           } catch (err) {
-            if (err.name === 'NotFoundError') {
-              targetHandle = await targetHandle.getDirectoryHandle(part, { create: true });
+            if (err.name === "NotFoundError") {
+              targetHandle = await targetHandle.getDirectoryHandle(part, {
+                create: true,
+              });
             } else {
               throw err;
             }
@@ -437,45 +464,58 @@ export function useFS(options = {}, hooks) {
         try {
           finalContent = await cryptoManager.encryptData(content);
         } catch (encryptErr) {
-          console.error('useFS: Failed to encrypt file content:', encryptErr);
+          console.error("useFS: Failed to encrypt file content:", encryptErr);
           throw new Error(`Encryption failed: ${encryptErr.message}`);
         }
       }
 
-      const fileHandle = await targetHandle.getFileHandle(fileName, { create: true });
+      const fileHandle = await targetHandle.getFileHandle(fileName, {
+        create: true,
+      });
       const writable = await fileHandle.createWritable();
       await writable.write(finalContent);
       await writable.close();
-      
-      console.log('useFS: File written successfully' + (encrypt ? ' (encrypted)' : '') + ':', fileName);
+
+      console.log(
+        "useFS: File written successfully" +
+          (encrypt ? " (encrypted)" : "") +
+          ":",
+        fileName,
+      );
     } catch (err) {
-      console.error('useFS: Failed to write file:', err);
+      console.error("useFS: Failed to write file:", err);
       setError(err);
       throw err;
     }
   };
 
   /** Directory handle for `path` under the volume root, with FSA write permission when needed. */
-  const resolveTargetDirectoryForWrite = async (path = '') => {
+  const resolveTargetDirectoryForWrite = async (path = "") => {
     const dirHandle = await getCurrentDirectoryHandle();
 
-    if (fsMode === 'fsa') {
-      const permissionStatus = await dirHandle.requestPermission({ mode: 'readwrite' });
-      if (permissionStatus !== 'granted') {
-        throw new Error('Write permission required. Please re-select the directory and grant write access.');
+    if (fsMode === "fsa") {
+      const permissionStatus = await dirHandle.requestPermission({
+        mode: "readwrite",
+      });
+      if (permissionStatus !== "granted") {
+        throw new Error(
+          "Write permission required. Please re-select the directory and grant write access.",
+        );
       }
     }
 
     let targetHandle = dirHandle;
 
     if (path) {
-      const pathParts = path.split('/').filter(Boolean);
+      const pathParts = path.split("/").filter(Boolean);
       for (const part of pathParts) {
         try {
           targetHandle = await targetHandle.getDirectoryHandle(part);
         } catch (err) {
-          if (err.name === 'NotFoundError') {
-            targetHandle = await targetHandle.getDirectoryHandle(part, { create: true });
+          if (err.name === "NotFoundError") {
+            targetHandle = await targetHandle.getDirectoryHandle(part, {
+              create: true,
+            });
           } else {
             throw err;
           }
@@ -487,123 +527,139 @@ export function useFS(options = {}, hooks) {
   };
 
   // Remove file
-  const removeFile = async (fileName, path = '') => {
+  const removeFile = async (fileName, path = "") => {
     try {
       const dirHandle = await getCurrentDirectoryHandle();
       let targetHandle = dirHandle;
 
       // Navigate to subdirectory if path is provided
       if (path) {
-        const pathParts = path.split('/').filter(Boolean);
+        const pathParts = path.split("/").filter(Boolean);
         for (const part of pathParts) {
           targetHandle = await targetHandle.getDirectoryHandle(part);
         }
       }
 
       await targetHandle.removeEntry(fileName);
-      console.log('useFS: File removed successfully:', fileName);
+      console.log("useFS: File removed successfully:", fileName);
     } catch (err) {
-      console.error('useFS: Failed to remove file:', err);
+      console.error("useFS: Failed to remove file:", err);
       setError(err);
       throw err;
     }
   };
 
   // Remove directory
-  const removeDirectory = async (dirName, path = '') => {
+  const removeDirectory = async (dirName, path = "") => {
     try {
       const dirHandle = await getCurrentDirectoryHandle();
       let targetHandle = dirHandle;
 
       // Navigate to parent directory if path is provided
       if (path) {
-        const pathParts = path.split('/').filter(Boolean);
+        const pathParts = path.split("/").filter(Boolean);
         for (const part of pathParts) {
           targetHandle = await targetHandle.getDirectoryHandle(part);
         }
       }
 
       await targetHandle.removeEntry(dirName, { recursive: true });
-      console.log('useFS: Directory removed successfully:', dirName);
+      console.log("useFS: Directory removed successfully:", dirName);
     } catch (err) {
-      console.error('useFS: Failed to remove directory:', err);
+      console.error("useFS: Failed to remove directory:", err);
       setError(err);
       throw err;
     }
   };
 
   // Upload file from user's device
-  const uploadFile = async (file, targetFileName = null, path = '') => {
+  const uploadFile = async (file, targetFileName = null, path = "") => {
     try {
       if (!file || !(file instanceof File)) {
-        throw new Error('Invalid file provided. Expected a File object.');
+        throw new Error("Invalid file provided. Expected a File object.");
       }
 
       const fileName = targetFileName || file.name;
 
-      if (file.type.startsWith('text/') ||
-          file.type === 'application/json' ||
-          file.type === 'application/javascript' ||
-          file.name.match(/\.(txt|md|json|js|ts|css|html|xml|csv)$/i)) {
+      if (
+        file.type.startsWith("text/") ||
+        file.type === "application/json" ||
+        file.type === "application/javascript" ||
+        file.name.match(/\.(txt|md|json|js|ts|css|html|xml|csv)$/i)
+      ) {
         const content = await file.text();
         await writeFile(fileName, content, path);
       } else {
         // Write raw bytes so archives, images, office docs, etc. remain valid on disk.
         const targetHandle = await resolveTargetDirectoryForWrite(path);
-        const fileHandle = await targetHandle.getFileHandle(fileName, { create: true });
+        const fileHandle = await targetHandle.getFileHandle(fileName, {
+          create: true,
+        });
         const writable = await fileHandle.createWritable();
         await writable.write(await file.arrayBuffer());
         await writable.close();
       }
 
-      console.log('useFS: File uploaded successfully' + (encrypt ? ' (encrypted)' : '') + ':', fileName);
+      console.log(
+        "useFS: File uploaded successfully" +
+          (encrypt ? " (encrypted)" : "") +
+          ":",
+        fileName,
+      );
       return { success: true, fileName, size: file.size, type: file.type };
     } catch (err) {
-      console.error('useFS: Failed to upload file:', err);
+      console.error("useFS: Failed to upload file:", err);
       setError(err);
       throw err;
     }
   };
 
   // Upload multiple files
-  const uploadFiles = async (files, path = '') => {
+  const uploadFiles = async (files, path = "") => {
     try {
       if (!files || !Array.isArray(files)) {
-        throw new Error('Invalid files provided. Expected an array of File objects.');
+        throw new Error(
+          "Invalid files provided. Expected an array of File objects.",
+        );
       }
 
       const results = [];
       for (const file of files) {
         try {
           const result = await uploadFile(file, null, path);
-          results.push({ ...result, status: 'success' });
+          results.push({ ...result, status: "success" });
         } catch (err) {
-          results.push({ 
-            fileName: file.name, 
-            status: 'error', 
+          results.push({
+            fileName: file.name,
+            status: "error",
             error: err.message,
             size: file.size,
-            type: file.type
+            type: file.type,
           });
         }
       }
 
       return results;
     } catch (err) {
-      console.error('useFS: Failed to upload files:', err);
+      console.error("useFS: Failed to upload files:", err);
       setError(err);
       throw err;
     }
   };
 
   // Get current directory path (for display purposes)
-  const directoryPath = selectedDirectoryName || (fsMode === 'opfs' ? 'OPFS Root' : 'No directory selected');
+  const directoryPath =
+    selectedDirectoryName ||
+    (fsMode === "opfs" ? "OPFS Root" : "No directory selected");
 
   // Check if we're ready to use the file system
-  const isReady = isInitialized && (fsMode === 'opfs' || (fsMode === 'fsa' && directoryHandle !== null));
-  
+  const isReady =
+    isInitialized &&
+    (fsMode === "opfs" || (fsMode === "fsa" && directoryHandle !== null));
+
   // Check if we actually have directory access
-  const hasDirectoryAccess = fsMode === 'opfs' || (fsMode === 'fsa' && directoryHandle !== null);
+  const hasDirectoryAccess =
+    fsMode === "opfs" || (fsMode === "fsa" && directoryHandle !== null);
 
   return {
     // Core operations
@@ -614,11 +670,11 @@ export function useFS(options = {}, hooks) {
     removeDirectory,
     uploadFile,
     uploadFiles,
-    
+
     // Permission and setup
     requestPermission,
     selectDirectory,
-    
+
     // State
     directoryPath,
     isReady,
@@ -626,31 +682,31 @@ export function useFS(options = {}, hooks) {
     hasPermission,
     hasDirectoryAccess,
     error,
-    
+
     // Encryption
     encryptionEnabled: encrypt,
     encryptionReady: encrypt ? !!cryptoManager : null,
-    
+
     // Mode switching
     switchToOPFS: () => {
       setPendingFolderReconnect(null);
-      setPreferredMode('opfs');
+      setPreferredMode("opfs");
       setIsInitialized(false);
       setDirectoryHandle(null);
       setHasPermission(false);
-      setSelectedDirectoryName('');
+      setSelectedDirectoryName("");
       void clearRootDirectoryHandle();
     },
-    
+
     switchToFSA: () => {
       if (isFileSystemAccessSupported()) {
-        setPreferredMode('fsa');
+        setPreferredMode("fsa");
         setIsInitialized(false);
         setDirectoryHandle(null);
         setHasPermission(false);
-        setSelectedDirectoryName('');
+        setSelectedDirectoryName("");
       } else {
-        throw new Error('File System Access API not supported');
+        throw new Error("File System Access API not supported");
       }
     },
 
@@ -660,7 +716,7 @@ export function useFS(options = {}, hooks) {
     clearPendingFolderReconnect,
 
     // Clear error
-    clearError: () => setError(null)
+    clearError: () => setError(null),
   };
 }
 

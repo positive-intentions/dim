@@ -14,7 +14,7 @@ function createDebouncedEventDispatcher(delay) {
       window.dispatchEvent(
         new CustomEvent(eventName, {
           detail: value,
-        })
+        }),
       );
       timeoutIds[eventName] = undefined;
     }, delay);

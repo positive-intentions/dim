@@ -1,7 +1,9 @@
 import { getCurrentInstance } from "../element/instance";
 import { unsafeCSS } from "../renderer/index.js";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useStyle(styles: any) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const component = getCurrentInstance() as any;
   const hookIndex = component.hookIndex++;
   const hookName = `style-hook-${hookIndex}`;

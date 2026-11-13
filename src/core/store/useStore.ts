@@ -29,7 +29,7 @@ function listenerIdKey(randomId) {
  */
 export const useStore = (
   store,
-  options: { encryptionKey?: string } | string = {}
+  options: { encryptionKey?: string } | string = {},
 ) => {
   const encryptionKey =
     typeof options === "string" ? options : options?.encryptionKey;

@@ -55,7 +55,7 @@ function processStaticStrings(strings) {
   // Self-closing custom elements: <foo-bar /> → <foo-bar></foo-bar>
   fullTemplate = fullTemplate.replace(
     /<([a-z][a-z0-9]*-[a-z0-9-]*)([^>]*?)\s*\/>/gi,
-    "<$1$2></$1>"
+    "<$1$2></$1>",
   );
 
   const objectAttrRegex = /(\w+)=\{\{([^}]+)\}\}/g;
@@ -73,7 +73,7 @@ function processStaticStrings(strings) {
     } catch (e) {
       console.warn(
         "Failed to parse object attribute as JSON (use .props for functions/non-JSON values):",
-        attrValue
+        attrValue,
       );
     }
   }

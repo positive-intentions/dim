@@ -17,21 +17,21 @@ export function useViewTransition(transitionId, options = {}) {
 
   const defaultOptions = {
     duration: 500,
-    direction: 'auto', // 'auto', 'left', 'right', 'up', 'down'
-    easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    direction: "auto", // 'auto', 'left', 'right', 'up', 'down'
+    easing: "cubic-bezier(0.4, 0, 0.2, 1)",
     autoDirection: true, // Automatically determine direction based on state change
-    ...options
+    ...options,
   };
 
   // Initialize hook state if not exists
   if (!component.hooks[hookName]) {
     component.hooks[hookName] = {
       isTransitioning: false,
-      direction: 'right',
+      direction: "right",
       currentTransitionId: transitionId,
       previousTransitionId: null,
       transitionCount: 0,
-      options: defaultOptions
+      options: defaultOptions,
     };
   }
 
@@ -53,19 +53,24 @@ export function useViewTransition(transitionId, options = {}) {
     // Auto-determine direction if enabled and not explicitly provided
     if (direction) {
       state.direction = direction;
-    } else if (state.options.autoDirection && prevId !== null && newTransitionId !== null) {
+    } else if (
+      state.options.autoDirection &&
+      prevId !== null &&
+      newTransitionId !== null
+    ) {
       // Try to parse numeric values to determine direction
       const prevNum = parseFloat(prevId);
       const newNum = parseFloat(newTransitionId);
-      
+
       if (!isNaN(prevNum) && !isNaN(newNum)) {
-        state.direction = newNum > prevNum ? 'right' : 'left';
+        state.direction = newNum > prevNum ? "right" : "left";
       } else {
         // For non-numeric IDs, use string comparison
-        state.direction = newTransitionId > prevId ? 'right' : 'left';
+        state.direction = newTransitionId > prevId ? "right" : "left";
       }
     } else {
-      state.direction = state.options.direction === 'auto' ? 'right' : state.options.direction;
+      state.direction =
+        state.options.direction === "auto" ? "right" : state.options.direction;
     }
 
     // Automatically end transition after duration. Guard against the component
@@ -86,7 +91,7 @@ export function useViewTransition(transitionId, options = {}) {
 
   const endTransition = () => {
     if (!state.isTransitioning) return;
-    
+
     state.isTransitioning = false;
     component.requestUpdate();
   };
@@ -102,53 +107,55 @@ export function useViewTransition(transitionId, options = {}) {
     direction: state.direction,
     currentId: state.currentTransitionId,
     previousId: state.previousTransitionId,
-    
+
     // Controls
     startTransition,
     endTransition,
-    
+
     // CSS class helpers (legacy single-layer helper, kept for back-compat)
-    getTransitionClasses: (baseClass = '') => {
+    getTransitionClasses: (baseClass = "") => {
       const classes = [baseClass].filter(Boolean);
-      
+
       if (state.isTransitioning) {
-        classes.push('transitioning');
+        classes.push("transitioning");
         classes.push(`slide-${state.direction}`);
         classes.push(`transition-${state.direction}`);
       }
-      
-      return classes.join(' ');
+
+      return classes.join(" ");
     },
 
     // Two-layer slide helpers. The incoming (current) content slides IN and is
     // never placed in a hidden exit state; the outgoing (previous) content
     // slides OUT in the opposite direction.
-    getIncomingClass: (baseClass = 'vt-layer') => {
+    getIncomingClass: (baseClass = "vt-layer") => {
       const classes = [baseClass].filter(Boolean);
       if (state.isTransitioning) {
         classes.push(`slide-in-${state.direction}`);
       }
-      return classes.join(' ');
+      return classes.join(" ");
     },
 
-    getOutgoingClass: (baseClass = 'vt-layer') => {
+    getOutgoingClass: (baseClass = "vt-layer") => {
       const classes = [baseClass].filter(Boolean);
       // Outgoing content leaves toward the opposite side of the incoming slide.
-      classes.push(state.direction === 'right' ? 'slide-out-left' : 'slide-out-right');
-      return classes.join(' ');
+      classes.push(
+        state.direction === "right" ? "slide-out-left" : "slide-out-right",
+      );
+      return classes.join(" ");
     },
-    
+
     // Style helpers
     getTransitionStyles: () => ({
-      transition: state.isTransitioning 
+      transition: state.isTransitioning
         ? `all ${state.options.duration}ms ${state.options.easing}`
-        : 'none',
-      '--transition-duration': `${state.options.duration}ms`,
-      '--transition-easing': state.options.easing,
-      '--transition-direction': state.direction
+        : "none",
+      "--transition-duration": `${state.options.duration}ms`,
+      "--transition-easing": state.options.easing,
+      "--transition-direction": state.direction,
     }),
 
     // Configuration
-    options: state.options
+    options: state.options,
   };
 }

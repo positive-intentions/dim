@@ -124,7 +124,7 @@ export class DimElement extends HTMLElement {
         } catch {
           // Fall through to a style tag if replaceSync is unavailable.
           let styleElement = root.querySelector(
-            `[data-style-hook="${hookName}"]`
+            `[data-style-hook="${hookName}"]`,
           );
           if (!styleElement) {
             styleElement = document.createElement("style");
@@ -136,9 +136,7 @@ export class DimElement extends HTMLElement {
         continue;
       }
 
-      let styleElement = root.querySelector(
-        `[data-style-hook="${hookName}"]`
-      );
+      let styleElement = root.querySelector(`[data-style-hook="${hookName}"]`);
       if (!styleElement) {
         if (
           preferAdopted &&

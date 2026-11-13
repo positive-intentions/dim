@@ -86,7 +86,7 @@ export class AutoTransitionHost {
         this._sharedRects = this._captureSharedRects();
         this._flipPlayed = false;
         const wrapperEl = this.host.shadowRoot?.querySelector(
-          ".auto-transition-wrapper"
+          ".auto-transition-wrapper",
         );
         this._wrapperHeights = {
           old: wrapperEl ? wrapperEl.offsetHeight : 0,
@@ -114,9 +114,7 @@ export class AutoTransitionHost {
     return html`
       ${wrapperStyles}
       <div class="auto-transition-wrapper view-transition-container">
-        <div class="view-transition-item" style="${styleString}">
-          ${result}
-        </div>
+        <div class="view-transition-item" style="${styleString}">${result}</div>
       </div>
     `;
   }
@@ -144,11 +142,11 @@ export class AutoTransitionHost {
       const runFlip = () => {
         if (!this._isTransitioningNow || this._flipPlayed) return false;
         const incomingLayer = this.host.shadowRoot?.querySelector(
-          ".vt-layer.vt-incoming"
+          ".vt-layer.vt-incoming",
         );
         if (!incomingLayer) return false;
         const hasTargets = queryDeep(incomingLayer, "[data-vt-shared]").some(
-          (el) => this._sharedRects[el.getAttribute("data-vt-shared")]
+          (el) => this._sharedRects[el.getAttribute("data-vt-shared")],
         );
         if (!hasTargets) return false;
         this._flipPlayed = true;
@@ -287,7 +285,7 @@ export class AutoTransitionHost {
     if (typeof wrapper.animate === "function") {
       this._wrapperHeightAnimation = wrapper.animate(
         [{ height: `${oldHeight}px` }, { height: `${newHeight}px` }],
-        { duration, easing, fill: "both" }
+        { duration, easing, fill: "both" },
       );
     }
   }
@@ -349,13 +347,9 @@ export class AutoTransitionHost {
       clone.style.transformOrigin = "center center";
 
       const dx =
-        oldRect.left +
-        oldRect.width / 2 -
-        (newRect.left + newRect.width / 2);
+        oldRect.left + oldRect.width / 2 - (newRect.left + newRect.width / 2);
       const dy =
-        oldRect.top +
-        oldRect.height / 2 -
-        (newRect.top + newRect.height / 2);
+        oldRect.top + oldRect.height / 2 - (newRect.top + newRect.height / 2);
       // Uniform scale from height so full-width block text (and images) do not
       // stretch anamorphically when old/new aspect ratios differ (esp. back-nav).
       const sx = newRect.width > 0 ? oldRect.width / newRect.width : 1;
@@ -384,7 +378,7 @@ export class AutoTransitionHost {
             { transform: initialTransform },
             { transform: "translate(0px, 0px) scale(1)" },
           ],
-          { duration, easing, fill: "both" }
+          { duration, easing, fill: "both" },
         );
       }
     });

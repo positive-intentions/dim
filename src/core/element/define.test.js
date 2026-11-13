@@ -1,4 +1,4 @@
-import { define, html, useState, useEffect, useMemo, useRef } from '../dim.ts';
+import { define, html, useState, useEffect, useMemo, useRef } from "../dim.ts";
 
 // Mount a defined custom element and wait for its first render to complete.
 async function mount(tag) {
@@ -8,10 +8,10 @@ async function mount(tag) {
   return el;
 }
 
-const text = (el) => el.shadowRoot.textContent.replace(/\s+/g, ' ').trim();
+const text = (el) => el.shadowRoot.textContent.replace(/\s+/g, " ").trim();
 
-describe('Dim hooks', () => {
-  describe('useState', () => {
+describe("Dim hooks", () => {
+  describe("useState", () => {
     let renderCount = 0;
 
     beforeAll(() => {
@@ -25,49 +25,49 @@ describe('Dim hooks', () => {
           <span>count:${count}</span>
         `;
       };
-      define({ tag: 'us-counter', component: Counter });
+      define({ tag: "us-counter", component: Counter });
     });
 
-    test('renders initial state and updates on setState', async () => {
-      const el = await mount('us-counter');
-      expect(text(el)).toContain('count:0');
+    test("renders initial state and updates on setState", async () => {
+      const el = await mount("us-counter");
+      expect(text(el)).toContain("count:0");
 
-      el.shadowRoot.querySelector('#inc').click();
+      el.shadowRoot.querySelector("#inc").click();
       await el.updateComplete;
-      expect(text(el)).toContain('count:1');
+      expect(text(el)).toContain("count:1");
     });
 
-    test('bails out of re-render when value is unchanged (Object.is)', async () => {
-      const el = await mount('us-counter');
+    test("bails out of re-render when value is unchanged (Object.is)", async () => {
+      const el = await mount("us-counter");
       await el.updateComplete;
       const before = renderCount;
 
       // Setting the same value should NOT trigger a re-render.
-      el.shadowRoot.querySelector('#same').click();
+      el.shadowRoot.querySelector("#same").click();
       await el.updateComplete;
 
       expect(renderCount).toBe(before);
     });
 
-    test('preserves falsy state (false) across re-renders', async () => {
+    test("preserves falsy state (false) across re-renders", async () => {
       const Flag = () => {
         const [on, setOn] = useState(true);
         return html`
           <button id="tog" @click=${() => setOn((v) => !v)}>tog</button>
-          <span id="flag">${on ? 'yes' : 'no'}</span>
+          <span id="flag">${on ? "yes" : "no"}</span>
         `;
       };
-      define({ tag: 'us-flag', component: Flag });
-      const el = await mount('us-flag');
-      expect(text(el)).toContain('yes');
-      el.shadowRoot.querySelector('#tog').click();
+      define({ tag: "us-flag", component: Flag });
+      const el = await mount("us-flag");
+      expect(text(el)).toContain("yes");
+      el.shadowRoot.querySelector("#tog").click();
       await el.updateComplete;
-      expect(text(el)).toContain('no');
-      expect(el.hooks['hook-0']).toBe(false);
+      expect(text(el)).toContain("no");
+      expect(el.hooks["hook-0"]).toBe(false);
     });
   });
 
-  describe('useEffect', () => {
+  describe("useEffect", () => {
     let effectRuns = 0;
     let cleanupRuns = 0;
 
@@ -84,17 +84,17 @@ describe('Dim hooks', () => {
         }, []);
         return html`<button @click=${() => setN(n + 1)}>${n}</button>`;
       };
-      define({ tag: 'ue-comp', component: EffectComp });
+      define({ tag: "ue-comp", component: EffectComp });
     });
 
-    test('runs once on mount, not again on re-render, and cleans up once on disconnect', async () => {
-      const el = await mount('ue-comp');
+    test("runs once on mount, not again on re-render, and cleans up once on disconnect", async () => {
+      const el = await mount("ue-comp");
       expect(effectRuns).toBe(1);
       expect(cleanupRuns).toBe(0);
 
       // Force several re-renders; effect has empty deps so must not re-run.
       for (let i = 0; i < 3; i++) {
-        el.shadowRoot.querySelector('button').click();
+        el.shadowRoot.querySelector("button").click();
         await el.updateComplete;
       }
       expect(effectRuns).toBe(1);
@@ -106,7 +106,7 @@ describe('Dim hooks', () => {
     });
   });
 
-  describe('useMemo', () => {
+  describe("useMemo", () => {
     let memoCalcs = 0;
 
     beforeAll(() => {
@@ -124,102 +124,102 @@ describe('Dim hooks', () => {
           <span>doubled:${doubled}</span>
         `;
       };
-      define({ tag: 'um-comp', component: MemoComp });
+      define({ tag: "um-comp", component: MemoComp });
     });
 
-    test('recomputes only when its dependency changes', async () => {
-      const el = await mount('um-comp');
+    test("recomputes only when its dependency changes", async () => {
+      const el = await mount("um-comp");
       expect(memoCalcs).toBe(1);
-      expect(text(el)).toContain('doubled:0');
+      expect(text(el)).toContain("doubled:0");
 
       // Changing an unrelated state must NOT recompute the memo.
-      el.shadowRoot.querySelector('#b').click();
+      el.shadowRoot.querySelector("#b").click();
       await el.updateComplete;
       expect(memoCalcs).toBe(1);
 
       // Changing the dependency recomputes.
-      el.shadowRoot.querySelector('#a').click();
+      el.shadowRoot.querySelector("#a").click();
       await el.updateComplete;
       expect(memoCalcs).toBe(2);
-      expect(text(el)).toContain('doubled:2');
+      expect(text(el)).toContain("doubled:2");
     });
   });
 
-  describe('attribute reactivity', () => {
+  describe("attribute reactivity", () => {
     beforeAll(() => {
       const AttrComp = (props) => html`<span>val:${props.label}</span>`;
-      define({ tag: 'attr-comp', component: AttrComp });
+      define({ tag: "attr-comp", component: AttrComp });
     });
 
-    test('re-renders when a plain attribute changes', async () => {
-      const el = document.createElement('attr-comp');
-      el.setAttribute('label', 'A');
+    test("re-renders when a plain attribute changes", async () => {
+      const el = document.createElement("attr-comp");
+      el.setAttribute("label", "A");
       document.body.appendChild(el);
       await el.updateComplete;
-      expect(text(el)).toContain('val:A');
+      expect(text(el)).toContain("val:A");
 
       // Changing a non-reactive attribute must trigger a re-render via the
       // framework MutationObserver (regression for auto view transitions
       // driven by transitionId="${...}").
-      el.setAttribute('label', 'B');
+      el.setAttribute("label", "B");
       await new Promise((r) => requestAnimationFrame(r));
       await el.updateComplete;
-      expect(text(el)).toContain('val:B');
+      expect(text(el)).toContain("val:B");
 
       el.remove();
     });
 
-    test('coalesces multiple attribute changes into one re-render per frame', async () => {
+    test("coalesces multiple attribute changes into one re-render per frame", async () => {
       let renderCount = 0;
       const CountComp = (props) => {
         renderCount++;
         return html`<span>${props.a}-${props.b}</span>`;
       };
-      define({ tag: 'attr-batch-comp', component: CountComp });
+      define({ tag: "attr-batch-comp", component: CountComp });
 
-      const el = document.createElement('attr-batch-comp');
+      const el = document.createElement("attr-batch-comp");
       document.body.appendChild(el);
       await el.updateComplete;
       const afterMount = renderCount;
 
-      el.setAttribute('a', '1');
-      el.setAttribute('b', '2');
+      el.setAttribute("a", "1");
+      el.setAttribute("b", "2");
       await new Promise((r) => requestAnimationFrame(r));
       await el.updateComplete;
 
       expect(renderCount).toBe(afterMount + 1);
-      expect(text(el)).toContain('1-2');
+      expect(text(el)).toContain("1-2");
       el.remove();
     });
   });
 
-  describe('useRef', () => {
+  describe("useRef", () => {
     beforeAll(() => {
       const RefComp = () => {
-        const ref = useRef('initial-value');
+        const ref = useRef("initial-value");
         return html`<span>${ref.current}</span>`;
       };
-      define({ tag: 'ur-comp', component: RefComp });
+      define({ tag: "ur-comp", component: RefComp });
 
       const RefDefaultComp = () => {
         const ref = useRef();
         const label =
           ref.current && ref.current.tagName
             ? ref.current.tagName.toLowerCase()
-            : 'none';
+            : "none";
         return html`<span>${label}</span>`;
       };
-      define({ tag: 'ur-default-comp', component: RefDefaultComp });
+      define({ tag: "ur-default-comp", component: RefDefaultComp });
     });
 
-    test('stores the provided initial value in current', async () => {
-      const el = await mount('ur-comp');
-      expect(text(el)).toContain('initial-value');
+    test("stores the provided initial value in current", async () => {
+      const el = await mount("ur-comp");
+      expect(text(el)).toContain("initial-value");
     });
 
-    test('defaults current to the host element when no initial value is given', async () => {
-      const el = await mount('ur-default-comp');
-      expect(text(el)).toContain('ur-default-comp');
+    test("defaults current to the host element when no initial value is given", async () => {
+      const el = await mount("ur-default-comp");
+      expect(text(el)).toContain("ur-default-comp");
     });
   });
 });

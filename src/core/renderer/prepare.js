@@ -22,7 +22,7 @@ function getBindingKind(stringBefore) {
   // Full binding at end: attr=, .prop=, @event=, ?bool=, ref=
   // e.g. ` @click=`, ` .props=`, ` ?disabled=`, ` class=`, ` ref=`
   const m = stringBefore.match(
-    /([.?@])?([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(["']?)$/
+    /([.?@])?([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(["']?)$/,
   );
   if (m) {
     const prefix = m[1];
@@ -40,13 +40,20 @@ function getBindingKind(stringBefore) {
     if (prefix === "?") {
       return { kind: BOOL_PART, name, quote, matchLength: m[0].length };
     }
-    return { kind: ATTR_PART, name, quote, matchLength: m[0].length, valuePrefix: "", valueSuffix: "" };
+    return {
+      kind: ATTR_PART,
+      name,
+      quote,
+      matchLength: m[0].length,
+      valuePrefix: "",
+      valueSuffix: "",
+    };
   }
 
   // Partial attribute value: style="background:${x}" or class="a ${b} c"
   // stringBefore ends inside an open quoted attribute value (no closing quote yet).
   const partial = stringBefore.match(
-    /([.?@])?([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(["'])([^"']*)$/
+    /([.?@])?([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(["'])([^"']*)$/,
   );
   if (partial) {
     const prefix = partial[1];
@@ -142,7 +149,10 @@ export function prepareTemplate(strings) {
       const valuePrefix = binding.valuePrefix || "";
       // Consume closing quote / remainder of attribute value from next string.
       // Handles class="${x}", class="${x} extra", and class="${a} ${b}".
-      if (segs[i + 1] && (binding.kind === ATTR_PART || binding.kind === BOOL_PART)) {
+      if (
+        segs[i + 1] &&
+        (binding.kind === ATTR_PART || binding.kind === BOOL_PART)
+      ) {
         const quote = binding.quote || (binding.partial ? '"' : "");
         if (quote) {
           const next = segs[i + 1];
@@ -159,7 +169,10 @@ export function prepareTemplate(strings) {
         } else if (segs[i + 1][0] === '"' || segs[i + 1][0] === "'") {
           segs[i + 1] = segs[i + 1].slice(1);
         }
-      } else if (segs[i + 1] && (segs[i + 1][0] === '"' || segs[i + 1][0] === "'")) {
+      } else if (
+        segs[i + 1] &&
+        (segs[i + 1][0] === '"' || segs[i + 1][0] === "'")
+      ) {
         segs[i + 1] = segs[i + 1].slice(1);
       }
       parts.push({
@@ -210,7 +223,7 @@ export function createInstance(template) {
   const walker = document.createTreeWalker(
     fragment,
     NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_COMMENT | NodeFilter.SHOW_TEXT,
-    null
+    null,
   );
 
   const attrNodes = [];

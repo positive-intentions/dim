@@ -1,0 +1,137 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Pack the package without publishing, tagging, or creating a GitHub Release"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - name: Guard branch
+        if: github.ref != 'refs/heads/staging'
+        run: |
+          echo "Publish is only allowed from the staging branch (got ${{ github.ref }})."
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint:check
+
+      - name: Test
+        run: npm test
+
+      - name: Build library
+        run: npm run build:lib
+
+      - name: Require pending changesets
+        run: |
+          count=$(find .changeset -maxdepth 1 -type f -name '*.md' ! -name 'README.md' | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "No pending changesets found in .changeset/. Add one with: npx changeset"
+            exit 1
+          fi
+          echo "Found $count pending changeset(s)."
+
+      - name: Version packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx changeset version
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing version $VERSION"
+
+      - name: Dry run pack
+        if: ${{ inputs.dry_run }}
+        run: npm pack
+
+      - name: Publish to npm
+        if: ${{ !inputs.dry_run }}
+        run: npm publish --access public --provenance
+
+      - name: Commit version bump, tag, and release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add package.json package-lock.json CHANGELOG.md .changeset
+          if git diff --cached --quiet; then
+            echo "No version files to commit."
+          else
+            git commit -m "chore: release ${TAG}"
+          fi
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists."
+          else
+            git tag "$TAG"
+          fi
+
+          git push origin HEAD --follow-tags
+
+          # Extract this version's section from CHANGELOG.md for the GitHub Release body
+          node <<'NODE'
+          const fs = require("fs");
+          const { execFileSync } = require("child_process");
+          const version = process.env.VERSION;
+          const tag = `v${version}`;
+          const changelog = fs.readFileSync("CHANGELOG.md", "utf8");
+          const header = `## ${version}`;
+          const start = changelog.indexOf(header);
+          let body = `Release ${version}`;
+          if (start !== -1) {
+            const after = changelog.slice(start + header.length);
+            const next = after.search(/\n## /);
+            body = (next === -1 ? after : after.slice(0, next)).trim() || body;
+          }
+          fs.writeFileSync("release-notes.md", body);
+          try {
+            execFileSync("gh", ["release", "view", tag], { stdio: "ignore" });
+            console.log(`Release ${tag} already exists.`);
+          } catch {
+            execFileSync(
+              "gh",
+              ["release", "create", tag, "--title", tag, "--notes-file", "release-notes.md"],
+              { stdio: "inherit" }
+            );
+          }
+          NODE

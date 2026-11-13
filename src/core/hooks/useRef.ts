@@ -1,6 +1,8 @@
 import { getCurrentInstance } from "../element/instance";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useRef(initialValue?: any) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const component = getCurrentInstance() as any;
   const hookIndex = component.hookIndex++;
   const hookName = `hook-${hookIndex}`;

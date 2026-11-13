@@ -15,7 +15,7 @@ export function useScope(elements) {
 
     if (!tag) {
       console.warn(
-        `useScope: cannot resolve tag for "${key}". Use a hyphenated tag key or call define() on the component first.`
+        `useScope: cannot resolve tag for "${key}". Use a hyphenated tag key or call define() on the component first.`,
       );
       return;
     }
@@ -30,7 +30,9 @@ export function useScope(elements) {
 // via `new Function`, which executes arbitrary JavaScript. Only use it with
 // fully trusted sources. It exists as a proof-of-concept for module federation
 // and is NOT safe for untrusted/remote input.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const useLazyScope = (tag: string, promise: Promise<any>) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   promise.then((module: any) => {
     const elementClass = new Function(`return ${module}`)();
 

@@ -1,10 +1,4 @@
-import {
-  html,
-  render,
-  keyed,
-  unsafeHTML,
-  css,
-} from "./index.js";
+import { html, render, keyed, unsafeHTML, css } from "./index.js";
 import { DimElement } from "../element/dim-element.js";
 
 function mount() {
@@ -52,7 +46,7 @@ describe("html/render", () => {
     expect(div.getAttribute("class")).toBe("base extra");
   });
 
-  test("multi-binding class attribute class=\"${a} ${b}\"", () => {
+  test('multi-binding class attribute class="${a} ${b}"', () => {
     const el = mount();
     const tpl = (a, b) => html`<button class="${a} ${b}">x</button>`;
     render(tpl("sidebar-tab", "active"), el);
@@ -85,10 +79,9 @@ describe("html/render", () => {
   test("shopping-shaped active class binding", () => {
     const el = mount();
     const tpl = (name, on) =>
-      html`<button
-        class="${name} ${on ? "active" : ""}"
-        title="Shop"
-      >🛍️</button>`;
+      html`<button class="${name} ${on ? "active" : ""}" title="Shop">
+        🛍️
+      </button>`;
     render(tpl("sidebar-tab", false), el);
     let btn = el.querySelector("button");
     expect(btn.getAttribute("class").trim()).toBe("sidebar-tab");
@@ -119,10 +112,14 @@ describe("html/render", () => {
     const el = mount();
     let clicked = 0;
     render(
-      html`<button @click="${() => {
-        clicked++;
-      }}">go</button>`,
-      el
+      html`<button
+        @click="${() => {
+          clicked++;
+        }}"
+      >
+        go
+      </button>`,
+      el,
     );
     el.querySelector("button").click();
     expect(clicked).toBe(1);
@@ -145,7 +142,12 @@ describe("html/render", () => {
   test("arrays of templates", () => {
     const el = mount();
     const items = [1, 2, 3].map((n) => html`<li>${n}</li>`);
-    render(html`<ul>${items}</ul>`, el);
+    render(
+      html`<ul>
+        ${items}
+      </ul>`,
+      el,
+    );
     expect(el.querySelectorAll("li").length).toBe(3);
     expect(el.textContent.replace(/\s+/g, "")).toBe("123");
   });
@@ -182,8 +184,7 @@ describe("html/render", () => {
       customElements.define("ml-child", ChildEl);
     }
     const el = mount();
-    const tpl = (n) =>
-      html`<div><ml-child></ml-child><span>${n}</span></div>`;
+    const tpl = (n) => html`<div><ml-child></ml-child><span>${n}</span></div>`;
     render(tpl(0), el);
     const child = el.querySelector("ml-child");
     render(tpl(1), el);
@@ -237,7 +238,7 @@ describe("html/render", () => {
           <input .value="${"hello"}" />
           <span>${label}</span>
         </div>`,
-        el
+        el,
       );
     paint("x");
     const input = el.querySelector("input");

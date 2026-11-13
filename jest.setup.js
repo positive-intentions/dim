@@ -7,7 +7,7 @@ if (typeof globalThis.structuredClone === 'undefined') {
 }
 
 // Provide a real (fake) IndexedDB implementation for tests
-import 'fake-indexeddb/auto';
+require('fake-indexeddb/auto');
 
 // Add TextEncoder/TextDecoder for the jsdom environment
 const { TextEncoder, TextDecoder } = require('util');
