@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { define, html, css, useState, useStyle, useStore } from "../../../core/index.ts";
-import { useDimStore } from "../../../core/index.ts";
+import { useDimStore } from "../../../core/react.ts";
 import { lessonStyles } from "../shared.js";
 
 const INTEROP_KEY = "tutReactNote";

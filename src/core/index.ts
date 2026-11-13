@@ -32,7 +32,8 @@ export {
 
 // Store
 export { useStore } from "./store/useStore";
-export { useDimStore } from "./store/useDimStore";
+// useDimStore lives in `@positive-intentions/dim/react` so the main entry
+// stays React-free for no-bundler / native ESM browser use.
 export { default as CryptoManager } from "./store/crypto-manager.js";
 export { default as StorageManager } from "./store/storage-manager.js";
 export { default as AsyncronousStateManager } from "./store/async-manager.js";

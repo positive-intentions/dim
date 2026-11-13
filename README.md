@@ -52,7 +52,7 @@ npm install @positive-intentions/dim
 - **React-like DX** - Familiar hooks API (`useState`, `useEffect`, `useMemo`, etc.)
 - **Web Standards** - Built on native Web Components and Shadow DOM
 - **Scoped Styling** - CSS-in-JS with automatic style isolation
-- **Zero runtime deps** - Own template renderer; pure JS for the core (`react` is an optional peer for `useDimStore`)
+- **Zero runtime deps** - Own template renderer; pure JS for the core (no React on the main entry)
 - **Lightweight** - Parts-based updates preserve focus, selection, and child state
 - **State Persistence** - Built-in global state management with `useStore`
 
@@ -97,6 +97,16 @@ define({ tag: "my-counter", component: Counter });
 // Use it
 // <my-counter></my-counter>
 ```
+
+### React interop
+
+The main package entry does **not** import React, so it works with native ES modules in the browser. For the React hook that shares Dim's encrypted store:
+
+```javascript
+import { useDimStore } from "@positive-intentions/dim/react";
+```
+
+`react` is an optional peer dependency required only when you use this subpath.
 
 ## Core Concepts
 

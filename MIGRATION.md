@@ -2,6 +2,24 @@
 
 This document covers breaking API changes in recent Dim releases. If you are upgrading from an older version, review each section below.
 
+## `useDimStore` moved to `@positive-intentions/dim/react`
+
+**Before:**
+
+```js
+import { useDimStore } from "@positive-intentions/dim";
+```
+
+**After:**
+
+```js
+import { useDimStore } from "@positive-intentions/dim/react";
+```
+
+The main entry no longer re-exports `useDimStore`, so a browser import of `@positive-intentions/dim` does not pull in React. Install `react` as a peer when you use the `/react` subpath.
+
+---
+
 ## `useStore` encryption is opt-in
 
 **Before:** A default password was baked into the framework. Encryption could be enabled implicitly:
