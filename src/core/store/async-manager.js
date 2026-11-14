@@ -88,8 +88,7 @@ class AsyncronousStateManager {
     );
     this.savingSetters[key].push({ id, setIsSaving });
     // Reflect current pending state for late subscribers.
-    const pending =
-      (this.writeGen[key] || 0) > (this.persistedGen[key] || 0);
+    const pending = (this.writeGen[key] || 0) > (this.persistedGen[key] || 0);
     setIsSaving(pending);
   }
 
@@ -118,9 +117,7 @@ class AsyncronousStateManager {
     Object.keys(this.savingSetters).forEach((key) => {
       const entry = this.savingSetters[key];
       if (!Array.isArray(entry)) return;
-      this.savingSetters[key] = entry.filter(
-        (item) => item?.id !== listenerId,
-      );
+      this.savingSetters[key] = entry.filter((item) => item?.id !== listenerId);
       if (this.savingSetters[key].length === 0) {
         delete this.savingSetters[key];
       }

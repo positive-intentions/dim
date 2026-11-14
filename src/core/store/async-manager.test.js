@@ -289,9 +289,7 @@ describe("AsyncronousStateManager", () => {
       asyncManager.store.echoKey = "ab";
       mockSetValue.mockClear();
 
-      const staleEncrypted = JSON.parse(
-        await cryptoManager.encryptData("a"),
-      );
+      const staleEncrypted = JSON.parse(await cryptoManager.encryptData("a"));
       window.dispatchEvent(
         new CustomEvent("echoKey", {
           detail: { ...staleEncrypted, _dimWriteGen: 1 },
