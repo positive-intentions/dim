@@ -1,6 +1,6 @@
 {
   "name": "@positive-intentions/dim",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A React-inspired functional web components framework built on native Web Components",
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
