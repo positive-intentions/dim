@@ -15,7 +15,7 @@
   \**********************/
 /***/ ((__unused_webpack_module, __unused_webpack_exports, __webpack_require__) => {
 
-eval("__webpack_require__.e(/*! import() */ \"src_bootstrap_tsx\").then(__webpack_require__.t.bind(__webpack_require__, /*! ./bootstrap.tsx */ \"./src/bootstrap.tsx\", 23));\n\n//# sourceURL=webpack://dim/./src/index.ts?");
+eval("__webpack_require__.e(/*! import() */ \"src_bootstrap_tsx\").then(__webpack_require__.t.bind(__webpack_require__, /*! ./bootstrap.tsx */ \"./src/bootstrap.tsx\", 23));\n\n//# sourceURL=webpack://@positive-intentions/dim/./src/index.ts?");
 
 /***/ })
 
@@ -33,16 +33,13 @@ eval("__webpack_require__.e(/*! import() */ \"src_bootstrap_tsx\").then(__webpac
 /******/ 		}
 /******/ 		// Create a new module (and put it into the cache)
 /******/ 		var module = __webpack_module_cache__[moduleId] = {
-/******/ 			id: moduleId,
-/******/ 			loaded: false,
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
 /******/ 			exports: {}
 /******/ 		};
 /******/ 	
 /******/ 		// Execute the module function
 /******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
-/******/ 	
-/******/ 		// Flag the module as loaded
-/******/ 		module.loaded = true;
 /******/ 	
 /******/ 		// Return the exports of the module
 /******/ 		return module.exports;
@@ -139,7 +136,7 @@ eval("__webpack_require__.e(/*! import() */ \"src_bootstrap_tsx\").then(__webpac
 /******/ 	/* webpack/runtime/load script */
 /******/ 	(() => {
 /******/ 		var inProgress = {};
-/******/ 		var dataWebpackPrefix = "dim:";
+/******/ 		var dataWebpackPrefix = "@positive-intentions/dim:";
 /******/ 		// loadScript function to load a script via script tag
 /******/ 		__webpack_require__.l = (url, done, key, chunkId) => {
 /******/ 			if(inProgress[url]) { inProgress[url].push(done); return; }
@@ -193,15 +190,6 @@ eval("__webpack_require__.e(/*! import() */ \"src_bootstrap_tsx\").then(__webpac
 /******/ 		};
 /******/ 	})();
 /******/ 	
-/******/ 	/* webpack/runtime/node module decorator */
-/******/ 	(() => {
-/******/ 		__webpack_require__.nmd = (module) => {
-/******/ 			module.paths = [];
-/******/ 			if (!module.children) module.children = [];
-/******/ 			return module;
-/******/ 		};
-/******/ 	})();
-/******/ 	
 /******/ 	/* webpack/runtime/sharing */
 /******/ 	(() => {
 /******/ 		__webpack_require__.S = {};
@@ -223,7 +211,7 @@ eval("__webpack_require__.e(/*! import() */ \"src_bootstrap_tsx\").then(__webpac
 /******/ 			var warn = (msg) => {
 /******/ 				if (typeof console !== "undefined" && console.warn) console.warn(msg);
 /******/ 			};
-/******/ 			var uniqueName = "dim";
+/******/ 			var uniqueName = "@positive-intentions/dim";
 /******/ 			var register = (name, version, factory, eager) => {
 /******/ 				var versions = scope[name] = scope[name] || {};
 /******/ 				var activeVersion = versions[version];
@@ -242,10 +230,6 @@ eval("__webpack_require__.e(/*! import() */ \"src_bootstrap_tsx\").then(__webpac
 /******/ 			}
 /******/ 			var promises = [];
 /******/ 			switch(name) {
-/******/ 				case "default": {
-/******/ 					register("react", "18.3.1", () => (__webpack_require__.e("vendors-node_modules_react_index_js").then(() => (() => (__webpack_require__(/*! ./node_modules/react/index.js */ "./node_modules/react/index.js"))))));
-/******/ 				}
-/******/ 				break;
 /******/ 			}
 /******/ 			if(!promises.length) return initPromises[name] = 1;
 /******/ 			return initPromises[name] = Promise.all(promises).then(() => (initPromises[name] = 1));
@@ -360,7 +344,7 @@ eval("__webpack_require__.e(/*! import() */ \"src_bootstrap_tsx\").then(__webpac
 /******/ 		
 /******/ 		}
 /******/ 		
-/******/ 		var chunkLoadingGlobal = self["webpackChunkdim"] = self["webpackChunkdim"] || [];
+/******/ 		var chunkLoadingGlobal = self["webpackChunk_positive_intentions_dim"] = self["webpackChunk_positive_intentions_dim"] || [];
 /******/ 		chunkLoadingGlobal.forEach(webpackJsonpCallback.bind(null, 0));
 /******/ 		chunkLoadingGlobal.push = webpackJsonpCallback.bind(null, chunkLoadingGlobal.push.bind(chunkLoadingGlobal));
 /******/ 	})();
