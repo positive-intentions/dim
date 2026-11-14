@@ -2,6 +2,18 @@
 
 This document covers breaking API changes in recent Dim releases. If you are upgrading from an older version, review each section below.
 
+## `useStore` tuple includes `isSaving` (additive)
+
+Each store entry is now:
+
+```js
+const [value, setValue, isLoading, setIsLoading, isSaving] = store.notes;
+```
+
+`isSaving` is `true` while a debounced persist to IndexedDB is pending or in flight, then `false` after a successful write. Existing callers that only destructure the first three elements keep working.
+
+---
+
 ## `useDimStore` moved to `@positive-intentions/dim/react`
 
 **Before:**

@@ -53,7 +53,8 @@ export const useStore = (
     stateManager = plaintextStateManager;
   }
 
-  // Add loading state for each store property
+  // Add loading + saving state for each store property.
+  // Tuple shape: [value, setValue, isLoading, setIsLoading, isSaving]
   const enhanceStoreWithLoading = (obj, path = "") => {
     Object.keys(obj).forEach((key) => {
       if (typeof obj[key] === "object" && obj[key].length === undefined) {
@@ -61,13 +62,15 @@ export const useStore = (
       } else if (Array.isArray(obj[key]) && obj[key].length === 2) {
         const [value, setValue] = obj[key];
         const [isLoading, setIsLoading] = useState(true);
+        const [isSaving, setIsSaving] = useState(false);
 
-        // Replace the store entry with enhanced version that includes loading state
-        obj[key] = [value, setValue, isLoading, setIsLoading];
+        // Replace the store entry with enhanced version that includes status
+        obj[key] = [value, setValue, isLoading, setIsLoading, isSaving];
 
-        // Multicast: every subscriber for this key gets isLoading cleared.
+        // Multicast: every subscriber for this key gets loading/saving updates.
         const fullKey = `${path}${key}`;
         stateManager.addLoadingSetter(fullKey, subscriberId, setIsLoading);
+        stateManager.addSavingSetter(fullKey, subscriberId, setIsSaving);
       }
     });
   };

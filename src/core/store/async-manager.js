@@ -1,13 +1,24 @@
 import StorageManager from "./storage-manager";
 import { debouncedDispatcher } from "./events.js";
 
+const PERSIST_DEBOUNCE_MS = 300;
+
 class AsyncronousStateManager {
   constructor(crypto = null) {
     this.store = {};
     // Per-key list of { id, setIsLoading }. Legacy tests may assign a
     // single function; clearLoading() accepts both shapes.
     this.loadingSetters = {};
+    // Per-key list of { id, setIsSaving } for persistence status.
+    this.savingSetters = {};
     this.eventListener = [];
+    // Monotonic write generation per key. User setters bump this so stale
+    // async encrypt/decrypt echoes cannot overwrite a newer local write.
+    this.writeGen = {};
+    // Last generation successfully written to IndexedDB (+ broadcast).
+    this.persistedGen = {};
+    // Debounced persist timers per key.
+    this.persistTimers = {};
     this.crypto = crypto;
     this.db = new StorageManager(crypto);
     this.db.asyncManager = this; // Connect storage manager back to this
@@ -32,6 +43,21 @@ class AsyncronousStateManager {
   }
 
   /**
+   * Notify every saving subscriber for `key`.
+   */
+  setSaving(key, isSaving) {
+    const entry = this.savingSetters?.[key];
+    if (!entry) return;
+    if (Array.isArray(entry)) {
+      entry.forEach((item) => {
+        if (typeof item?.setIsSaving === "function") {
+          item.setIsSaving(isSaving);
+        }
+      });
+    }
+  }
+
+  /**
    * Register (or replace) a loading setter for a subscriber id on `key`.
    */
   addLoadingSetter(key, id, setIsLoading) {
@@ -47,6 +73,24 @@ class AsyncronousStateManager {
       (item) => item?.id !== id,
     );
     this.loadingSetters[key].push({ id, setIsLoading });
+  }
+
+  /**
+   * Register (or replace) a saving setter for a subscriber id on `key`.
+   */
+  addSavingSetter(key, id, setIsSaving) {
+    this.savingSetters = this.savingSetters || {};
+    if (!Array.isArray(this.savingSetters[key])) {
+      this.savingSetters[key] = [];
+    }
+    this.savingSetters[key] = this.savingSetters[key].filter(
+      (item) => item?.id !== id,
+    );
+    this.savingSetters[key].push({ id, setIsSaving });
+    // Reflect current pending state for late subscribers.
+    const pending =
+      (this.writeGen[key] || 0) > (this.persistedGen[key] || 0);
+    setIsSaving(pending);
   }
 
   /**
@@ -66,11 +110,81 @@ class AsyncronousStateManager {
     });
   }
 
+  /**
+   * Drop saving setters registered under `listenerId`.
+   */
+  removeSavingSetters(listenerId) {
+    if (!this.savingSetters) return;
+    Object.keys(this.savingSetters).forEach((key) => {
+      const entry = this.savingSetters[key];
+      if (!Array.isArray(entry)) return;
+      this.savingSetters[key] = entry.filter(
+        (item) => item?.id !== listenerId,
+      );
+      if (this.savingSetters[key].length === 0) {
+        delete this.savingSetters[key];
+      }
+    });
+  }
+
+  /**
+   * Persist the latest value for `key` (encrypt once, write DB, broadcast).
+   */
+  async flushPersist(key, eventName) {
+    const gen = this.writeGen[key] || 0;
+    const value = this.store[key];
+
+    try {
+      let dispatchDetail;
+      if (this.crypto) {
+        const encryptedValue = await this.crypto.encryptData(value);
+        // A newer write landed while we were encrypting — abort this flush.
+        if (this.writeGen[key] !== gen) return;
+        await this.db.writeValue(key, encryptedValue);
+        if (this.writeGen[key] !== gen) return;
+        const encryptedObject = JSON.parse(encryptedValue);
+        dispatchDetail = {
+          ...encryptedObject,
+          _dimWriteGen: gen,
+        };
+      } else {
+        if (this.writeGen[key] !== gen) return;
+        await this.db.writeValue(key, value);
+        if (this.writeGen[key] !== gen) return;
+        dispatchDetail = {
+          _dimValue: value,
+          _dimWriteGen: gen,
+        };
+      }
+
+      this.persistedGen[key] = gen;
+      debouncedDispatcher(eventName, dispatchDetail);
+
+      // Only clear saving if nothing newer is pending.
+      if (this.writeGen[key] === gen) {
+        this.setSaving(key, false);
+      }
+    } catch (error) {
+      console.error("Failed to persist value:", error);
+      // Keep isSaving true so the UI does not claim "Saved" after a failure.
+    }
+  }
+
+  schedulePersist(key, eventName) {
+    if (this.persistTimers[key] !== undefined) {
+      clearTimeout(this.persistTimers[key]);
+    }
+    this.persistTimers[key] = setTimeout(() => {
+      this.persistTimers[key] = undefined;
+      this.flushPersist(key, eventName);
+    }, PERSIST_DEBOUNCE_MS);
+  }
+
   generateListener(listener) {
     const { listenerId, key, value } = listener;
 
     // Capture the real useState setter BEFORE we wrap the slot.
-    // (value may already be a length-4 [value, set, loading, setLoading].)
+    // (value may already be a length-4/5 enhanced tuple.)
     const originalSetter = value[1];
 
     // Remove existing event listeners if they exist
@@ -101,6 +215,11 @@ class AsyncronousStateManager {
         const isInitialLoad =
           isInitialLoadEvent || event.detail?._isInitialLoad;
 
+        const eventGen =
+          event.detail && typeof event.detail === "object"
+            ? event.detail._dimWriteGen
+            : undefined;
+
         let finalValue;
         if (isInitialLoad) {
           // For initial load, the value is already decrypted by storage manager
@@ -111,9 +230,26 @@ class AsyncronousStateManager {
             ...event.detail,
             crypto: this.crypto,
           });
+        } else if (
+          event.detail &&
+          typeof event.detail === "object" &&
+          Object.prototype.hasOwnProperty.call(event.detail, "_dimValue")
+        ) {
+          // Plaintext dispatch wraps value so _dimWriteGen can ride along
+          finalValue = event.detail._dimValue;
         } else {
           // No encryption: the dispatched detail is the plaintext value
           finalValue = event.detail;
+        }
+
+        // Re-check after await: a newer local write may have landed mid-decrypt.
+        if (
+          !isInitialLoad &&
+          eventGen != null &&
+          eventGen < (this.writeGen[key] || 0)
+        ) {
+          this.clearLoading(key);
+          return;
         }
 
         // Update the store
@@ -121,6 +257,18 @@ class AsyncronousStateManager {
           ...this.store,
           [key]: finalValue,
         };
+
+        if (eventGen != null) {
+          this.writeGen[key] = Math.max(this.writeGen[key] || 0, eventGen);
+          // Remote/echo apply that is current also counts as persisted.
+          this.persistedGen[key] = Math.max(
+            this.persistedGen[key] || 0,
+            eventGen,
+          );
+          if ((this.writeGen[key] || 0) === (this.persistedGen[key] || 0)) {
+            this.setSaving(key, false);
+          }
+        }
 
         // Update the component state directly without triggering another event
         const currentState = value[0];
@@ -164,6 +312,8 @@ class AsyncronousStateManager {
         return;
       }
 
+      this.writeGen[key] = (this.writeGen[key] || 0) + 1;
+
       // Keep the manager cache in sync before re-render. Otherwise the next
       // generateListener() overwrites value[0] with a stale this.store[key]
       // (truthy empty/restored arrays beat the fresh useState value via ||).
@@ -172,39 +322,10 @@ class AsyncronousStateManager {
         [key]: newValue,
       };
 
-      // User updates: update UI immediately, then persist + broadcast.
+      // User updates: update UI immediately, then debounce persist + broadcast.
       originalSetter(newValue);
-
-      const storeToDB = async () => {
-        try {
-          // When encryption is enabled, persist the serialized ciphertext;
-          // otherwise persist the plaintext value directly.
-          const valueToStore = this.crypto
-            ? await this.crypto.encryptData(newValue)
-            : newValue;
-          await this.db.writeValue(key, valueToStore);
-        } catch (error) {
-          console.error("Failed to store value:", error);
-        }
-      };
-      storeToDB();
-
-      const dispatchUpdate = async (eventName, value) => {
-        try {
-          if (this.crypto) {
-            const encryptedValue = await this.crypto.encryptData(value);
-            // Parse the encrypted string back to object for dispatch
-            const encryptedObject = JSON.parse(encryptedValue);
-            debouncedDispatcher(eventName, encryptedObject);
-          } else {
-            // No encryption: dispatch the plaintext value directly
-            debouncedDispatcher(eventName, value);
-          }
-        } catch (error) {
-          console.error("Failed to dispatch update:", error);
-        }
-      };
-      dispatchUpdate(listenerName, newValue);
+      this.setSaving(key, true);
+      this.schedulePersist(key, listenerName);
     };
 
     // Prefer cache when present — including empty arrays (do not use ||).
@@ -230,6 +351,7 @@ class AsyncronousStateManager {
     );
 
     this.removeLoadingSetters(listenerId);
+    this.removeSavingSetters(listenerId);
   }
 
   createListeners = (store, listenerId) => {
@@ -246,7 +368,7 @@ class AsyncronousStateManager {
             value: obj[key],
           });
 
-          // Preserve the loading state info (indices 2 and 3)
+          // Preserve the loading/saving state info (indices 2+)
           obj[key][0] = asyncState;
           obj[key][1] = asyncSetState;
         }
@@ -258,3 +380,4 @@ class AsyncronousStateManager {
 }
 
 export default AsyncronousStateManager;
+export { PERSIST_DEBOUNCE_MS };

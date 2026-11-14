@@ -1,6 +1,11 @@
-import AsyncronousStateManager from "./async-manager.js";
+import AsyncronousStateManager, {
+  PERSIST_DEBOUNCE_MS,
+} from "./async-manager.js";
 import CryptoManager from "./crypto-manager.js";
 import StorageManager from "./storage-manager.js";
+
+const flushPersist = () =>
+  new Promise((resolve) => setTimeout(resolve, PERSIST_DEBOUNCE_MS + 50));
 
 // Mock debouncedDispatcher (factory may only reference allowed globals like
 // `globalThis`, not `window`).
@@ -189,6 +194,141 @@ describe("AsyncronousStateManager", () => {
     });
   });
 
+  describe("write generation (stale echo guard)", () => {
+    test("rapid successive sets leave state at the latest value", async () => {
+      const mockSetValue = jest.fn();
+      const mockSetSaving = jest.fn();
+      const writeValue = jest.fn(async () => {});
+
+      const manager = new AsyncronousStateManager(cryptoManager);
+      manager.db.writeValue = writeValue;
+      manager.addSavingSetter("raceKey", "race-sub", mockSetSaving);
+
+      const [, setter] = manager.generateListener({
+        listenerId: "race-id",
+        key: "raceKey",
+        value: ["", mockSetValue],
+      });
+
+      setter("a");
+      setter("ab");
+
+      expect(manager.store.raceKey).toBe("ab");
+      expect(mockSetValue).toHaveBeenLastCalledWith("ab");
+      expect(manager.writeGen.raceKey).toBe(2);
+      expect(mockSetSaving).toHaveBeenCalledWith(true);
+
+      await flushPersist();
+
+      // One debounced flush of the latest value only.
+      expect(writeValue).toHaveBeenCalledTimes(1);
+      const persisted = writeValue.mock.calls[0][1];
+      const decrypted = await cryptoManager.decryptData(persisted);
+      expect(decrypted).toBe("ab");
+      expect(manager.persistedGen.raceKey).toBe(2);
+      expect(mockSetSaving).toHaveBeenCalledWith(false);
+
+      manager.eventListener.forEach((listener) => {
+        window.removeEventListener(listener.eventName, listener.listener);
+      });
+    });
+
+    test("isSaving stays true until persist completes", async () => {
+      const mockSetSaving = jest.fn();
+      let resolveEncrypt;
+      const encryptGate = new Promise((resolve) => {
+        resolveEncrypt = resolve;
+      });
+
+      const gatedCrypto = {
+        encryptData: jest.fn(async (value) => {
+          await encryptGate;
+          return cryptoManager.encryptData(value);
+        }),
+        decryptData: (payload) => cryptoManager.decryptData(payload),
+      };
+
+      const manager = new AsyncronousStateManager(gatedCrypto);
+      manager.db.writeValue = jest.fn(async () => {});
+      manager.addSavingSetter("saveKey", "save-sub", mockSetSaving);
+
+      const [, setter] = manager.generateListener({
+        listenerId: "save-id",
+        key: "saveKey",
+        value: ["", jest.fn()],
+      });
+
+      setter("draft");
+      expect(mockSetSaving).toHaveBeenCalledWith(true);
+
+      await flushPersist();
+      // Still encrypting — not saved yet.
+      expect(manager.persistedGen.saveKey).toBeUndefined();
+
+      resolveEncrypt();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(manager.persistedGen.saveKey).toBe(1);
+      expect(mockSetSaving).toHaveBeenCalledWith(false);
+
+      manager.eventListener.forEach((listener) => {
+        window.removeEventListener(listener.eventName, listener.listener);
+      });
+    });
+
+    test("listener ignores encrypted events with a stale _dimWriteGen", async () => {
+      const mockSetValue = jest.fn();
+      asyncManager.generateListener({
+        listenerId: "stale-echo-id",
+        key: "echoKey",
+        value: ["initial", mockSetValue],
+      });
+
+      // Simulate a newer local write already applied.
+      asyncManager.writeGen.echoKey = 2;
+      asyncManager.store.echoKey = "ab";
+      mockSetValue.mockClear();
+
+      const staleEncrypted = JSON.parse(
+        await cryptoManager.encryptData("a"),
+      );
+      window.dispatchEvent(
+        new CustomEvent("echoKey", {
+          detail: { ...staleEncrypted, _dimWriteGen: 1 },
+        }),
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockSetValue).not.toHaveBeenCalled();
+      expect(asyncManager.store.echoKey).toBe("ab");
+    });
+
+    test("listener still applies events with a current _dimWriteGen", async () => {
+      const mockSetValue = jest.fn();
+      asyncManager.generateListener({
+        listenerId: "fresh-echo-id",
+        key: "freshKey",
+        value: ["initial", mockSetValue],
+      });
+      asyncManager.writeGen.freshKey = 1;
+      mockSetValue.mockClear();
+
+      const encrypted = JSON.parse(await cryptoManager.encryptData("latest"));
+      window.dispatchEvent(
+        new CustomEvent("freshKey", {
+          detail: { ...encrypted, _dimWriteGen: 2 },
+        }),
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockSetValue).toHaveBeenCalledWith("latest");
+      expect(asyncManager.store.freshKey).toBe("latest");
+      expect(asyncManager.writeGen.freshKey).toBe(2);
+    });
+  });
+
   describe("Integration with StorageManager", () => {
     test("should connect storage manager", () => {
       const storageManager = new StorageManager(cryptoManager);
@@ -235,6 +375,8 @@ describe("AsyncronousStateManager", () => {
       const { debouncedDispatcher } = require("./events.js");
       debouncedDispatcher.mockClear();
 
+      plainManager.db.writeValue = jest.fn(async () => {});
+
       const [, setter] = plainManager.generateListener({
         listenerId: "plain-id-2",
         key: "plainKey2",
@@ -242,9 +384,12 @@ describe("AsyncronousStateManager", () => {
       });
 
       setter("newValue");
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await flushPersist();
 
-      expect(debouncedDispatcher).toHaveBeenCalledWith("plainKey2", "newValue");
+      expect(debouncedDispatcher).toHaveBeenCalledWith("plainKey2", {
+        _dimValue: "newValue",
+        _dimWriteGen: 1,
+      });
     });
 
     test("wrapped setter updates original useState immediately", () => {

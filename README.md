@@ -173,10 +173,12 @@ const inputRef = useRef();
 
 ```javascript
 const {
-  user: [user, setUser],
-} = useStore({
-  user: { name: "John" },
-});
+  user: [user, setUser, isLoading, , isSaving],
+} = useStore(
+  { user: useState({ name: "John" }) },
+  { encryptionKey: "optional-secret" },
+);
+// isSaving is true while a debounced IndexedDB persist is in flight
 ```
 
 ## Examples
