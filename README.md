@@ -232,6 +232,18 @@ const TodoList = (props, { useState, html, css, useStyle }) => {
 };
 ```
 
+### Larger examples
+
+- **[dimui](https://github.com/positive-intentions/dimui)** — a Material-inspired
+  component library and custom Storybook-like explorer built on Dim (atoms,
+  molecules, demos, no bundler). Live:
+  https://positive-intentions.github.io/dimui/
+- **[dim-boilerplate](https://github.com/positive-intentions/dim-boilerplate)** —
+  a larger-scale encrypted notes app (vault, folders, list/editor) that loads
+  Dim from the Pages CDN and pulls dimui atoms remotely — classic scripts, no
+  app-side transpile or bundler, with optional PWA offline support. Live:
+  https://positive-intentions.github.io/dim-boilerplate/
+
 ## Rust/WASM Runtime
 
 Dim ships a second, drop-in runtime whose renderer core (template
@@ -313,12 +325,12 @@ components hosted on GitHub Pages), load the global script first, then map
 
 Remote modules then share the same classic IIFE runtime (one `customElements`
 registry). Classic `https://` scripts work from `file://`; dimui atoms use
-`import()` of ESM URLs instead. The
-[dim-boilerplate](https://github.com/positive-intentions/dim-boilerplate) repo
-uses this pattern for the encrypted notes demo.
-
-The [dimui](https://github.com/positive-intentions/dimui) explorer switches
-runtimes with `?impl=js|wasm|wasm-split`.
+`import()` of ESM URLs instead. See the
+[larger examples](#larger-examples) —
+[dimui](https://github.com/positive-intentions/dimui) and
+[dim-boilerplate](https://github.com/positive-intentions/dim-boilerplate) —
+for this pattern end to end. The dimui explorer switches runtimes with
+`?impl=js|wasm`.
 
 ### Building and testing
 
