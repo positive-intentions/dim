@@ -1,0 +1,19 @@
+[package]
+name = "dim-spec-core"
+version = "0.1.2"
+edition = "2021"
+license = "GPL-3.0"
+description = "DOM-free pure core for Dim template preparation and security policy"
+repository = "https://github.com/positive-intentions/dim"
+publish = false
+
+[lib]
+name = "dim_spec_core"
+path = "src/lib.rs"
+
+[dependencies]
+
+[dev-dependencies]
+proptest = "1.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

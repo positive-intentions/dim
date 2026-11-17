@@ -1,6 +1,6 @@
 {
   "name": "@positive-intentions/dim",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A React-inspired functional web components framework built on native Web Components",
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
@@ -13,31 +13,52 @@
     "./react": {
       "types": "./dist/react.d.ts",
       "import": "./dist/react.mjs"
-    }
+    },
+    "./wasm": {
+      "types": "./dist/wasm/index.d.ts",
+      "import": "./dist/wasm/index.mjs"
+    },
+    "./wasm/split": {
+      "types": "./dist/wasm/split/index.d.ts",
+      "import": "./dist/wasm/split/index.mjs"
+    },
+    "./wasm/global": "./dist/wasm/dim.global.js",
+    "./global": "./dist/dim.global.js"
   },
   "files": [
     "dist",
     "LICENSE",
     "README.md",
     "CHANGELOG.md",
-    "MIGRATION.md"
+    "MIGRATION.md",
+    "SECURITY.md"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/wasm/**",
+    "./src/wasm/**"
+  ],
   "scripts": {
     "start": "storybook dev -p 6006",
     "start:webpack": "webpack serve --config webpack.config.cjs",
     "lint": "npm run lint:prettier && npm run lint:eslint",
     "lint:check": "npm run lint:prettier:check && npm run lint:eslint:check",
     "lint:prettier": "prettier --write ./src/**/*.{js,jsx,ts,tsx}",
-    "lint:prettier:check": "prettier --check ./src/core/**/*.{js,jsx,ts,tsx}",
+    "lint:prettier:check": "prettier --check ./src/core/**/*.{js,jsx,ts,tsx} ./src/wasm/*.{js,ts}",
     "lint:eslint": "eslint --fix ./src/**/*.{js,jsx,ts,tsx}",
-    "lint:eslint:check": "eslint ./src/core/**/*.{js,jsx,ts,tsx}",
+    "lint:eslint:check": "eslint ./src/core/**/*.{js,jsx,ts,tsx} ./src/wasm/*.ts",
     "test": "jest",
     "test:watch": "jest --watchAll",
-    "build": "npm run build:reset && npm run build:frontend && npm run build:frontend:vite && npm run build:storybook",
-    "build:lib": "tsup && tsc --emitDeclarationOnly --declaration --declarationMap --noCheck -p tsconfig.json",
+    "test:wasm": "node scripts/build-wasm.mjs --no-bundle && DIM_IMPL=wasm jest",
+    "test:rust": "cargo test --manifest-path rust/dim-spec-core/Cargo.toml && cargo test --manifest-path rust/dim-core/Cargo.toml --lib",
+    "test:all": "npm test && npm run test:rust && npm run test:wasm",
+    "verify": "bash scripts/verify.sh",
+    "verify:lean": "cd verification/lean && lake build Dim && bash scripts/check-axioms.sh && lake build dim-oracle",
+    "build": "npm run build:reset && npm run build:lib && npm run build:frontend && npm run build:frontend:vite && npm run build:storybook && npm run build:pages-lib",
+    "build:lib": "tsup && tsc --emitDeclarationOnly --declaration --declarationMap --noCheck -p tsconfig.json && npm run build:wasm",
+    "build:wasm": "node scripts/build-wasm.mjs",
     "build:reset": "rm -rf ./Frontend && mkdir ./Frontend",
     "build:storybook": "storybook build && cp -r storybook-static/* ./Frontend",
+    "build:pages-lib": "mkdir -p Frontend/lib && cp dist/dim.global.js Frontend/lib/dim.global.js && cp dist/wasm/dim.global.js Frontend/lib/dim.wasm.global.js && touch Frontend/.nojekyll",
     "build:frontend": "webpack --mode development --config webpack.config.cjs && cp -r dist/* ./Frontend",
     "build:frontend:vite": "vite build && cp -r dist/* ./Frontend",
     "build:development": "webpack --mode development --config webpack.config.cjs && cp -r dist/* ./Frontend",
@@ -108,6 +129,7 @@
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-storybook": "^0.11.0",
     "fake-indexeddb": "^6.0.1",
+    "fast-check": "^3.23.2",
     "html-webpack-plugin": "^5.6.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",

@@ -39,7 +39,7 @@ Dim is a lightweight framework that brings React's component model and hooks to 
 
 > **Experimental**: This framework is in early development and is not production-ready. It's provided for educational and experimental purposes.
 
-> **Upgrading?** See [MIGRATION.md](MIGRATION.md) for breaking API changes (`useStore`, object attributes, `useFS`, crypto format). See [CHANGELOG.md](CHANGELOG.md) for release notes (created on the first publish).
+> **Upgrading?** See [MIGRATION.md](MIGRATION.md) for API changes (including **0.1.2 security** hardening). See [CHANGELOG.md](CHANGELOG.md) for release notes. Vulnerability reports: [SECURITY.md](SECURITY.md).
 
 ## Install
 
@@ -232,6 +232,137 @@ const TodoList = (props, { useState, html, css, useStyle }) => {
 };
 ```
 
+## Rust/WASM Runtime
+
+Dim ships a second, drop-in runtime whose renderer core (template
+preparation, commit/diff, focus preservation), hook bookkeeping, update
+scheduling, style flushing and prop parsing are written in Rust
+(`rust/dim-core`, plain `wasm-bindgen` + `web-sys`) and compiled to
+WebAssembly. The public JS API is identical, so existing components run
+unchanged; only the import changes. Stores, crypto, storage, view transitions
+and `useFS` are shared with the JS runtime.
+
+| Entry                                  | Loads WASM                               | Works from `file://` |
+| -------------------------------------- | ---------------------------------------- | -------------------- |
+| `@positive-intentions/dim`             | — (pure JS)                              | no (ES module)\*     |
+| `@positive-intentions/dim/global`      | — (pure JS, classic → `window.Dim`)      | **yes**              |
+| `@positive-intentions/dim/wasm`        | inlined (base64, `initSync`)             | no (ES module)\*     |
+| `@positive-intentions/dim/wasm/split`  | `fetch` of `dim_core_bg.wasm` (streamed) | no                   |
+| `@positive-intentions/dim/wasm/global` | inlined, classic script → `window.Dim`   | **yes**              |
+
+\* Chrome refuses `<script type="module">` on `file://` (an opaque origin), for
+either runtime. Classic scripts (`./global` and `./wasm/global`) still work.
+
+### Switching runtimes
+
+With an import map, swap one line:
+
+```html
+<script type="importmap">
+  {
+    "imports": {
+      "@positive-intentions/dim": "./node_modules/@positive-intentions/dim/dist/wasm/index.mjs"
+    }
+  }
+</script>
+```
+
+Or import it directly: `import { define } from "@positive-intentions/dim/wasm";`.
+
+To open a page straight from disk (double-click `index.html`, no server), use
+a classic-script build. Pure JS:
+
+```html
+<script src="./node_modules/@positive-intentions/dim/dist/dim.global.js"></script>
+<script>
+  const { define, html } = Dim;
+</script>
+```
+
+WASM (see also [`examples/todo-wasm/index.html`](examples/todo-wasm/index.html)):
+
+```html
+<script src="./node_modules/@positive-intentions/dim/dist/wasm/dim.global.js"></script>
+<script>
+  const { define, html } = Dim;
+</script>
+```
+
+To combine a classic Dim runtime with remote un-transpiled ESM (for example
+components hosted on GitHub Pages), load the global script first, then map
+`@positive-intentions/dim` to a `data:` module that re-exports `globalThis.Dim`:
+
+```html
+<!-- Local copy, or the GitHub Pages CDN after `npm run build` publishes Frontend/lib/: -->
+<script src="https://positive-intentions.github.io/dim/lib/dim.global.js"></script>
+<!-- WASM: https://positive-intentions.github.io/dim/lib/dim.wasm.global.js -->
+<script>
+  const keys = Object.keys(Dim).join(",");
+  const shim = `const D=globalThis.Dim;export const{${keys}}=D;`;
+  const s = document.createElement("script");
+  s.type = "importmap";
+  s.textContent = JSON.stringify({
+    imports: {
+      "@positive-intentions/dim": "data:text/javascript," + encodeURIComponent(shim),
+      "dimui/": "https://positive-intentions.github.io/dimui/src/",
+    },
+  });
+  document.currentScript.after(s);
+</script>
+```
+
+Remote modules then share the same classic IIFE runtime (one `customElements`
+registry). Classic `https://` scripts work from `file://`; dimui atoms use
+`import()` of ESM URLs instead. The
+[dim-boilerplate](https://github.com/positive-intentions/dim-boilerplate) repo
+uses this pattern for the encrypted notes demo.
+
+The [dimui](https://github.com/positive-intentions/dimui) explorer switches
+runtimes with `?impl=js|wasm|wasm-split`.
+
+### Building and testing
+
+Requires Rust (toolchain pinned in `rust/rust-toolchain.toml`, with the
+`wasm32-unknown-unknown` target) and [`wasm-pack`](https://rustwasm.github.io/wasm-pack/) 0.13.
+
+```bash
+npm run build:wasm   # wasm-pack + tsup → dist/wasm/** (also run by build:lib)
+npm run test:wasm    # the runtime parity Jest suites against the WASM runtime
+npm run test:rust    # cargo unit tests for template preparation
+npm run test:all     # JS + Rust + WASM
+```
+
+### Caveats
+
+- **Size.** `dim_core_bg.wasm` is ~150 KB (~65 KB gzipped). The inline and
+  global builds embed it as base64 (+33%), so they are ~310 KB vs ~105 KB for
+  the JS build; the split build is ~110 KB of JS plus the `.wasm` file.
+- **Startup.** The inline builds compile synchronously with `initSync` (fine
+  well below Chrome's 8 MB sync-compile limit). The split build uses
+  top-level `await`, so it needs an HTTP(S) server and a bundler/browser that
+  supports TLA.
+- **CSP.** Instantiating WebAssembly needs `script-src 'wasm-unsafe-eval'`
+  under a strict Content Security Policy.
+- **Performance.** Every DOM operation still crosses the JS↔WASM boundary,
+  so the WASM runtime is not faster than the JS one. dimui's keyed-list
+  benchmark (`?id=benchmarks-keyed-list-default`, median of 5, Chrome):
+
+  | Operation             | JS (ms) | WASM (ms) |
+  | --------------------- | ------- | --------- |
+  | create 1,000 rows     | 15.9    | 25.4      |
+  | update every 10th row | 1.7     | 2.9       |
+  | select row            | 0.5     | 2.7       |
+  | swap rows             | 0.6     | 2.6       |
+  | remove first row      | 12.9    | 25.4      |
+  | append 1,000 rows     | 13.2    | 28.9      |
+  | clear                 | 3.1     | 2.1       |
+  | **total**             | 47.9    | 90.0      |
+
+- **Behavioural differences.** The WASM committer skips parts whose value is
+  the identical primitive (or the same listener) as last commit, as lit does;
+  `.prop` bindings are always re-assigned. External DOM edits to a bound text
+  node or attribute are therefore not reverted until the value changes.
+
 ## Documentation
 
 The framework includes comprehensive documentation through Storybook:
@@ -275,6 +406,26 @@ npm run build:lib
 npm run build
 ```
 
+## Security and verification
+
+From 0.1.2, Dim ships a hardened template policy and a Lean 4 spec of the pure (DOM-free) core (still experimental).
+
+| Component | Proven (Lean) | Conformance-tested | Untested / host |
+| --------- | ------------- | ------------------ | --------------- |
+| Binding policy / `sanitizeUrl` / `escapeText` | Laws + proofs | JS + Rust vs Lean oracle | — |
+| `prepare` (pure) | Structural contracts | Unit + differential | DOM instantiation |
+| Aeneas refinement of Rust | Hand model (`Dim/Refinement`); full Aeneas optional | Differential | `VERIFY_AENEAS=1` |
+| Commit / events / CryptoManager | — | Unit tests | Browser / WebCrypto |
+
+Local gate (Lean proofs, oracle, Rust + JS differential tests):
+
+```bash
+# Needs elan/lake (https://lean-lang.org/lean4/doc/setup.html)
+npm run verify
+```
+
+CI: [`.github/workflows/verify.yml`](.github/workflows/verify.yml) on every push/PR. Details: [security/analysis.md](security/analysis.md), [verification/lean/](verification/lean/).
+
 ### Project Structure
 
 ```
@@ -284,12 +435,21 @@ dim/
 │   │   ├── index.ts        # Public API (published as @positive-intentions/dim)
 │   │   ├── dim.ts          # Compatibility shim (re-exports index)
 │   │   ├── renderer/       # html/css tagged templates, parts, render()
+│   │   │   └── pure/       # DOM-free prepare + security policy
 │   │   ├── element/        # DimElement, define(), props helpers
 │   │   ├── hooks/          # useState, useEffect, useMemo, useRef, useStyle, useScope
 │   │   ├── store/          # useStore, crypto/storage/async managers
 │   │   ├── transitions/    # view transitions + AutoTransitionHost
 │   │   └── fs/             # useFS + File System Access handle persistence
+│   ├── wasm/               # Rust/WASM runtime facade (same API as core/index.ts)
 │   └── stories/            # Storybook docs and demo apps
+├── rust/
+│   ├── dim-spec-core/      # DOM-free pure core (policy + prepare)
+│   └── dim-core/           # WASM runtime (depends on dim-spec-core)
+├── verification/lean/      # Lean 4 laws, proofs, dim-oracle
+├── security/               # Threat model and findings
+├── scripts/                # verify.sh, build-wasm.mjs, …
+├── examples/todo-wasm/     # file:// demo using dist/wasm/dim.global.js
 ├── public/
 └── README.md
 ```

@@ -14,14 +14,48 @@ import {
   prepareTemplate,
   createInstance,
 } from "./prepare.js";
+import { isUrlAttr, sanitizeUrl } from "./pure/policy.js";
 import { captureFocus, restoreFocus, isFormControl } from "./focus.js";
 
 const containerState = new WeakMap();
+
+let dimTrustedTypesPolicy = null;
+function getDimPolicy() {
+  if (dimTrustedTypesPolicy !== null) return dimTrustedTypesPolicy;
+  const tt = globalThis.trustedTypes;
+  if (tt && typeof tt.createPolicy === "function") {
+    try {
+      dimTrustedTypesPolicy = tt.createPolicy("dim", {
+        createHTML: (s) => s,
+      });
+    } catch {
+      // Policy may already exist (e.g. HMR / duplicate import).
+      dimTrustedTypesPolicy =
+        typeof tt.getPolicy === "function" ? tt.getPolicy("dim") : undefined;
+    }
+  } else {
+    dimTrustedTypesPolicy = undefined;
+  }
+  return dimTrustedTypesPolicy;
+}
+
+function toTrustedHtml(htmlString) {
+  const policy = getDimPolicy();
+  if (policy) return policy.createHTML(htmlString);
+  return htmlString;
+}
 
 function formatAttrMid(value) {
   if (value == null || value === false) return "";
   if (value === true) return "";
   return String(value);
+}
+
+function finalizeAttrValue(name, value) {
+  if (isUrlAttr(name)) {
+    return sanitizeUrl(name, value);
+  }
+  return value;
 }
 
 function commitAttrGroup(part) {
@@ -37,7 +71,11 @@ function commitAttrGroup(part) {
     ) {
       part.element.removeAttribute(part.name);
     } else {
-      part.element.setAttribute(part.name, prefix + mid + suffix);
+      const raw = prefix + mid + suffix;
+      part.element.setAttribute(
+        part.name,
+        finalizeAttrValue(part.name, raw),
+      );
     }
     return;
   }
@@ -52,7 +90,10 @@ function commitAttrGroup(part) {
     result += formatAttrMid(g.committed);
   }
   result += group[group.length - 1].valueSuffix || "";
-  part.element.setAttribute(part.name, result);
+  part.element.setAttribute(
+    part.name,
+    finalizeAttrValue(part.name, result),
+  );
 }
 
 function clearNodesBetween(start, end) {
@@ -86,18 +127,25 @@ function setChildValue(part, value, container) {
   }
 
   if (isUnsafeHTML(value)) {
-    const htmlString = value.value == null ? "" : String(value.value);
+    // TrustedHTML objects stringify; preserve identity for equality checks.
+    const raw = value.value;
+    const htmlString =
+      raw == null
+        ? ""
+        : typeof raw === "object" && raw !== null && "toString" in raw
+          ? String(raw)
+          : String(raw);
     if (
       part.committed &&
       isUnsafeHTML(part.committed) &&
-      part.committed.value === htmlString
+      part.committed.value === value.value
     ) {
       return;
     }
     clearNodesBetween(part.start, part.end);
     if (htmlString) {
       const tpl = document.createElement("template");
-      tpl.innerHTML = htmlString;
+      tpl.innerHTML = toTrustedHtml(htmlString);
       part.end.parentNode.insertBefore(tpl.content, part.end);
     }
     part.committed = value;

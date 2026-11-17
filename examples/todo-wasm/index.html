@@ -1,0 +1,123 @@
+<!doctype html>
+<!--
+  Dim todo list on the Rust/WASM runtime, opened straight from disk.
+
+    npm run build:wasm
+    xdg-open examples/todo-wasm/index.html   # or double-click it
+
+  Uses the classic-script build (global `Dim`) because browsers block
+  <script type="module"> on file:// pages. Swap the script src for
+  ../../dist/index.mjs / dist/wasm/index.mjs (as type="module") when serving
+  over HTTP.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dim todo (WASM, file://)</title>
+    <script src="../../dist/wasm/dim.global.js"></script>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 32rem;
+        margin: 2rem auto;
+      }
+    </style>
+  </head>
+  <body>
+    <todo-app></todo-app>
+    <script>
+      const { define, useState, useStyle, useMemo, useEffect, html, css } = Dim;
+
+      const AddItemForm = ({ addTodo }, { useState, useStyle, html, css }) => {
+        const [inputValue, setInputValue] = useState("");
+
+        useStyle(css`
+          button {
+            background-color: #029cfd;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            padding: 5px 10px;
+            cursor: pointer;
+          }
+        `);
+
+        const add = () => {
+          if (!inputValue.trim()) return;
+          addTodo(inputValue);
+          setInputValue("");
+        };
+
+        return html`
+          <input
+            type="text"
+            placeholder="Add todo"
+            .value="${inputValue}"
+            @input="${(e) => setInputValue(e.target.value)}"
+            @keydown="${(e) => e.key === "Enter" && add()}"
+          />
+          <button @click="${add}">Add</button>
+          <button @click="${() => setInputValue("")}">Clear</button>
+        `;
+      };
+
+      const ListItem = ({ todo, onRemove }, { useEffect, html }) => {
+        useEffect(() => {
+          console.log("List item mounted");
+          return () => console.log("List item unmounted");
+        }, []);
+
+        return html`
+          <li>
+            ${todo}
+            <button @click="${onRemove}">Remove</button>
+          </li>
+        `;
+      };
+
+      const TodoList = ({ todos, onRemove }, { useScope, html }) => {
+        useScope({ "list-item": ListItem });
+        return html`
+          <ul>
+            ${todos.map(
+              (todo, index) => html`
+                <list-item
+                  .props="${{ todo, onRemove: () => onRemove(index) }}"
+                ></list-item>
+              `,
+            )}
+          </ul>
+        `;
+      };
+
+      const Todo = (_props, { useState, useMemo, useScope, html }) => {
+        useScope({
+          "add-item-form": AddItemForm,
+          "todo-list": TodoList,
+        });
+
+        const [todos, setTodos] = useState([]);
+        const count = useMemo(() => todos.length, [todos]);
+
+        return html`
+          <div>
+            <h1>Todo App</h1>
+            <add-item-form
+              .props="${{ addTodo: (t) => setTodos([...todos, t]) }}"
+            ></add-item-form>
+            <p>Number of todo items: ${count}</p>
+            <todo-list
+              .props="${{
+                todos,
+                onRemove: (i) => setTodos(todos.filter((_, j) => j !== i)),
+              }}"
+            ></todo-list>
+          </div>
+        `;
+      };
+
+      define({ tag: "todo-app", component: Todo });
+    </script>
+  </body>
+</html>

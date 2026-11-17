@@ -11,6 +11,13 @@ module.exports = {
     ],
     "overrides": [
         {
+            // JS <-> WASM boundary: values are untyped JsValues on the Rust side
+            "files": ["src/wasm/**/*.ts"],
+            "rules": {
+                "@typescript-eslint/no-explicit-any": "off"
+            }
+        },
+        {
             "env": {
                 "node": true
             },
@@ -37,6 +44,7 @@ module.exports = {
     "ignorePatterns": [
         "**/*.test.*",
         "**/*.stories.*",
+        "src/wasm/generated/**",
     ],
     "settings": {
         "react": {

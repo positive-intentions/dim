@@ -1,5 +1,13 @@
-import { html, render, keyed, unsafeHTML, css } from "./index.js";
+import {
+  html,
+  render,
+  keyed,
+  unsafeHTML,
+  css,
+  renderChildren,
+} from "./index.js";
 import { DimElement } from "../element/dim-element.js";
+import { sanitizeUrl, prepare } from "./pure/index.js";
 
 function mount() {
   const container = document.createElement("div");
@@ -303,5 +311,48 @@ describe("DimElement", () => {
       }
     `;
     expect(result.cssText).toContain("color: red");
+  });
+});
+
+describe("security (0.1.2)", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test("html rejects plain strings and crafted arrays", () => {
+    expect(() => html("<div>x</div>")).toThrow(/template literal/);
+    expect(() => html(["<div>", "</div>"], "x")).toThrow(/template literal/);
+  });
+
+  test("renderChildren treats strings as text, not HTML", () => {
+    const el = mount();
+    render(html`<div>${renderChildren("<img src=x onerror=alert(1)>")}</div>`, el);
+    expect(el.querySelector("img")).toBeNull();
+    expect(el.textContent).toContain("<img");
+  });
+
+  test("prepare rejects on* attribute bindings", () => {
+    expect(() => prepare(['<a onclick="', '">x</a>'])).toThrow(/forbidden/);
+  });
+
+  test("prepare rejects srcdoc and .innerHTML", () => {
+    expect(() => prepare(['<iframe srcdoc="', '">'])).toThrow(/forbidden/);
+    expect(() => prepare(['<div .innerHTML="', '">'])).toThrow(/forbidden/);
+  });
+
+  test("javascript: URLs are sanitized on commit", () => {
+    const el = mount();
+    render(html`<a href="${"javascript:alert(1)"}">x</a>`, el);
+    expect(el.querySelector("a").getAttribute("href")).toBe(
+      "about:invalid#dim",
+    );
+  });
+
+  test("sanitizeUrl allows https and relative", () => {
+    expect(sanitizeUrl("href", "https://example.com")).toBe(
+      "https://example.com",
+    );
+    expect(sanitizeUrl("href", "/path")).toBe("/path");
+    expect(sanitizeUrl("src", "data:text/html,x")).toBe("about:invalid#dim");
   });
 });

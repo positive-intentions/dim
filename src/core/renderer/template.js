@@ -4,6 +4,8 @@
  * custom-element state survive re-renders.
  */
 
+import { processStaticStrings } from "./pure/static-strings.js";
+
 /** @type {1} TemplateResult */
 export const HTML_RESULT = 1;
 /** @type {2} Keyed wrapper */
@@ -35,94 +37,48 @@ export function isUnsafeHTML(value) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// React-like preprocess (JSON-only attr={{}}; self-closing custom elements)
-// Cached per template-literal site so strings identity stays stable across
-// re-renders (required for parts reuse / focus preservation).
-// ---------------------------------------------------------------------------
-
 const processedStringsCache = new WeakMap();
 
-function processStaticStrings(strings) {
-  const valueCount = strings.length - 1;
-  let fullTemplate = strings[0];
-  for (let i = 0; i < valueCount; i++) {
-    fullTemplate += `__VALUE_${i}__` + strings[i + 1];
+function normalizeJsonObjectLiteral(bodyWithBraces) {
+  try {
+    const objValue = JSON.parse(bodyWithBraces);
+    return JSON.stringify(objValue);
+  } catch {
+    console.warn(
+      "Failed to parse object attribute as JSON (use .props for functions/non-JSON values):",
+      bodyWithBraces,
+    );
+    return null;
   }
+}
 
-  const original = fullTemplate;
-
-  // Self-closing custom elements: <foo-bar /> → <foo-bar></foo-bar>
-  fullTemplate = fullTemplate.replace(
-    /<([a-z][a-z0-9]*-[a-z0-9-]*)([^>]*?)\s*\/>/gi,
-    "<$1$2></$1>",
-  );
-
-  const objectAttrRegex = /(\w+)=\{\{([^}]+)\}\}/g;
-  let replacements = [];
-  let match;
-  while ((match = objectAttrRegex.exec(fullTemplate)) !== null) {
-    const [fullMatch, attrName, attrValue] = match;
-    try {
-      const objValue = JSON.parse("{" + attrValue + "}");
-      const jsonString = JSON.stringify(objValue);
-      replacements.push({
-        from: fullMatch,
-        to: `${attrName}='${jsonString}'`,
-      });
-    } catch (e) {
-      console.warn(
-        "Failed to parse object attribute as JSON (use .props for functions/non-JSON values):",
-        attrValue,
-      );
-    }
-  }
-
-  replacements.forEach((replacement) => {
-    fullTemplate = fullTemplate.replace(replacement.from, replacement.to);
-  });
-
-  if (fullTemplate === original) {
-    return strings;
-  }
-
-  const parts = fullTemplate.split(/__VALUE_(\d+)__/);
-  const newStrings = [];
-  newStrings.push(parts[0]);
-  for (let i = 1; i < parts.length; i += 2) {
-    newStrings.push(parts[i + 1] || "");
-  }
-  while (newStrings.length < valueCount + 1) {
-    newStrings.push("");
-  }
-  newStrings.raw = [...newStrings];
-  return newStrings;
+function processCached(strings) {
+  const processed = processStaticStrings(strings, normalizeJsonObjectLiteral);
+  if (!processed) return strings;
+  processed.raw = [...processed];
+  return processed;
 }
 
 /**
  * Enhanced html tagged template — Dim's public template API.
+ * Requires a real template-strings array (with `.raw`).
  */
 export const html = (strings, ...values) => {
-  if (!strings || !strings.raw) {
-    if (typeof strings === "string") {
-      const templateStrings = [strings];
-      templateStrings.raw = [strings];
-      return {
-        _$dimType$: HTML_RESULT,
-        strings: templateStrings,
-        values: values,
-      };
-    }
-    return {
-      _$dimType$: HTML_RESULT,
-      strings,
-      values,
-    };
+  if (
+    !strings ||
+    typeof strings !== "object" ||
+    !Array.isArray(strings.raw) ||
+    !Array.isArray(strings)
+  ) {
+    throw new Error(
+      "html`...` requires a template literal (TemplateStringsArray with .raw). " +
+        "Do not call html() with a plain string or crafted array.",
+    );
   }
 
   let processedStrings = processedStringsCache.get(strings);
   if (!processedStrings) {
-    processedStrings = processStaticStrings(strings);
+    processedStrings = processCached(strings);
     processedStringsCache.set(strings, processedStrings);
   }
 
@@ -142,6 +98,8 @@ export function keyed(key, result) {
 
 /**
  * Render a string as HTML (trusted content only).
+ * When Trusted Types is enforced, pass a TrustedHTML value or a string that
+ * the installed `dim` policy will create.
  */
 export function unsafeHTML(value) {
   return { _$dimType$: UNSAFE_HTML_RESULT, value };
@@ -149,19 +107,14 @@ export function unsafeHTML(value) {
 
 /**
  * Helper to render children content into a template.
+ * Strings are text (escaped by the browser text node). Raw HTML requires
+ * an explicit `unsafeHTML(...)` wrapper.
  */
 export const renderChildren = (children) => {
   if (!children) return html``;
 
   if (typeof children === "string") {
-    if (
-      children.includes("-") &&
-      children.includes("<") &&
-      children.includes(">")
-    ) {
-      return html`<slot></slot>`;
-    }
-    return html`${unsafeHTML(children)}`;
+    return html`${children}`;
   }
 
   if (Array.isArray(children)) {

@@ -21,6 +21,19 @@ import {
   saveRootDirectoryHandle,
 } from "./handle-persistence.js";
 
+/** Split a path and reject `.` / `..` segments (defense in depth for FSA/OPFS). */
+function pathSegments(path) {
+  const parts = String(path || "")
+    .split("/")
+    .filter(Boolean);
+  for (const part of parts) {
+    if (part === "." || part === "..") {
+      throw new Error(`useFS: invalid path segment "${part}"`);
+    }
+  }
+  return parts;
+}
+
 export function useFS(options = {}, hooks) {
   const { opfs = false, encrypt = false, encryptionPassword } = options;
   const { useState, useEffect, useStore } = hooks;
@@ -332,7 +345,7 @@ export function useFS(options = {}, hooks) {
 
       // Navigate to subdirectory if path is provided
       if (path) {
-        const pathParts = path.split("/").filter(Boolean);
+        const pathParts = pathSegments(path);
         for (const part of pathParts) {
           targetHandle = await targetHandle.getDirectoryHandle(part);
         }
@@ -369,7 +382,7 @@ export function useFS(options = {}, hooks) {
 
       // Navigate to subdirectory if path is provided
       if (path) {
-        const pathParts = path.split("/").filter(Boolean);
+        const pathParts = pathSegments(path);
         for (const part of pathParts) {
           targetHandle = await targetHandle.getDirectoryHandle(part);
         }
@@ -442,7 +455,7 @@ export function useFS(options = {}, hooks) {
 
       // Navigate to subdirectory if path is provided, create if needed
       if (path) {
-        const pathParts = path.split("/").filter(Boolean);
+        const pathParts = pathSegments(path);
         for (const part of pathParts) {
           try {
             targetHandle = await targetHandle.getDirectoryHandle(part);
@@ -507,7 +520,7 @@ export function useFS(options = {}, hooks) {
     let targetHandle = dirHandle;
 
     if (path) {
-      const pathParts = path.split("/").filter(Boolean);
+      const pathParts = pathSegments(path);
       for (const part of pathParts) {
         try {
           targetHandle = await targetHandle.getDirectoryHandle(part);
@@ -534,7 +547,7 @@ export function useFS(options = {}, hooks) {
 
       // Navigate to subdirectory if path is provided
       if (path) {
-        const pathParts = path.split("/").filter(Boolean);
+        const pathParts = pathSegments(path);
         for (const part of pathParts) {
           targetHandle = await targetHandle.getDirectoryHandle(part);
         }
@@ -557,7 +570,7 @@ export function useFS(options = {}, hooks) {
 
       // Navigate to parent directory if path is provided
       if (path) {
-        const pathParts = path.split("/").filter(Boolean);
+        const pathParts = pathSegments(path);
         for (const part of pathParts) {
           targetHandle = await targetHandle.getDirectoryHandle(part);
         }

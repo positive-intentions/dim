@@ -1,0 +1,41 @@
+[package]
+name = "dim-core"
+version = "0.1.2"
+edition = "2021"
+license = "GPL-3.0"
+description = "Rust/WebAssembly runtime core for the Dim functional web components framework"
+repository = "https://github.com/positive-intentions/dim"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+dim-spec-core = { path = "../dim-spec-core" }
+wasm-bindgen = { version = "0.2.100", features = ["enable-interning"] }
+js-sys = "0.3.77"
+web-sys = { version = "0.3.77", features = [
+  "Attr",
+  "CharacterData",
+  "Comment",
+  "CssStyleSheet",
+  "CustomElementRegistry",
+  "Document",
+  "DocumentFragment",
+  "Element",
+  "EventTarget",
+  "HtmlElement",
+  "HtmlTemplateElement",
+  "NamedNodeMap",
+  "Node",
+  "Range",
+  "NodeFilter",
+  "ShadowRoot",
+  "Text",
+  "TreeWalker",
+  "Window",
+  "console",
+] }
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]

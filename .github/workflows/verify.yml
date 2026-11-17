@@ -1,0 +1,117 @@
+name: Verify
+
+on:
+  push:
+    branches: [staging, main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install elan
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Build Lean proofs + oracle
+        working-directory: verification/lean
+        run: |
+          lake build Dim
+          bash scripts/check-axioms.sh
+          lake build dim-oracle
+
+      - name: Upload oracle binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: dim-oracle
+          path: verification/lean/.lake/build/bin/dim-oracle
+
+  conformance:
+    needs: lean
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        working-directory: rust
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - name: Download oracle
+        uses: actions/download-artifact@v4
+        with:
+          name: dim-oracle
+          path: verification/lean/.lake/build/bin
+
+      - name: Make oracle executable
+        run: chmod +x verification/lean/.lake/build/bin/dim-oracle
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Rust pure-core + oracle
+        run: cargo test --manifest-path rust/dim-spec-core/Cargo.toml
+
+      - name: JS pure-core + oracle
+        run: npm test -- --testPathPattern='pure.test'
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        working-directory: rust
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: npm audit (high+)
+        run: npm audit --audit-level=high || true
+        # Soft-fail until the dependency tree is fully cleaned; CI still surfaces the report.
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked || true
+
+      - name: cargo audit
+        working-directory: rust
+        run: cargo audit || true
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked || true
+
+      - name: cargo deny
+        working-directory: rust
+        run: cargo deny check --config deny.toml || true
+
+  aeneas:
+    runs-on: ubuntu-latest
+    if: ${{ vars.VERIFY_AENEAS == '1' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Aeneas regenerate
+        env:
+          VERIFY_AENEAS: "1"
+        run: bash scripts/aeneas-regenerate.sh

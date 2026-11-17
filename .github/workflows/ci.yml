@@ -7,6 +7,9 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,14 +23,40 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Setup Rust (toolchain from rust/rust-toolchain.toml)
+        working-directory: rust
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: v0.13.1
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('rust/**/Cargo.lock', 'rust/**/Cargo.toml') }}
+
       - name: Install dependencies
         run: npm ci
 
       - name: Lint
         run: npm run lint:check
 
-      - name: Test
+      - name: Test (JS runtime)
         run: npm test
 
-      - name: Build library
+      - name: Test (Rust pure core + template)
+        run: |
+          cargo test --manifest-path rust/dim-spec-core/Cargo.toml
+          npm run test:rust
+
+      - name: Test (WASM runtime parity)
+        run: npm run test:wasm
+
+      - name: Build library (JS + WASM)
         run: npm run build:lib

@@ -1,19 +1,16 @@
 # @positive-intentions/dim
 
+## 0.1.2
+
+### Patch Changes
+
+- Experimental security hardening for the template / commit path (JS and Rust/WASM): safer `renderChildren`, attribute/URL policy, template-strings check, Trusted Types when available
+- `CryptoManager`: lazy derivation, non-extractable keys, versioned payloads (legacy still decrypts)
+- Extract DOM-free pure core (`src/core/renderer/pure`, `rust/dim-spec-core`) with Lean 4 laws + oracle and differential tests
+- See [MIGRATION.md](./MIGRATION.md), [SECURITY.md](./SECURITY.md), [security/analysis.md](./security/analysis.md)
+
 ## 0.1.1
 
 ### Patch Changes
 
-- [`aaf88d1`](https://github.com/positive-intentions/dim/commit/aaf88d1e6d9a74c7007ccd351c91748205330795) - Debounce encrypted `useStore` persistence (single encrypt per flush) and expose `isSaving` on each store tuple so UIs can show save status and avoid refresh-before-write data loss.
-
-- [`aaf88d1`](https://github.com/positive-intentions/dim/commit/aaf88d1e6d9a74c7007ccd351c91748205330795) - Prevent stale encrypted `useStore` async echoes from overwriting newer local writes (fixes delayed typing / caret jumps on controlled inputs).
-
-## 0.1.0
-
-### Minor Changes
-
-- c6a629b: First npm release of the Dim core API (`define`, hooks, `html`/`css`, `useStore`, `useFS`, and related utilities).
-
-### Patch Changes
-
-- Move `useDimStore` to `@positive-intentions/dim/react` so the main entry stays React-free for native ESM / no-bundler browser use.
+- Initial published library surface with JS and WASM runtimes

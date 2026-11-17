@@ -21,15 +21,12 @@ describe("CryptoManager", () => {
       expect(key.algorithm.name).toBe("AES-GCM");
     });
 
-    test("should derive the same key for the same password and salt", async () => {
+    test("should return the same CryptoKey object for the same salt (cache)", async () => {
       const salt = new Uint8Array(16).fill(9);
       const key1 = await cryptoManager.getKeyFromPassword(testPassword, salt);
       const key2 = await cryptoManager.getKeyFromPassword(testPassword, salt);
-
-      const exported1 = await crypto.subtle.exportKey("raw", key1);
-      const exported2 = await crypto.subtle.exportKey("raw", key2);
-
-      expect(new Uint8Array(exported1)).toEqual(new Uint8Array(exported2));
+      expect(key1).toBe(key2);
+      expect(key1.extractable).toBe(false);
     });
 
     test("should derive different keys for different salts", async () => {
@@ -37,23 +34,42 @@ describe("CryptoManager", () => {
       const saltB = new Uint8Array(16).fill(2);
       const keyA = await cryptoManager.getKeyFromPassword(testPassword, saltA);
       const keyB = await cryptoManager.getKeyFromPassword(testPassword, saltB);
-
-      const exportedA = await crypto.subtle.exportKey("raw", keyA);
-      const exportedB = await crypto.subtle.exportKey("raw", keyB);
-
-      expect(new Uint8Array(exportedA)).not.toEqual(new Uint8Array(exportedB));
+      expect(keyA).not.toBe(keyB);
+      // Round-trip proves both keys work and produce distinct ciphertexts
+      const enc = new TextEncoder();
+      const iv = new Uint8Array(12);
+      const ctA = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        keyA,
+        enc.encode("x"),
+      );
+      const ctB = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        keyB,
+        enc.encode("x"),
+      );
+      expect(new Uint8Array(ctA)).not.toEqual(new Uint8Array(ctB));
     });
 
     test("generateKey wrapper still returns a usable AES-GCM key", async () => {
       const key = await cryptoManager.generateKey(testPassword);
       expect(key.algorithm.name).toBe("AES-GCM");
+      expect(key.extractable).toBe(false);
+    });
+
+    test("does not eagerly derive a key in the constructor", () => {
+      const m = makeManager("lazy");
+      expect(m.key).toBeNull();
+      expect(m.keyPromise).toBeNull();
     });
   });
 
   describe("Encryption/Decryption", () => {
-    test("payload embeds encryptedData, iv and salt", async () => {
+    test("payload embeds v, iter, encryptedData, iv and salt", async () => {
       const encrypted = await cryptoManager.encryptData("hello");
       const parsed = JSON.parse(encrypted);
+      expect(parsed.v).toBe(2);
+      expect(parsed.iter).toBe(1000);
       expect(parsed.encryptedData).toBeDefined();
       expect(parsed.iv).toBeDefined();
       expect(parsed.salt).toBeDefined();
