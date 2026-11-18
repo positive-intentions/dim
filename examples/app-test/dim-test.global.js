@@ -40,12 +40,16 @@
   var currentTestName = "";
   /** @type {HTMLElement|null} */
   var e2ePreviewHost = null;
-  /** @type {Record<string, { lines: number[], hits: Record<number, number> }>} */
-  var coverFiles = {};
+  /** @type {Record<string, Record<string, { lines: number[], hits: Record<number, number> }>>} */
+  var coverBuckets = { unit: {}, e2e: {} };
   /** @type {Record<string, boolean>} */
   var coverExpanded = {};
   /** @type {Record<string, boolean>} */
+  var coverExpandedE2e = {};
+  /** @type {Record<string, boolean>} */
   var testExpanded = {};
+  /** @type {Record<string, string>} */
+  var instrumentCache = {};
 
   function deepEqual(a, b) {
     if (Object.is(a, b)) return true;
@@ -361,11 +365,29 @@
     );
   }
 
-  function injectIsolation(html, baseHref, runId, seed) {
+  function coverBridgeBootstrap() {
+    return (
+      "(function(){" +
+      "try{" +
+      "var p=window.parent;" +
+      "if(!p||p===window||!p.__DIM_COV__)return;" +
+      "window.__DIM_COV__={" +
+      "hit:function(file,line,bucket){try{p.__DIM_COV__.hit(file,line,bucket||'e2e');}catch(e){}}," +
+      "register:function(file,lines,bucket){try{p.__DIM_COV__.register(file,lines,bucket||'e2e');}catch(e){}}" +
+      "};" +
+      "}catch(e2){}" +
+      "})();"
+    );
+  }
+
+  function injectIsolation(html, baseHref, runId, seed, withCoverBridge) {
     var baseTag = '<base href="' + String(baseHref).replace(/"/g, "&quot;") + '">';
     var boot =
       "<script>" + isolationBootstrap(runId, seed) + "<\/script>";
-    var inject = baseTag + boot;
+    var bridge = withCoverBridge
+      ? "<script>" + coverBridgeBootstrap() + "<\/script>"
+      : "";
+    var inject = baseTag + boot + bridge;
     if (/<head[^>]*>/i.test(html)) {
       return html.replace(/<head[^>]*>/i, function (m) {
         return m + inject;
@@ -377,6 +399,99 @@
       });
     }
     return "<!DOCTYPE html><html><head>" + inject + "</head><body>" + html + "</body></html>";
+  }
+
+  function notesScriptPathFromSrc(src, baseHref) {
+    try {
+      var abs = new URL(src, baseHref);
+      var page = new URL(baseHref, location.href);
+      var path = abs.pathname || "";
+      var basePath = page.pathname || "";
+      if (basePath && path.indexOf(basePath) === 0) {
+        path = path.slice(basePath.length);
+      }
+      path = String(path).replace(/^\//, "");
+      if (path.indexOf("notes/") === 0 && /\.js$/i.test(path)) return path;
+      // Also accept "./notes/..." resolved forms that still contain /notes/
+      var idx = path.indexOf("notes/");
+      if (idx >= 0 && /\.js$/i.test(path)) return path.slice(idx);
+    } catch (e) {}
+    return null;
+  }
+
+  function escapeScriptClose(source) {
+    return String(source).replace(/<\/script/gi, "<\\/script");
+  }
+
+  function instrumentNotesScriptsInHtml(html, baseHref) {
+    if (!global.DimTest || typeof global.DimTest.instrument !== "function") {
+      return Promise.resolve(html);
+    }
+    var re = /<script\b([^>]*?)\bsrc\s*=\s*(["'])([^"']+)\2([^>]*)>\s*<\/script>/gi;
+    var matches = [];
+    var m;
+    while ((m = re.exec(html))) {
+      matches.push({
+        full: m[0],
+        src: m[3],
+        index: m.index,
+      });
+    }
+    if (!matches.length) return Promise.resolve(html);
+
+    var chain = Promise.resolve();
+    var replacements = [];
+    matches.forEach(function (item) {
+      var file = notesScriptPathFromSrc(item.src, baseHref);
+      if (!file) return;
+      chain = chain.then(function () {
+        var abs = new URL(item.src, baseHref).href;
+        if (instrumentCache[abs]) {
+          replacements.push({
+            full: item.full,
+            inline: instrumentCache[abs],
+            file: file,
+          });
+          return;
+        }
+        return fetch(abs)
+          .then(function (res) {
+            if (!res.ok) {
+              throw new Error(
+                "DimTest.open cover: failed to fetch " + abs + " (" + res.status + ")",
+              );
+            }
+            return res.text();
+          })
+          .then(function (text) {
+            // Register into e2e bucket; probes hit iframe __DIM_COV__ → parent e2e.
+            var instrumented = global.DimTest.instrument(text, file, {
+              bucket: "e2e",
+            });
+            instrumentCache[abs] = instrumented;
+            replacements.push({
+              full: item.full,
+              inline: instrumented,
+              file: file,
+            });
+          });
+      });
+    });
+
+    return chain.then(function () {
+      var out = html;
+      for (var i = 0; i < replacements.length; i++) {
+        var rep = replacements[i];
+        var tag =
+          "<script data-dim-cover=\"" +
+          escapeHtml(rep.file) +
+          "\">\n" +
+          escapeScriptClose(rep.inline) +
+          "\n<\/script>";
+        out = out.split(rep.full).join(tag);
+      }
+      return out;
+    });
   }
 
   function makePage(iframe) {
@@ -542,6 +657,11 @@
     var visible =
       opts.visible != null ? !!opts.visible : currentTestKind === "e2e";
     var mode = opts.mode || "srcdoc";
+    var wantCover =
+      opts.cover != null
+        ? !!opts.cover
+        : currentTestKind === "e2e" &&
+          !!(global.DimTest && typeof global.DimTest.instrument === "function");
     pageSeq += 1;
     var runId =
       Date.now().toString(36) +
@@ -614,7 +734,17 @@
         return res.text();
       })
       .then(function (html) {
-        iframe.srcdoc = injectIsolation(html, baseHref, runId, seed);
+        if (!wantCover) {
+          return injectIsolation(html, baseHref, runId, seed, false);
+        }
+        return instrumentNotesScriptsInHtml(html, baseHref).then(function (
+          rewritten,
+        ) {
+          return injectIsolation(rewritten, baseHref, runId, seed, true);
+        });
+      })
+      .then(function (srcdoc) {
+        iframe.srcdoc = srcdoc;
         var page = makePage(iframe);
         return waitReady(page);
       });
@@ -806,44 +936,65 @@
     return parts.join(", ");
   }
 
-  function coverRegister(file, executableLines) {
+  function normalizeCoverBucket(bucket) {
+    return bucket === "e2e" ? "e2e" : "unit";
+  }
+
+  function coverBucketMap(bucket) {
+    var key = normalizeCoverBucket(bucket);
+    if (!coverBuckets[key]) coverBuckets[key] = {};
+    return coverBuckets[key];
+  }
+
+  function coverRegister(file, executableLines, bucket) {
     var lines = uniqueSortedLines(executableLines || []);
     if (!lines.length) return;
-    var existing = coverFiles[file];
+    var map = coverBucketMap(bucket);
+    var existing = map[file];
     if (existing) {
       var merged = existing.lines.concat(lines);
       existing.lines = uniqueSortedLines(merged);
       return;
     }
-    coverFiles[file] = { lines: lines, hits: {} };
+    map[file] = { lines: lines, hits: {} };
   }
 
-  function coverHit(file, line) {
-    var entry = coverFiles[file];
+  function coverHit(file, line, bucket) {
+    var map = coverBucketMap(bucket);
+    var entry = map[file];
     if (!entry) {
-      coverFiles[file] = { lines: [line], hits: {} };
-      entry = coverFiles[file];
+      map[file] = { lines: [line], hits: {} };
+      entry = map[file];
     }
     var n = Number(line);
     if (!n) return;
     entry.hits[n] = (entry.hits[n] || 0) + 1;
   }
 
-  function coverResetHits() {
-    var paths = Object.keys(coverFiles);
-    for (var i = 0; i < paths.length; i++) {
-      coverFiles[paths[i]].hits = {};
+  function coverResetHits(bucket) {
+    if (bucket) {
+      var map = coverBucketMap(bucket);
+      var paths = Object.keys(map);
+      for (var i = 0; i < paths.length; i++) {
+        map[paths[i]].hits = {};
+      }
+      return;
     }
+    coverResetHits("unit");
+    coverResetHits("e2e");
   }
 
-  function coverSummary() {
+  function coverSummary(opts) {
+    var bucket =
+      opts && typeof opts === "object" ? opts.bucket : opts;
+    var map = coverBucketMap(bucket);
     var files = [];
     var hit = 0;
     var total = 0;
-    var paths = Object.keys(coverFiles).sort();
+    var paths = Object.keys(map).sort();
     for (var i = 0; i < paths.length; i++) {
       var path = paths[i];
-      var entry = coverFiles[path];
+      var entry = map[path];
       var fileHit = 0;
       var uncovered = [];
       for (var j = 0; j < entry.lines.length; j++) {
@@ -864,6 +1015,7 @@
       });
     }
     return {
+      bucket: normalizeCoverBucket(bucket),
       files: files,
       hit: hit,
       total: total,
@@ -1118,7 +1270,12 @@
           var path = btn.getAttribute("data-dim-tree-path");
           var kind = btn.getAttribute("data-dim-tree-kind") || "cover";
           if (!path) return;
-          var map = kind === "test" ? testExpanded : coverExpanded;
+          var map =
+            kind === "test"
+              ? testExpanded
+              : kind === "cover-e2e"
+                ? coverExpandedE2e
+                : coverExpanded;
           var defaultExpanded =
             btn.getAttribute("data-dim-tree-default") === "1";
           var current = isExpanded(map, path, defaultExpanded);
@@ -1129,6 +1286,11 @@
       })(buttons[i]);
     }
   }
+
+  /** @type {Record<string, boolean>} */
+  var activeCoverExpandMap = coverExpanded;
+  /** @type {string} */
+  var activeCoverTreeKind = "cover";
 
   function aggregateCovNode(node) {
     if (node.kind === "file") {
@@ -1154,7 +1316,7 @@
 
   function paintCovNode(node) {
     if (node.kind === "file") {
-      var fileExpanded = isExpanded(coverExpanded, node.path, false);
+      var fileExpanded = isExpanded(activeCoverExpandMap, node.path, false);
       var fileCls = "dim-tree-node dim-tree-file";
       if (node.pct === 0) fileCls += " dim-cov-zero";
       else if (node.pct === 100) fileCls += " dim-cov-full";
@@ -1176,7 +1338,9 @@
         '">' +
         '<button type="button" class="dim-tree-row" data-dim-tree-path="' +
         escapeHtml(node.path) +
-        '" data-dim-tree-kind="cover" data-dim-tree-default="0" aria-expanded="' +
+        '" data-dim-tree-kind="' +
+        escapeHtml(activeCoverTreeKind) +
+        '" data-dim-tree-default="0" aria-expanded="' +
         (fileExpanded ? "true" : "false") +
         '">' +
         '<span class="dim-tree-chevron" aria-hidden="true">' +
@@ -1202,7 +1366,7 @@
     }
 
     aggregateCovNode(node);
-    var dirExpanded = isExpanded(coverExpanded, node.path, false);
+    var dirExpanded = isExpanded(activeCoverExpandMap, node.path, false);
     var kids = sortedChildren(node);
     var childHtml = "";
     if (dirExpanded && kids.length) {
@@ -1217,7 +1381,9 @@
       '<li class="dim-tree-node dim-tree-dir">' +
       '<button type="button" class="dim-tree-row" data-dim-tree-path="' +
       escapeHtml(node.path) +
-      '" data-dim-tree-kind="cover" data-dim-tree-default="0" aria-expanded="' +
+      '" data-dim-tree-kind="' +
+      escapeHtml(activeCoverTreeKind) +
+      '" data-dim-tree-default="0" aria-expanded="' +
       (dirExpanded ? "true" : "false") +
       '">' +
       '<span class="dim-tree-chevron" aria-hidden="true">' +
@@ -1242,17 +1408,27 @@
     );
   }
 
-  function paintCoverageHtml() {
-    var cov = coverSummary();
+  function paintCoverageHtml(opts) {
+    opts = opts || {};
+    var bucket = normalizeCoverBucket(opts.bucket);
+    var title = opts.title || (bucket === "e2e" ? "E2E coverage" : "Coverage");
+    var treeKind = opts.treeKind || (bucket === "e2e" ? "cover-e2e" : "cover");
+    var expandMap = bucket === "e2e" ? coverExpandedE2e : coverExpanded;
+    var cov = coverSummary({ bucket: bucket });
     if (!cov.total) return "";
+
+    activeCoverExpandMap = expandMap;
+    activeCoverTreeKind = treeKind;
 
     var root = createTreeRoot();
     for (var i = 0; i < cov.files.length; i++) {
       var f = cov.files[i];
-      insertPathLeaf(root, f.path, {
+      var treePath =
+        bucket === "e2e" ? "e2e/" + f.path : f.path;
+      insertPathLeaf(root, treePath, {
         kind: "file",
         name: basename(f.path),
-        path: f.path,
+        path: treePath,
         hit: f.hit,
         total: f.total,
         pct: f.pct,
@@ -1267,9 +1443,16 @@
       rows.push(paintCovNode(top[j]));
     }
 
+    activeCoverExpandMap = coverExpanded;
+    activeCoverTreeKind = "cover";
+
     return (
-      '<div class="dim-cov">' +
-      "<h2>Coverage</h2>" +
+      '<div class="dim-cov' +
+      (bucket === "e2e" ? " dim-cov-e2e" : "") +
+      '">' +
+      "<h2>" +
+      escapeHtml(title) +
+      "</h2>" +
       '<p class="dim-cov-meta"><strong>' +
       cov.pct +
       "%</strong> of executable lines · " +
@@ -1487,11 +1670,21 @@
     if (!e2eResults || !e2eResults.length) return "";
     var passed = 0;
     var failed = 0;
+    var running = 0;
     for (var i = 0; i < e2eResults.length; i++) {
       var st = testLeafStatus(e2eResults[i]);
       if (st === "pass") passed += 1;
       else if (st === "fail") failed += 1;
+      else if (st === "running") running += 1;
     }
+    var finished = passed + failed;
+    var total = e2eResults.length;
+    var pct = total ? Math.round((finished / total) * 100) : 0;
+    var e2eCovHtml = paintCoverageHtml({
+      bucket: "e2e",
+      title: "E2E coverage",
+      treeKind: "cover-e2e",
+    });
     return (
       '<div class="dim-e2e">' +
       "<h2>E2E</h2>" +
@@ -1500,9 +1693,18 @@
       "</strong> passed, <strong>" +
       failed +
       "</strong> failed · " +
-      e2eResults.length +
+      finished +
+      " / " +
+      total +
+      (running ? " · running" : "") +
       " browser automation</p>" +
+      '<div class="dim-test-progress dim-e2e-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' +
+      pct +
+      '"><span style="width:' +
+      pct +
+      '%"></span></div>' +
       paintResultsTree(e2eResults, "e2e") +
+      e2eCovHtml +
       '<div id="dim-test-e2e-slot"></div>' +
       "</div>"
     );
@@ -1586,7 +1788,7 @@
         (split.e2es.length
           ? '<p class="dim-test-meta">No unit tests in this run.</p>'
           : "")) +
-      paintCoverageHtml() +
+      paintCoverageHtml({ bucket: "unit", title: "Coverage" }) +
       e2eHtml;
 
     if (savedPreview) {
@@ -1636,7 +1838,8 @@
         results: results,
         runningName: runningName || "",
         total: total,
-        coverage: coverSummary(),
+        coverage: coverSummary({ bucket: "unit" }),
+        coverageE2e: coverSummary({ bucket: "e2e" }),
       };
     }
 
@@ -1671,7 +1874,8 @@
             };
           }),
           total: total,
-          coverage: coverSummary(),
+          coverage: coverSummary({ bucket: "unit" }),
+          coverageE2e: coverSummary({ bucket: "e2e" }),
         };
         global.__DIM_TEST__ = summary;
         paintReport(summary);

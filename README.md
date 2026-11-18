@@ -456,18 +456,18 @@ sources on disk stay untouched.
 
 **Iframe AUT (browser automation, still no transpile):** `DimTest.e2e(name, fn)`
 (or any `*.e2e.test.js` / `…/e2e/…` path) runs **after** unit tests. The report
-layout is **Results → Coverage → E2E**, with a live device-frame preview of the
-AUT iframe while e2e runs (leave the page open; do not `page.close()` if you
-want the last screen to stay visible). `DimTest.open(url)` loads a real
+layout is **Results → Coverage (unit) → E2E** (pass progress, e2e test tree,
+**E2E line coverage**, live preview). `DimTest.open(url)` loads a real
 same-origin HTML page into an iframe (default: fetch + `srcdoc` with
 `<base href>`, IndexedDB name suffix, session-prefixed `localStorage`, and a
 no-op `serviceWorker.register`). During e2e, `open` defaults to a visible
-preview. Returns a page object with shadow-piercing `query` / `queryAll` /
-`click` / `fill` / `text` / `wait` / `close` (`click` / `fill` return promises
-and flush Dim `updateComplete`). Opt-in `{ mode: "src" }` navigates the iframe
-directly (exercises SW; not recommended from `runTests.html`). Demo:
-[`examples/app-test/counter.html`](examples/app-test/counter.html) driven from
-[`examples/app-test/index.html`](examples/app-test/index.html).
+preview and `{ cover: true }`: same-origin `notes/**` `<script src>` tags are
+rewritten to in-memory instrumented sources; hits go to cover bucket `"e2e"`
+(unit bucket stays separate). Opt out with `{ cover: false }`. `{ mode: "src" }`
+navigates the iframe directly and skips cover rewrite. Returns a page object
+with shadow-piercing `query` / `queryAll` / `click` / `fill` / `text` / `wait` /
+`close`. Demo: [`examples/app-test/counter.html`](examples/app-test/counter.html)
+driven from [`examples/app-test/index.html`](examples/app-test/index.html).
 
 ```js
 DimTest.e2e("iframe counter", async () => {

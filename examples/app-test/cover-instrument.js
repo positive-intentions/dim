@@ -93,9 +93,10 @@
   /**
    * @param {string} source
    * @param {string} file logical path e.g. notes/lib/note-filters.js
+   * @param {{ bucket?: string }|string} [opts] cover bucket ("unit" default, or "e2e")
    * @returns {string} instrumented source
    */
-  function instrument(source, file) {
+  function instrument(source, file, opts) {
     if (!global.DimParse || !global.DimParse.parse) {
       throw new Error(
         "dim.cover: global DimParse is required (load dim.cover.global.js or dim.parse.global.js)",
@@ -104,6 +105,13 @@
     if (!global.DimTest || !global.DimTest.cover) {
       throw new Error("dim.cover: DimTest.cover is required (load dim.test.global.js first)");
     }
+
+    var bucket =
+      opts && typeof opts === "object"
+        ? opts.bucket
+        : typeof opts === "string"
+          ? opts
+          : "unit";
 
     var ast = global.DimParse.parse(source, {
       allowReturnOutsideFunction: true,
@@ -114,7 +122,7 @@
     var lines = inserts.map(function (x) {
       return x.line;
     });
-    global.DimTest.cover.register(file, lines);
+    global.DimTest.cover.register(file, lines, bucket);
 
     // Apply from the end so earlier offsets stay valid.
     inserts.sort(function (a, b) {
@@ -123,6 +131,7 @@
 
     var out = source;
     var pathLit = escapeForString(file);
+    var bucketLit = escapeForString(bucket === "e2e" ? "e2e" : "unit");
     for (var i = 0; i < inserts.length; i++) {
       var ins = inserts[i];
       var probe =
@@ -130,7 +139,9 @@
         pathLit +
         '",' +
         ins.line +
-        "));";
+        ',"' +
+        bucketLit +
+        '"));';
       out = out.slice(0, ins.offset) + probe + out.slice(ins.offset);
     }
     return out;
