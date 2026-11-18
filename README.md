@@ -362,9 +362,10 @@ IIFE (no app transpile, no bundler) can use a separate browser harness:
 </script>
 ```
 
-`window.DimTest` provides `test`, `expect`, `mount`, `shadowText`, `open`
-(iframe AUT), `run`, `rerun`, and `splash`. It also paints the runner chrome
-(splash + JS/WASM / Rerun toolbar). It does not change `window.Dim`. Source:
+`window.DimTest` provides `test`, `e2e`, `expect`, `mount`, `shadowText`,
+`open` (iframe AUT), `run`, `rerun`, and `splash`. It also paints the runner
+chrome (splash + JS/WASM / Rerun toolbar + E2E preview). It does not change
+`window.Dim`. Source:
 [`examples/app-test/dim-test.global.js`](examples/app-test/dim-test.global.js).
 Optional line instrumenter:
 [`examples/app-test/cover-instrument.js`](examples/app-test/cover-instrument.js)
@@ -442,34 +443,37 @@ Dim ships a tiny classic-script harness:
 </script>
 ```
 
-`DimTest` API: `test`, `expect` (`toBe`, `toEqual`, `toBeTruthy`, `toContain`,
-`toBeGreaterThan`), `mount(tag, props?)`, `shadowText(el)`, `run()`, `rerun()`,
-`splash(message)`, plus optional `cover.register` / `cover.hit` /
-`cover.summary` and `instrument` (from `dim.cover.global.js`) for in-page line
-coverage. Coverage uses first-party **DimParse** (no Acorn / jsDelivr). The
-harness owns the **toolbar** (JS/WASM reload toggle, Rerun, impl label) and an
-animated **splash** during boot — load `dim.test.global.js` before Dim so the
-splash appears immediately. Apps list which files to fetch and instrument;
-production sources on disk stay untouched.
+`DimTest` API: `test`, `e2e`, `expect` (`toBe`, `toEqual`, `toBeTruthy`,
+`toContain`, `toBeGreaterThan`), `mount(tag, props?)`, `shadowText(el)`,
+`open(url)`, `run()`, `rerun()`, `splash(message)`, plus optional
+`cover.register` / `cover.hit` / `cover.summary` and `instrument` (from
+`dim.cover.global.js`) for in-page line coverage. Coverage uses first-party
+**DimParse** (no Acorn / jsDelivr). The harness owns the **toolbar** (JS/WASM
+reload toggle, Rerun, impl label), an animated **splash** during boot, and the
+**E2E** preview section — load `dim.test.global.js` before Dim so the splash
+appears immediately. Apps list which files to fetch and instrument; production
+sources on disk stay untouched.
 
-**Iframe AUT (browser automation, still no transpile):** `DimTest.open(url)`
-loads a real same-origin HTML page into an iframe (default: fetch + `srcdoc`
-with `<base href>`, IndexedDB name suffix, session-prefixed `localStorage`,
-and a no-op `serviceWorker.register` so the runner is not hijacked). Returns a
-page object with shadow-piercing `query` / `queryAll` / `click` / `fill` /
-`text` / `wait` / `close` (`click` / `fill` return promises and flush Dim
-`updateComplete` so state is visible to the next action). Opt-in
-`{ mode: "src" }` navigates the iframe directly (exercises SW; not
-recommended from `runTests.html`). Demo:
+**Iframe AUT (browser automation, still no transpile):** `DimTest.e2e(name, fn)`
+(or any `*.e2e.test.js` / `…/e2e/…` path) runs **after** unit tests. The report
+layout is **Results → Coverage → E2E**, with a live device-frame preview of the
+AUT iframe while e2e runs (leave the page open; do not `page.close()` if you
+want the last screen to stay visible). `DimTest.open(url)` loads a real
+same-origin HTML page into an iframe (default: fetch + `srcdoc` with
+`<base href>`, IndexedDB name suffix, session-prefixed `localStorage`, and a
+no-op `serviceWorker.register`). During e2e, `open` defaults to a visible
+preview. Returns a page object with shadow-piercing `query` / `queryAll` /
+`click` / `fill` / `text` / `wait` / `close` (`click` / `fill` return promises
+and flush Dim `updateComplete`). Opt-in `{ mode: "src" }` navigates the iframe
+directly (exercises SW; not recommended from `runTests.html`). Demo:
 [`examples/app-test/counter.html`](examples/app-test/counter.html) driven from
 [`examples/app-test/index.html`](examples/app-test/index.html).
 
 ```js
-DimTest.test("iframe counter", async () => {
+DimTest.e2e("iframe counter", async () => {
   const page = await DimTest.open("./counter.html", { ready: "dim-test-counter" });
   await page.click("dim-test-counter");
   await page.wait(() => page.text("dim-test-counter").includes("Count: 1"));
-  page.close();
 });
 ```
 

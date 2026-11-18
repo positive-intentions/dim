@@ -13,6 +13,8 @@
  * Optional iframe AUT driver: DimTest.open(url) fetches the page (default
  * srcdoc + isolation: IDB suffix, localStorage wrap, SW register no-op),
  * then returns a page object with shadow-piercing query/click/fill/wait.
+ * E2E specs (DimTest.e2e or paths with /e2e/ / .e2e.) run after unit tests
+ * and show a live iframe preview under an E2E report section.
  *
  *   <script src=".../dim.test.global.js"></script>
  *   <script> DimTest.splash("Loading Dim…"); </script>
@@ -32,6 +34,12 @@
   /** @type {Array<{ close: function(): void }>} */
   var openPages = [];
   var pageSeq = 0;
+  /** @type {"unit"|"e2e"|""} */
+  var currentTestKind = "";
+  /** @type {string} */
+  var currentTestName = "";
+  /** @type {HTMLElement|null} */
+  var e2ePreviewHost = null;
   /** @type {Record<string, { lines: number[], hits: Record<number, number> }>} */
   var coverFiles = {};
   /** @type {Record<string, boolean>} */
@@ -483,11 +491,56 @@
     return page;
   }
 
+  function ensureE2ePreviewHost() {
+    // Keep a detached host (e.g. mid-paintReport) so the live iframe survives.
+    if (e2ePreviewHost) return e2ePreviewHost;
+    var existing = document.getElementById("dim-test-e2e-preview");
+    if (existing) {
+      e2ePreviewHost = existing;
+      return e2ePreviewHost;
+    }
+    e2ePreviewHost = document.createElement("div");
+    e2ePreviewHost.id = "dim-test-e2e-preview";
+    e2ePreviewHost.className = "dim-e2e-preview";
+    e2ePreviewHost.innerHTML =
+      '<div class="dim-e2e-preview-label" id="dim-test-e2e-preview-label">Waiting for e2e…</div>' +
+      '<div class="dim-e2e-preview-frame" id="dim-test-e2e-preview-frame"></div>';
+    return e2ePreviewHost;
+  }
+
+  function setE2ePreviewLabel(text) {
+    var host = ensureE2ePreviewHost();
+    var label = host.querySelector("#dim-test-e2e-preview-label");
+    if (label) label.textContent = text || "Waiting for e2e…";
+  }
+
+  function getE2ePreviewFrame() {
+    var host = ensureE2ePreviewHost();
+    var frame = host.querySelector("#dim-test-e2e-preview-frame");
+    if (!frame) {
+      frame = document.createElement("div");
+      frame.id = "dim-test-e2e-preview-frame";
+      frame.className = "dim-e2e-preview-frame";
+      host.appendChild(frame);
+    }
+    return frame;
+  }
+
+  function reattachE2ePreview() {
+    var slot = document.getElementById("dim-test-e2e-slot");
+    if (!slot) return;
+    var host = ensureE2ePreviewHost();
+    if (host.parentNode !== slot) {
+      slot.appendChild(host);
+    }
+  }
+
   function open(url, opts) {
     opts = opts || {};
     var timeout = opts.timeout || 30000;
     var ready = opts.ready || "body";
-    var visible = !!opts.visible;
+    var visible =
+      opts.visible != null ? !!opts.visible : currentTestKind === "e2e";
     var mode = opts.mode || "srcdoc";
     pageSeq += 1;
     var runId =
@@ -501,11 +554,16 @@
     iframe.setAttribute("title", "DimTest page");
     iframe.setAttribute("data-dim-test-page", runId);
     if (visible) {
+      iframe.removeAttribute("hidden");
       iframe.style.cssText =
-        "display:block;width:min(100%,420px);height:640px;border:1px solid #cbd5e1;border-radius:8px;margin:1rem auto;background:#fff;";
-      var stage = document.getElementById("dim-test-stage");
-      if (stage) stage.appendChild(iframe);
-      else document.body.appendChild(iframe);
+        "display:block;width:100%;height:100%;border:0;background:#fff;";
+      var frame = getE2ePreviewFrame();
+      frame.innerHTML = "";
+      frame.appendChild(iframe);
+      setE2ePreviewLabel(
+        currentTestName ? "Running: " + currentTestName : "E2E preview",
+      );
+      reattachE2ePreview();
     } else {
       iframe.setAttribute("hidden", "");
       iframe.style.cssText =
@@ -577,8 +635,50 @@
     }
   }
 
+  function pathLooksE2e(file) {
+    var p = String(file || "");
+    return p.indexOf("/e2e/") >= 0 || p.indexOf(".e2e.") >= 0;
+  }
+
+  function isE2eEntry(entry) {
+    if (!entry) return false;
+    if (entry.kind === "e2e") return true;
+    return pathLooksE2e(entry.file);
+  }
+
+  function isE2eResult(r) {
+    if (!r) return false;
+    if (r.kind === "e2e") return true;
+    return pathLooksE2e(r.file);
+  }
+
   function test(name, fn) {
-    suite.push({ name: name, fn: fn, file: scriptPathFromCurrent() });
+    var file = scriptPathFromCurrent();
+    suite.push({
+      name: name,
+      fn: fn,
+      file: file,
+      kind: pathLooksE2e(file) ? "e2e" : "unit",
+    });
+  }
+
+  function e2e(name, fn) {
+    suite.push({
+      name: name,
+      fn: fn,
+      file: scriptPathFromCurrent(),
+      kind: "e2e",
+    });
+  }
+
+  function orderSuiteForRun() {
+    var units = [];
+    var e2es = [];
+    for (var i = 0; i < suite.length; i++) {
+      if (isE2eEntry(suite[i])) e2es.push(suite[i]);
+      else units.push(suite[i]);
+    }
+    suite = units.concat(e2es);
   }
 
   function escapeHtml(s) {
@@ -867,6 +967,13 @@
       "#dim-test-report .dim-cov-progress{height:6px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin:0 0 .85rem}" +
       "#dim-test-report .dim-cov-progress > span{display:block;height:100%;border-radius:inherit;background:#0ea5e9;transition:width .35s cubic-bezier(.22,1,.36,1)}" +
       "#dim-test-report .dim-cov-list{list-style:none;margin:0;padding:0}" +
+      "#dim-test-report .dim-e2e{margin-top:1.35rem}" +
+      "#dim-test-report .dim-e2e-meta{margin:0 0 .65rem;color:#64748b;font-size:.92rem}" +
+      "#dim-test-e2e-slot{margin-top:1rem}" +
+      "#dim-test-e2e-preview.dim-e2e-preview{display:flex;flex-direction:column;align-items:center;gap:.65rem}" +
+      "#dim-test-e2e-preview .dim-e2e-preview-label{font-size:.85rem;color:#64748b;text-align:center;min-height:1.2em}" +
+      "#dim-test-e2e-preview .dim-e2e-preview-frame{width:min(100%,360px);height:640px;max-height:70vh;border:1px solid #cbd5e1;border-radius:16px;overflow:hidden;background:#0f172a;box-shadow:0 8px 28px rgba(15,23,42,.12)}" +
+      "#dim-test-e2e-preview .dim-e2e-preview-frame:empty::before{content:'Waiting for e2e…';display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:.9rem;background:#f8fafc}" +
       "#dim-test-splash{flex:1;display:flex;align-items:center;justify-content:center;padding:2rem 1.25rem;animation:dim-test-in .4s ease both}" +
       "#dim-test-splash .dim-test-splash-card{width:min(22rem,100%);text-align:center;padding:2rem 1.5rem;border-radius:16px;background:#f8fafc;box-shadow:0 1px 2px rgba(15,23,42,.06),0 12px 32px rgba(15,23,42,.08);animation:dim-test-splash-glow 2s ease-in-out infinite}" +
       "#dim-test-splash .dim-test-splash-card h1{margin:.9rem 0 .35rem;font-size:1.35rem;letter-spacing:-.02em;animation:dim-test-pulse 1.6s ease-in-out infinite}" +
@@ -1324,8 +1431,9 @@
     );
   }
 
-  function paintResultsTree(results) {
+  function paintResultsTree(results, pathPrefix) {
     var root = createTreeRoot();
+    var prefix = pathPrefix || "tests";
     for (var i = 0; i < results.length; i++) {
       var r = results[i];
       var filePath = r.file || "(inline)";
@@ -1335,18 +1443,22 @@
           return p !== "";
         });
       var node = root;
-      var accum = [];
+      var accum = [prefix];
       for (var j = 0; j < parts.length - 1; j++) {
         accum.push(parts[j]);
         node = ensureDir(node, parts[j], accum.join("/"));
       }
       var fileName = parts.length ? parts[parts.length - 1] : "(inline)";
-      var fileNode = ensureFile(node, fileName, filePath);
+      var fileNode = ensureFile(
+        node,
+        fileName,
+        accum.concat([fileName]).join("/"),
+      );
       var testKey = r.name + "#" + i;
       fileNode.children[testKey] = {
         kind: "test",
         name: r.name,
-        path: filePath + "#" + testKey,
+        path: fileNode.path + "#" + testKey,
         result: r,
         children: {},
       };
@@ -1357,7 +1469,43 @@
     for (var k = 0; k < top.length; k++) {
       rows.push(paintTestNode(top[k]));
     }
+    if (!rows.length) return "";
     return '<ul class="dim-test-tree">' + rows.join("") + "</ul>";
+  }
+
+  function splitResultsByKind(results) {
+    var units = [];
+    var e2es = [];
+    for (var i = 0; i < (results || []).length; i++) {
+      if (isE2eResult(results[i])) e2es.push(results[i]);
+      else units.push(results[i]);
+    }
+    return { units: units, e2es: e2es };
+  }
+
+  function paintE2eHtml(e2eResults) {
+    if (!e2eResults || !e2eResults.length) return "";
+    var passed = 0;
+    var failed = 0;
+    for (var i = 0; i < e2eResults.length; i++) {
+      var st = testLeafStatus(e2eResults[i]);
+      if (st === "pass") passed += 1;
+      else if (st === "fail") failed += 1;
+    }
+    return (
+      '<div class="dim-e2e">' +
+      "<h2>E2E</h2>" +
+      '<p class="dim-e2e-meta"><strong>' +
+      passed +
+      "</strong> passed, <strong>" +
+      failed +
+      "</strong> failed · " +
+      e2eResults.length +
+      " browser automation</p>" +
+      paintResultsTree(e2eResults, "e2e") +
+      '<div id="dim-test-e2e-slot"></div>' +
+      "</div>"
+    );
   }
 
   /**
@@ -1401,6 +1549,19 @@
         '<span class="dim-test-status-label">Starting…</span>';
     }
 
+    var split = splitResultsByKind(state.results || []);
+    var unitTree = paintResultsTree(split.units, "unit");
+    var e2eHtml = paintE2eHtml(split.e2es);
+
+    // Preserve live iframe across innerHTML repaints.
+    var savedPreview = null;
+    if (e2ePreviewHost && e2ePreviewHost.isConnected) {
+      savedPreview = e2ePreviewHost;
+      if (savedPreview.parentNode) {
+        savedPreview.parentNode.removeChild(savedPreview);
+      }
+    }
+
     panel.innerHTML =
       "<h1>Results</h1>" +
       '<p class="dim-test-meta"><strong>' +
@@ -1421,14 +1582,36 @@
       '<div class="dim-test-status">' +
       statusHtml +
       "</div>" +
-      paintResultsTree(state.results || []) +
-      paintCoverageHtml();
+      (unitTree ||
+        (split.e2es.length
+          ? '<p class="dim-test-meta">No unit tests in this run.</p>'
+          : "")) +
+      paintCoverageHtml() +
+      e2eHtml;
+
+    if (savedPreview) {
+      e2ePreviewHost = savedPreview;
+    }
+    if (split.e2es.length) {
+      reattachE2ePreview();
+      if (done && openPages.length) {
+        setE2ePreviewLabel("Last e2e preview");
+      } else if (!done && currentTestKind === "e2e" && currentTestName) {
+        setE2ePreviewLabel("Running: " + currentTestName);
+      } else if (
+        !getE2ePreviewFrame().querySelector("iframe") &&
+        !openPages.length
+      ) {
+        setE2ePreviewLabel("Waiting for e2e…");
+      }
+    }
 
     bindTreeToggles(panel);
     updateToolbar();
   }
 
   function runSuite() {
+    orderSuiteForRun();
     var results = [];
     var passed = 0;
     var failed = 0;
@@ -1439,6 +1622,7 @@
       results.push({
         name: suite[i].name,
         file: suite[i].file || "(inline)",
+        kind: isE2eEntry(suite[i]) ? "e2e" : "unit",
         status: "pending",
         ok: null,
       });
@@ -1464,6 +1648,8 @@
 
     function finish(summary) {
       runInFlight = false;
+      currentTestKind = "";
+      currentTestName = "";
       updateToolbar();
       return summary;
     }
@@ -1478,6 +1664,7 @@
             return {
               name: r.name,
               file: r.file || "(inline)",
+              kind: r.kind || "unit",
               ok: r.ok,
               status: r.status,
               error: r.error,
@@ -1496,8 +1683,11 @@
       slot.status = "running";
       slot.ok = null;
       delete slot.error;
-      publish(entry.name);
+      currentTestKind = isE2eEntry(entry) ? "e2e" : "unit";
+      currentTestName = entry.name;
+      // Clears prior mount/AUT; e2e preview host lives outside #dim-test-root.
       clearFixture();
+      publish(entry.name);
       index += 1;
 
       var paintDelay = new Promise(function (resolve) {
@@ -1527,6 +1717,8 @@
     }
 
     runInFlight = true;
+    currentTestKind = "";
+    currentTestName = "";
     updateToolbar();
     global.__DIM_TEST__ = snapshot("");
     paintReport(snapshot(""));
@@ -1567,6 +1759,7 @@
 
   global.DimTest = {
     test: test,
+    e2e: e2e,
     expect: expect,
     mount: mount,
     shadowText: shadowText,
