@@ -611,9 +611,7 @@
           if (!path) return;
           var map = kind === "test" ? testExpanded : coverExpanded;
           var defaultExpanded =
-            kind === "test"
-              ? true
-              : btn.getAttribute("data-dim-tree-default") === "1";
+            btn.getAttribute("data-dim-tree-default") === "1";
           var current = isExpanded(map, path, defaultExpanded);
           map[path] = !current;
           var state = global.__DIM_TEST__;
@@ -695,7 +693,7 @@
     }
 
     aggregateCovNode(node);
-    var dirExpanded = isExpanded(coverExpanded, node.path, true);
+    var dirExpanded = isExpanded(coverExpanded, node.path, false);
     var kids = sortedChildren(node);
     var childHtml = "";
     if (dirExpanded && kids.length) {
@@ -710,7 +708,7 @@
       '<li class="dim-tree-node dim-tree-dir">' +
       '<button type="button" class="dim-tree-row" data-dim-tree-path="' +
       escapeHtml(node.path) +
-      '" data-dim-tree-kind="cover" data-dim-tree-default="1" aria-expanded="' +
+      '" data-dim-tree-kind="cover" data-dim-tree-default="0" aria-expanded="' +
       (dirExpanded ? "true" : "false") +
       '">' +
       '<span class="dim-tree-chevron" aria-hidden="true">' +
@@ -881,7 +879,7 @@
     }
 
     aggregateTestNode(node);
-    var expanded = isExpanded(testExpanded, node.path, true);
+    var expanded = isExpanded(testExpanded, node.path, false);
     var groupCls = testGroupClass(node);
     var kids = sortedChildren(node);
     var childHtml = "";
@@ -901,7 +899,7 @@
       '">' +
       '<button type="button" class="dim-tree-row" data-dim-tree-path="' +
       escapeHtml(node.path) +
-      '" data-dim-tree-kind="test" data-dim-tree-default="1" aria-expanded="' +
+      '" data-dim-tree-kind="test" data-dim-tree-default="0" aria-expanded="' +
       (expanded ? "true" : "false") +
       '">' +
       '<span class="dim-tree-chevron" aria-hidden="true">' +
