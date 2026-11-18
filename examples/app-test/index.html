@@ -22,26 +22,15 @@
         min-height: 100%;
         background: #e2e8f0;
         color: #0f172a;
-        font-family: system-ui, sans-serif;
-      }
-      #dim-test-root {
-        position: absolute;
-        left: -9999px;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
       }
     </style>
   </head>
   <body>
     <div id="dim-test-root" hidden></div>
-    <div id="dim-test-report">Loading DimTest…</div>
 
     <script>
       (function () {
-        // HTTP demo: inject Dim without document.write (avoids Chromium
-        // parser-blocking cross-site warnings). App index.html still uses
-        // document.write for file:// sync boot.
+        // DimTest first → splash + toolbar; then Dim IIFE from CDN.
         var CDN = "https://positive-intentions.github.io/dim/lib/";
         var impl = "js";
         try {
@@ -70,9 +59,10 @@
           });
         }
 
-        loadScript(dimSrc)
+        loadScript("./dim-test.global.js")
           .then(function () {
-            return loadScript("./dim-test.global.js");
+            DimTest.splash("Loading Dim (" + impl + ")…");
+            return loadScript(dimSrc);
           })
           .then(function () {
             if (!globalThis.Dim) {
@@ -81,6 +71,8 @@
             if (!globalThis.DimTest) {
               throw new Error("DimTest global missing");
             }
+
+            DimTest.splash("Registering demo tests…");
 
             var define = Dim.define;
             var css = Dim.css;
@@ -138,15 +130,12 @@
               DimTest.expect(DimTest.shadowText(el)).toContain("Count: 1");
             });
 
+            DimTest.splash("Running tests…");
             return DimTest.run();
           })
           .catch(function (err) {
-            var panel = document.getElementById("dim-test-report");
-            if (panel) {
-              panel.textContent = String(
-                err && err.message ? err.message : err,
-              );
-              panel.style.color = "#991b1b";
+            if (globalThis.DimTest && DimTest.splash) {
+              DimTest.splash(String(err && err.message ? err.message : err));
             }
             globalThis.__DIM_TEST__ = {
               done: true,
@@ -166,4 +155,3 @@
     </script>
   </body>
 </html>
-

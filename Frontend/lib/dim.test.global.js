@@ -1,21 +1,20 @@
 /**
  * DimTest — tiny classic-script harness for uncompiled Dim apps.
  *
- * Load after window.Dim (dim.global.js or dim.wasm.global.js). Does not
+ * Can load before window.Dim so a splash appears during boot. Does not
  * modify Dim. Exposes window.DimTest and writes window.__DIM_TEST__ after run().
+ *
+ * Chrome owned here: toolbar (JS/WASM reload toggle, Rerun, impl label),
+ * splash, report + optional coverage.
  *
  * Optional live line coverage (when DimTest.cover.register is used by a
  * test-only instrumenter): window.__DIM_COV__ + Coverage block in the report.
  *
- *   <script src=".../dim.global.js"></script>
  *   <script src=".../dim.test.global.js"></script>
- *   <script>
- *     DimTest.test("renders", async () => {
- *       const el = await DimTest.mount("my-counter");
- *       DimTest.expect(DimTest.shadowText(el)).toContain("0");
- *     });
- *     DimTest.run();
- *   </script>
+ *   <script> DimTest.splash("Loading Dim…"); </script>
+ *   <script src=".../dim.global.js"></script>
+ *   …
+ *   DimTest.run();
  */
 (function (global) {
   "use strict";
@@ -23,6 +22,9 @@
   var suite = [];
   var fixtureRoot = null;
   var styleInjected = false;
+  var shellBuilt = false;
+  var runInFlight = false;
+  var splashVisible = false;
   /** @type {Record<string, { lines: number[], hits: Record<number, number> }>} */
   var coverFiles = {};
   /** @type {Record<string, boolean>} */
@@ -224,6 +226,13 @@
     entry.hits[n] = (entry.hits[n] || 0) + 1;
   }
 
+  function coverResetHits() {
+    var paths = Object.keys(coverFiles);
+    for (var i = 0; i < paths.length; i++) {
+      coverFiles[paths[i]].hits = {};
+    }
+  }
+
   function coverSummary() {
     var files = [];
     var hit = 0;
@@ -259,6 +268,31 @@
     };
   }
 
+  function currentImpl() {
+    var fromDom =
+      document.documentElement && document.documentElement.dataset
+        ? document.documentElement.dataset.dimRuntime
+        : "";
+    if (fromDom === "js" || fromDom === "wasm") return fromDom;
+    try {
+      var q = new URLSearchParams(location.search || "").get("impl") || "";
+      q = String(q).toLowerCase();
+      if (q === "js" || q === "wasm") return q;
+    } catch (e) {}
+    return "js";
+  }
+
+  function setImpl(next) {
+    if (next !== "js" && next !== "wasm") return;
+    try {
+      var url = new URL(location.href);
+      url.searchParams.set("impl", next);
+      location.href = url.toString();
+    } catch (e) {
+      location.search = "?impl=" + next;
+    }
+  }
+
   function ensureStyles() {
     if (styleInjected) return;
     styleInjected = true;
@@ -270,7 +304,18 @@
       "@keyframes dim-test-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}" +
       "@keyframes dim-test-bar{from{background-position:0 0}to{background-position:40px 0}}" +
       "@keyframes dim-test-pop{0%{transform:scale(.85);opacity:0}70%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}" +
-      "#dim-test-report{font-family:system-ui,sans-serif;max-width:48rem;margin:1.5rem auto;padding:1.25rem 1.35rem;color:#0f172a;background:#f8fafc;border-radius:12px;box-shadow:0 1px 2px rgba(15,23,42,.06),0 8px 24px rgba(15,23,42,.06);animation:dim-test-in .35s ease both}" +
+      "@keyframes dim-test-splash-glow{0%,100%{box-shadow:0 0 0 0 rgba(2,156,253,.25)}50%{box-shadow:0 0 0 12px rgba(2,156,253,0)}}" +
+      "html,body{margin:0;min-height:100%}" +
+      "#dim-test-shell{font-family:system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;background:#e2e8f0;color:#0f172a}" +
+      "#dim-test-shell .dim-test-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .65rem;padding:.75rem 1.1rem;background:#0f172a;color:#e2e8f0;box-shadow:0 1px 0 rgba(15,23,42,.2)}" +
+      "#dim-test-shell .dim-test-bar-title{font-weight:650;letter-spacing:-.02em;margin-right:.35rem}" +
+      "#dim-test-shell .dim-test-bar-meta{color:#94a3b8;font-size:.88rem;margin-right:auto}" +
+      "#dim-test-shell .dim-test-bar button{font:inherit;font-size:.88rem;padding:.35rem .7rem;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;cursor:pointer}" +
+      "#dim-test-shell .dim-test-bar button:hover:not(:disabled){background:#334155}" +
+      "#dim-test-shell .dim-test-bar button.active{background:#029cfd;border-color:#029cfd;color:#fff}" +
+      "#dim-test-shell .dim-test-bar button:disabled{opacity:.45;cursor:not-allowed}" +
+      "#dim-test-stage{flex:1;display:flex;flex-direction:column;min-height:0}" +
+      "#dim-test-report{font-family:system-ui,sans-serif;max-width:48rem;width:100%;margin:1.5rem auto;padding:1.25rem 1.35rem;box-sizing:border-box;color:#0f172a;background:#f8fafc;border-radius:12px;box-shadow:0 1px 2px rgba(15,23,42,.06),0 8px 24px rgba(15,23,42,.06);animation:dim-test-in .35s ease both}" +
       "#dim-test-report h1{margin:0 0 .35rem;font-size:1.35rem;letter-spacing:-.02em}" +
       "#dim-test-report h2{margin:1.25rem 0 .5rem;font-size:1.05rem;letter-spacing:-.01em}" +
       "#dim-test-report .dim-test-meta{margin:0 0 1rem;color:#64748b;font-size:.95rem}" +
@@ -281,7 +326,8 @@
       "#dim-test-report.dim-test-done-ok .dim-test-progress > span{background:#16a34a;animation:none}" +
       "#dim-test-report.dim-test-done-fail .dim-test-progress > span{background:#dc2626;animation:none}" +
       "#dim-test-report .dim-test-status{display:flex;align-items:center;gap:.55rem;min-height:1.4rem;margin:0 0 .85rem;font-size:.92rem;color:#475569}" +
-      "#dim-test-report .dim-test-spinner{width:.85rem;height:.85rem;border:2px solid #cbd5e1;border-top-color:#029cfd;border-radius:50%;animation:dim-test-spin .7s linear infinite;flex-shrink:0}" +
+      "#dim-test-report .dim-test-spinner,#dim-test-splash .dim-test-spinner{width:.85rem;height:.85rem;border:2px solid #cbd5e1;border-top-color:#029cfd;border-radius:50%;animation:dim-test-spin .7s linear infinite;flex-shrink:0}" +
+      "#dim-test-splash .dim-test-spinner{width:2.25rem;height:2.25rem;border-width:3px}" +
       "#dim-test-report .dim-test-status-label{animation:dim-test-pulse 1.2s ease-in-out infinite}" +
       "#dim-test-report.dim-test-done .dim-test-status-label{animation:none}" +
       "#dim-test-report ul{list-style:none;margin:0;padding:0}" +
@@ -313,19 +359,141 @@
       "#dim-test-report .dim-cov-file.dim-cov-zero .dim-cov-mini > span{background:#cbd5e1}" +
       "#dim-test-report .dim-cov-file.dim-cov-full .dim-cov-mini > span{background:#16a34a}" +
       "#dim-test-report .dim-cov-uncovered{margin:0;padding:.35rem .7rem .65rem 1.9rem;font-size:.8rem;color:#991b1b;line-height:1.4}" +
-      "#dim-test-report .dim-cov-uncovered strong{color:#64748b;font-weight:600}";
+      "#dim-test-report .dim-cov-uncovered strong{color:#64748b;font-weight:600}" +
+      "#dim-test-splash{flex:1;display:flex;align-items:center;justify-content:center;padding:2rem 1.25rem;animation:dim-test-in .4s ease both}" +
+      "#dim-test-splash .dim-test-splash-card{width:min(22rem,100%);text-align:center;padding:2rem 1.5rem;border-radius:16px;background:#f8fafc;box-shadow:0 1px 2px rgba(15,23,42,.06),0 12px 32px rgba(15,23,42,.08);animation:dim-test-splash-glow 2s ease-in-out infinite}" +
+      "#dim-test-splash .dim-test-splash-card h1{margin:.9rem 0 .35rem;font-size:1.35rem;letter-spacing:-.02em;animation:dim-test-pulse 1.6s ease-in-out infinite}" +
+      "#dim-test-splash .dim-test-splash-status{margin:0 0 1.1rem;color:#64748b;font-size:.95rem;min-height:1.35em}" +
+      "#dim-test-splash .dim-test-splash-bar{height:6px;border-radius:999px;background:#e2e8f0;overflow:hidden}" +
+      "#dim-test-splash .dim-test-splash-bar > span{display:block;height:100%;width:40%;border-radius:inherit;background:linear-gradient(90deg,#029cfd,#38bdf8,#029cfd);background-size:40px 100%;animation:dim-test-bar .7s linear infinite}" +
+      "#dim-test-root{position:absolute;left:-9999px;width:320px;height:480px;overflow:hidden}";
     document.head.appendChild(style);
   }
 
-  function getPanel() {
+  function updateToolbar() {
+    var impl = currentImpl();
+    var meta = document.getElementById("dim-test-bar-meta");
+    if (meta) meta.textContent = "runtime: " + impl;
+    var jsBtn = document.getElementById("dim-test-btn-js");
+    var wasmBtn = document.getElementById("dim-test-btn-wasm");
+    var rerunBtn = document.getElementById("dim-test-btn-rerun");
+    if (jsBtn) {
+      jsBtn.className = impl === "js" ? "active" : "";
+    }
+    if (wasmBtn) {
+      wasmBtn.className = impl === "wasm" ? "active" : "";
+    }
+    if (rerunBtn) {
+      rerunBtn.disabled = runInFlight || suite.length === 0;
+    }
+  }
+
+  function ensureShell() {
     ensureStyles();
+    getFixtureRoot();
+
+    if (shellBuilt && document.getElementById("dim-test-shell")) {
+      updateToolbar();
+      return document.getElementById("dim-test-shell");
+    }
+
+    var existingReport = document.getElementById("dim-test-report");
+    if (existingReport && existingReport.parentNode) {
+      existingReport.parentNode.removeChild(existingReport);
+    }
+
+    var shell = document.getElementById("dim-test-shell");
+    if (!shell) {
+      shell = document.createElement("div");
+      shell.id = "dim-test-shell";
+      document.body.insertBefore(shell, document.body.firstChild);
+    }
+
+    shell.innerHTML =
+      '<header class="dim-test-bar">' +
+      '<span class="dim-test-bar-title">DimTest</span>' +
+      '<span class="dim-test-bar-meta" id="dim-test-bar-meta"></span>' +
+      '<button type="button" id="dim-test-btn-js">JS</button>' +
+      '<button type="button" id="dim-test-btn-wasm">WASM</button>' +
+      '<button type="button" id="dim-test-btn-rerun">Rerun</button>' +
+      "</header>" +
+      '<div id="dim-test-stage"></div>';
+
+    document.getElementById("dim-test-btn-js").addEventListener("click", function () {
+      setImpl("js");
+    });
+    document
+      .getElementById("dim-test-btn-wasm")
+      .addEventListener("click", function () {
+        setImpl("wasm");
+      });
+    document
+      .getElementById("dim-test-btn-rerun")
+      .addEventListener("click", function () {
+        rerun();
+      });
+
+    shellBuilt = true;
+    updateToolbar();
+    return shell;
+  }
+
+  function getStage() {
+    ensureShell();
+    return document.getElementById("dim-test-stage");
+  }
+
+  function getPanel() {
+    ensureShell();
+    var stage = getStage();
     var panel = document.getElementById("dim-test-report");
     if (!panel) {
       panel = document.createElement("div");
       panel.id = "dim-test-report";
-      document.body.appendChild(panel);
+      stage.appendChild(panel);
     }
     return panel;
+  }
+
+  function showSplash(message) {
+    ensureShell();
+    splashVisible = true;
+    var stage = getStage();
+    var msg =
+      message == null || message === ""
+        ? "Starting…"
+        : String(message);
+    stage.innerHTML =
+      '<div id="dim-test-splash">' +
+      '<div class="dim-test-splash-card">' +
+      '<div class="dim-test-spinner" aria-hidden="true"></div>' +
+      "<h1>DimTest</h1>" +
+      '<p class="dim-test-splash-status" id="dim-test-splash-status">' +
+      escapeHtml(msg) +
+      "</p>" +
+      '<div class="dim-test-splash-bar" aria-hidden="true"><span></span></div>' +
+      "</div></div>";
+    updateToolbar();
+  }
+
+  function splash(message) {
+    if (!splashVisible || !document.getElementById("dim-test-splash")) {
+      showSplash(message);
+      return;
+    }
+    var el = document.getElementById("dim-test-splash-status");
+    if (el) {
+      el.textContent =
+        message == null || message === "" ? "Starting…" : String(message);
+    }
+  }
+
+  function hideSplash() {
+    splashVisible = false;
+    var splashEl = document.getElementById("dim-test-splash");
+    if (splashEl && splashEl.parentNode) {
+      splashEl.parentNode.removeChild(splashEl);
+    }
   }
 
   function bindCoverageToggles(panel) {
@@ -402,7 +570,7 @@
       "<h2>Coverage</h2>" +
       '<p class="dim-cov-meta"><strong>' +
       cov.pct +
-      "%</strong> of executable lines in notes/ · " +
+      "%</strong> of executable lines · " +
       cov.hit +
       " / " +
       cov.total +
@@ -422,7 +590,13 @@
    * @param {{done:boolean,passed:number,failed:number,results:Array,runningName?:string,total:number}} state
    */
   function paintReport(state) {
+    hideSplash();
     var panel = getPanel();
+    var stage = getStage();
+    if (panel.parentNode !== stage) {
+      stage.appendChild(panel);
+    }
+
     var total = state.total || suite.length || state.results.length;
     var finished = state.passed + state.failed;
     var pct = total ? Math.round((finished / total) * 100) : 0;
@@ -486,7 +660,7 @@
     }
 
     panel.innerHTML =
-      "<h1>DimTest</h1>" +
+      "<h1>Results</h1>" +
       '<p class="dim-test-meta"><strong>' +
       state.passed +
       "</strong> passed, <strong>" +
@@ -511,9 +685,10 @@
       paintCoverageHtml();
 
     bindCoverageToggles(panel);
+    updateToolbar();
   }
 
-  function run() {
+  function runSuite() {
     var results = [];
     var passed = 0;
     var failed = 0;
@@ -546,6 +721,12 @@
       paintReport(state);
     }
 
+    function finish(summary) {
+      runInFlight = false;
+      updateToolbar();
+      return summary;
+    }
+
     function next() {
       if (index >= suite.length) {
         var summary = {
@@ -565,7 +746,7 @@
         };
         global.__DIM_TEST__ = summary;
         paintReport(summary);
-        return Promise.resolve(summary);
+        return Promise.resolve(finish(summary));
       }
 
       var entry = suite[index];
@@ -603,15 +784,37 @@
         .then(next);
     }
 
+    runInFlight = true;
+    updateToolbar();
     global.__DIM_TEST__ = snapshot("");
     paintReport(snapshot(""));
     return next();
+  }
+
+  function run() {
+    if (runInFlight) {
+      return Promise.resolve(global.__DIM_TEST__);
+    }
+    return runSuite();
+  }
+
+  function rerun() {
+    if (runInFlight) {
+      return Promise.resolve(global.__DIM_TEST__);
+    }
+    if (!suite.length) {
+      return Promise.reject(new Error("DimTest.rerun: no tests registered"));
+    }
+    coverResetHits();
+    clearFixture();
+    return runSuite();
   }
 
   var cover = {
     register: coverRegister,
     hit: coverHit,
     summary: coverSummary,
+    resetHits: coverResetHits,
   };
 
   global.__DIM_COV__ = {
@@ -626,7 +829,20 @@
     mount: mount,
     shadowText: shadowText,
     run: run,
+    rerun: rerun,
+    splash: splash,
     clearFixture: clearFixture,
     cover: cover,
   };
+
+  // Build chrome as soon as the script runs so boot pages are not blank.
+  if (document.body) {
+    ensureShell();
+    showSplash("Starting…");
+  } else {
+    document.addEventListener("DOMContentLoaded", function () {
+      ensureShell();
+      showSplash("Starting…");
+    });
+  }
 })(typeof globalThis !== "undefined" ? globalThis : window);

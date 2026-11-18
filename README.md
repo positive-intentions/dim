@@ -362,8 +362,9 @@ IIFE (no app transpile, no bundler) can use a separate browser harness:
 </script>
 ```
 
-`window.DimTest` provides `test`, `expect`, `mount`, `shadowText`, and `run`.
-It does not change `window.Dim`. Source:
+`window.DimTest` provides `test`, `expect`, `mount`, `shadowText`, `run`,
+`rerun`, and `splash`. It also paints the runner chrome (splash + JS/WASM /
+Rerun toolbar). It does not change `window.Dim`. Source:
 [`examples/app-test/dim-test.global.js`](examples/app-test/dim-test.global.js).
 Optional line instrumenter:
 [`examples/app-test/cover-instrument.js`](examples/app-test/cover-instrument.js)
@@ -440,10 +441,13 @@ Dim ships a tiny classic-script harness:
 ```
 
 `DimTest` API: `test`, `expect` (`toBe`, `toEqual`, `toBeTruthy`, `toContain`,
-`toBeGreaterThan`), `mount(tag, props?)`, `shadowText(el)`, `run()`, plus
-optional `cover.register` / `cover.hit` / `cover.summary` and `instrument`
-(from `dim.cover.global.js`) for in-page line coverage. Apps list which files
-to fetch and instrument; production sources on disk stay untouched.
+`toBeGreaterThan`), `mount(tag, props?)`, `shadowText(el)`, `run()`, `rerun()`,
+`splash(message)`, plus optional `cover.register` / `cover.hit` /
+`cover.summary` and `instrument` (from `dim.cover.global.js`) for in-page line
+coverage. The harness owns the **toolbar** (JS/WASM reload toggle, Rerun, impl
+label) and an animated **splash** during boot — load `dim.test.global.js`
+before Dim so the splash appears immediately. Apps list which files to fetch
+and instrument; production sources on disk stay untouched.
 
 Full notes-app example (BP modules, colocated specs, `runTests.html`, live
 coverage UI, CI with Playwright):
