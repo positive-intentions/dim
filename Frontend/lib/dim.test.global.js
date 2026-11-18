@@ -29,6 +29,8 @@
   var coverFiles = {};
   /** @type {Record<string, boolean>} */
   var coverExpanded = {};
+  /** @type {Record<string, boolean>} */
+  var testExpanded = {};
 
   function deepEqual(a, b) {
     if (Object.is(a, b)) return true;
@@ -158,8 +160,23 @@
     return text.replace(/\s+/g, " ").trim();
   }
 
+  function scriptPathFromCurrent() {
+    try {
+      var script = document.currentScript;
+      if (!script || !script.src) return "(inline)";
+      var srcUrl = new URL(script.src, location.href);
+      var pageDir = location.pathname.replace(/[^/]*$/, "");
+      if (srcUrl.pathname.indexOf(pageDir) === 0) {
+        return srcUrl.pathname.slice(pageDir.length) || "(inline)";
+      }
+      return srcUrl.pathname.replace(/^\//, "") || "(inline)";
+    } catch (e) {
+      return "(inline)";
+    }
+  }
+
   function test(name, fn) {
-    suite.push({ name: name, fn: fn });
+    suite.push({ name: name, fn: fn, file: scriptPathFromCurrent() });
   }
 
   function escapeHtml(s) {
@@ -168,6 +185,90 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
+  }
+
+  function basename(path) {
+    var parts = String(path || "").split("/");
+    return parts[parts.length - 1] || path || "";
+  }
+
+  function createTreeRoot() {
+    return { kind: "dir", name: "", path: "", children: {} };
+  }
+
+  function ensureDir(node, name, path) {
+    if (!node.children[name]) {
+      node.children[name] = {
+        kind: "dir",
+        name: name,
+        path: path,
+        children: {},
+      };
+    }
+    return node.children[name];
+  }
+
+  function ensureFile(node, name, path) {
+    if (!node.children[name] || node.children[name].kind !== "file") {
+      node.children[name] = {
+        kind: "file",
+        name: name,
+        path: path,
+        children: {},
+      };
+    }
+    return node.children[name];
+  }
+
+  function sortedChildren(node) {
+    var dirs = [];
+    var files = [];
+    var other = [];
+    var keys = Object.keys(node.children || {});
+    for (var i = 0; i < keys.length; i++) {
+      var child = node.children[keys[i]];
+      if (child.kind === "dir") dirs.push(child);
+      else if (child.kind === "file") files.push(child);
+      else other.push(child);
+    }
+    function byName(a, b) {
+      return String(a.name).localeCompare(String(b.name));
+    }
+    dirs.sort(byName);
+    files.sort(byName);
+    other.sort(byName);
+    return dirs.concat(files, other);
+  }
+
+  function insertPathLeaf(root, path, leaf) {
+    var parts = String(path || "")
+      .split("/")
+      .filter(function (p) {
+        return p !== "";
+      });
+    if (!parts.length) {
+      root.children[leaf.name || "(file)"] = leaf;
+      return;
+    }
+    var node = root;
+    var accum = [];
+    for (var i = 0; i < parts.length - 1; i++) {
+      accum.push(parts[i]);
+      node = ensureDir(node, parts[i], accum.join("/"));
+    }
+    var fileName = parts[parts.length - 1];
+    leaf.kind = leaf.kind || "file";
+    leaf.name = leaf.name || fileName;
+    leaf.path = leaf.path || path;
+    if (!leaf.children) leaf.children = {};
+    node.children[fileName] = leaf;
+  }
+
+  function isExpanded(map, path, defaultExpanded) {
+    if (Object.prototype.hasOwnProperty.call(map, path)) {
+      return Boolean(map[path]);
+    }
+    return Boolean(defaultExpanded);
   }
 
   function uniqueSortedLines(lines) {
@@ -315,7 +416,7 @@
       "#dim-test-shell .dim-test-bar button.active{background:#029cfd;border-color:#029cfd;color:#fff}" +
       "#dim-test-shell .dim-test-bar button:disabled{opacity:.45;cursor:not-allowed}" +
       "#dim-test-stage{flex:1;display:flex;flex-direction:column;min-height:0}" +
-      "#dim-test-report{font-family:system-ui,sans-serif;max-width:48rem;width:100%;margin:1.5rem auto;padding:1.25rem 1.35rem;box-sizing:border-box;color:#0f172a;background:#f8fafc;border-radius:12px;box-shadow:0 1px 2px rgba(15,23,42,.06),0 8px 24px rgba(15,23,42,.06);animation:dim-test-in .35s ease both}" +
+      "#dim-test-report{font-family:system-ui,sans-serif;max-width:56rem;width:100%;margin:1.5rem auto;padding:1.25rem 1.35rem;box-sizing:border-box;color:#0f172a;background:#f8fafc;border-radius:12px;box-shadow:0 1px 2px rgba(15,23,42,.06),0 8px 24px rgba(15,23,42,.06);animation:dim-test-in .35s ease both}" +
       "#dim-test-report h1{margin:0 0 .35rem;font-size:1.35rem;letter-spacing:-.02em}" +
       "#dim-test-report h2{margin:1.25rem 0 .5rem;font-size:1.05rem;letter-spacing:-.01em}" +
       "#dim-test-report .dim-test-meta{margin:0 0 1rem;color:#64748b;font-size:.95rem}" +
@@ -331,16 +432,32 @@
       "#dim-test-report .dim-test-status-label{animation:dim-test-pulse 1.2s ease-in-out infinite}" +
       "#dim-test-report.dim-test-done .dim-test-status-label{animation:none}" +
       "#dim-test-report ul{list-style:none;margin:0;padding:0}" +
-      "#dim-test-report li{display:flex;flex-wrap:wrap;align-items:flex-start;gap:.5rem .65rem;margin:0;padding:.55rem .65rem;border-radius:8px;border:1px solid transparent;background:transparent;transition:background .25s ease,border-color .25s ease,transform .25s ease}" +
-      "#dim-test-report li + li{margin-top:.35rem}" +
-      "#dim-test-report li.dim-test-pending{color:#94a3b8}" +
-      "#dim-test-report li.dim-test-running{color:#0369a1;background:#e0f2fe;border-color:#bae6fd;animation:dim-test-pulse 1.1s ease-in-out infinite}" +
-      "#dim-test-report li.dim-test-pass{color:#166534;background:#f0fdf4;border-color:#bbf7d0;animation:dim-test-pop .35s ease both}" +
-      "#dim-test-report li.dim-test-fail{color:#991b1b;background:#fef2f2;border-color:#fecaca;animation:dim-test-pop .35s ease both}" +
+      "#dim-test-report .dim-tree-children{padding-left:1.1rem;margin:.15rem 0 .2rem;border-left:1px solid #e2e8f0}" +
+      "#dim-test-report .dim-tree-node{margin:0;padding:0;border:0;background:transparent}" +
+      "#dim-test-report .dim-tree-node + .dim-tree-node{margin-top:.15rem}" +
+      "#dim-test-report .dim-tree-row{display:flex;flex-wrap:wrap;align-items:center;gap:.45rem .65rem;width:100%;margin:0;padding:.4rem .55rem;border:0;border-radius:7px;background:transparent;font:inherit;color:inherit;cursor:pointer;text-align:left}" +
+      "#dim-test-report .dim-tree-row:hover{background:#f1f5f9}" +
+      "#dim-test-report .dim-tree-chevron{width:.7rem;color:#94a3b8;flex-shrink:0}" +
+      "#dim-test-report .dim-tree-label{flex:1;min-width:0;font-size:.88rem;word-break:break-word}" +
+      "#dim-test-report .dim-tree-dir > .dim-tree-row .dim-tree-label{font-weight:600;color:#334155}" +
+      "#dim-test-report .dim-tree-file > .dim-tree-row .dim-tree-label{color:#0f172a}" +
+      "#dim-test-report .dim-tree-stats{font-size:.8rem;color:#64748b;white-space:nowrap}" +
+      "#dim-test-report .dim-tree-mini{width:3.5rem;height:5px;border-radius:999px;background:#e2e8f0;overflow:hidden;flex-shrink:0}" +
+      "#dim-test-report .dim-tree-mini > span{display:block;height:100%;background:#0ea5e9}" +
+      "#dim-test-report .dim-cov-zero > .dim-tree-row .dim-tree-mini > span{background:#cbd5e1}" +
+      "#dim-test-report .dim-cov-full > .dim-tree-row .dim-tree-mini > span{background:#16a34a}" +
+      "#dim-test-report .dim-cov-uncovered{margin:0;padding:.25rem .55rem .55rem 1.7rem;font-size:.8rem;color:#991b1b;line-height:1.4}" +
+      "#dim-test-report .dim-cov-uncovered strong{color:#64748b;font-weight:600}" +
+      "#dim-test-report .dim-test-leaf{display:flex;flex-wrap:wrap;align-items:flex-start;gap:.5rem .65rem;margin:0;padding:.45rem .55rem;border-radius:7px;border:1px solid transparent;background:transparent;transition:background .25s ease,border-color .25s ease,transform .25s ease}" +
+      "#dim-test-report .dim-test-leaf + .dim-test-leaf{margin-top:.15rem}" +
+      "#dim-test-report .dim-test-leaf.dim-test-pending{color:#94a3b8}" +
+      "#dim-test-report .dim-test-leaf.dim-test-running{color:#0369a1;background:#e0f2fe;border-color:#bae6fd;animation:dim-test-pulse 1.1s ease-in-out infinite}" +
+      "#dim-test-report .dim-test-leaf.dim-test-pass{color:#166534;background:#f0fdf4;border-color:#bbf7d0;animation:dim-test-pop .35s ease both}" +
+      "#dim-test-report .dim-test-leaf.dim-test-fail{color:#991b1b;background:#fef2f2;border-color:#fecaca;animation:dim-test-pop .35s ease both}" +
       "#dim-test-report .dim-test-badge{font-size:.72rem;font-weight:700;letter-spacing:.04em;min-width:3.2rem;text-align:center;padding:.15rem .4rem;border-radius:999px;background:rgba(15,23,42,.06)}" +
-      "#dim-test-report li.dim-test-running .dim-test-badge{background:#0284c7;color:#fff}" +
-      "#dim-test-report li.dim-test-pass .dim-test-badge{background:#16a34a;color:#fff}" +
-      "#dim-test-report li.dim-test-fail .dim-test-badge{background:#dc2626;color:#fff}" +
+      "#dim-test-report .dim-test-running .dim-test-badge,#dim-test-report .dim-tree-running > .dim-tree-row .dim-test-badge{background:#0284c7;color:#fff}" +
+      "#dim-test-report .dim-test-pass .dim-test-badge,#dim-test-report .dim-tree-pass > .dim-tree-row .dim-test-badge{background:#16a34a;color:#fff}" +
+      "#dim-test-report .dim-test-fail .dim-test-badge,#dim-test-report .dim-tree-fail > .dim-tree-row .dim-test-badge{background:#dc2626;color:#fff}" +
       "#dim-test-report .dim-test-name{flex:1;min-width:12rem;line-height:1.35}" +
       "#dim-test-report pre{flex-basis:100%;white-space:pre-wrap;margin:.15rem 0 0;padding:.5rem .65rem;border-radius:6px;background:rgba(127,29,29,.06);font-size:.8rem;animation:dim-test-in .3s ease both}" +
       "#dim-test-report .dim-cov{margin-top:.25rem}" +
@@ -348,18 +465,6 @@
       "#dim-test-report .dim-cov-progress{height:6px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin:0 0 .85rem}" +
       "#dim-test-report .dim-cov-progress > span{display:block;height:100%;border-radius:inherit;background:#0ea5e9;transition:width .35s cubic-bezier(.22,1,.36,1)}" +
       "#dim-test-report .dim-cov-list{list-style:none;margin:0;padding:0}" +
-      "#dim-test-report .dim-cov-file{margin:0 0 .4rem;border:1px solid #e2e8f0;border-radius:8px;background:#fff;overflow:hidden}" +
-      "#dim-test-report .dim-cov-toggle{display:flex;align-items:center;gap:.65rem;width:100%;margin:0;padding:.55rem .7rem;border:0;background:transparent;font:inherit;color:inherit;cursor:pointer;text-align:left}" +
-      "#dim-test-report .dim-cov-toggle:hover{background:#f1f5f9}" +
-      "#dim-test-report .dim-cov-chevron{width:.7rem;color:#94a3b8;flex-shrink:0}" +
-      "#dim-test-report .dim-cov-path{flex:1;min-width:0;font-size:.88rem;word-break:break-all}" +
-      "#dim-test-report .dim-cov-stats{font-size:.8rem;color:#64748b;white-space:nowrap}" +
-      "#dim-test-report .dim-cov-mini{width:3.5rem;height:5px;border-radius:999px;background:#e2e8f0;overflow:hidden;flex-shrink:0}" +
-      "#dim-test-report .dim-cov-mini > span{display:block;height:100%;background:#0ea5e9}" +
-      "#dim-test-report .dim-cov-file.dim-cov-zero .dim-cov-mini > span{background:#cbd5e1}" +
-      "#dim-test-report .dim-cov-file.dim-cov-full .dim-cov-mini > span{background:#16a34a}" +
-      "#dim-test-report .dim-cov-uncovered{margin:0;padding:.35rem .7rem .65rem 1.9rem;font-size:.8rem;color:#991b1b;line-height:1.4}" +
-      "#dim-test-report .dim-cov-uncovered strong{color:#64748b;font-weight:600}" +
       "#dim-test-splash{flex:1;display:flex;align-items:center;justify-content:center;padding:2rem 1.25rem;animation:dim-test-in .4s ease both}" +
       "#dim-test-splash .dim-test-splash-card{width:min(22rem,100%);text-align:center;padding:2rem 1.5rem;border-radius:16px;background:#f8fafc;box-shadow:0 1px 2px rgba(15,23,42,.06),0 12px 32px rgba(15,23,42,.08);animation:dim-test-splash-glow 2s ease-in-out infinite}" +
       "#dim-test-splash .dim-test-splash-card h1{margin:.9rem 0 .35rem;font-size:1.35rem;letter-spacing:-.02em;animation:dim-test-pulse 1.6s ease-in-out infinite}" +
@@ -496,14 +601,21 @@
     }
   }
 
-  function bindCoverageToggles(panel) {
-    var buttons = panel.querySelectorAll("[data-dim-cov-path]");
+  function bindTreeToggles(panel) {
+    var buttons = panel.querySelectorAll("[data-dim-tree-path]");
     for (var i = 0; i < buttons.length; i++) {
       (function (btn) {
         btn.addEventListener("click", function () {
-          var path = btn.getAttribute("data-dim-cov-path");
+          var path = btn.getAttribute("data-dim-tree-path");
+          var kind = btn.getAttribute("data-dim-tree-kind") || "cover";
           if (!path) return;
-          coverExpanded[path] = !coverExpanded[path];
+          var map = kind === "test" ? testExpanded : coverExpanded;
+          var defaultExpanded =
+            kind === "test"
+              ? true
+              : btn.getAttribute("data-dim-tree-default") === "1";
+          var current = isExpanded(map, path, defaultExpanded);
+          map[path] = !current;
           var state = global.__DIM_TEST__;
           if (state) paintReport(state);
         });
@@ -511,58 +623,141 @@
     }
   }
 
-  function paintCoverageHtml() {
-    var cov = coverSummary();
-    if (!cov.total) return "";
+  function aggregateCovNode(node) {
+    if (node.kind === "file") {
+      return {
+        hit: node.hit || 0,
+        total: node.total || 0,
+        pct: node.pct || 0,
+      };
+    }
+    var hit = 0;
+    var total = 0;
+    var kids = sortedChildren(node);
+    for (var i = 0; i < kids.length; i++) {
+      var a = aggregateCovNode(kids[i]);
+      hit += a.hit;
+      total += a.total;
+    }
+    node.hit = hit;
+    node.total = total;
+    node.pct = total ? Math.round((hit / total) * 100) : 0;
+    return { hit: hit, total: total, pct: node.pct };
+  }
 
-    var rows = [];
-    for (var i = 0; i < cov.files.length; i++) {
-      var f = cov.files[i];
-      var expanded = Boolean(coverExpanded[f.path]);
-      var fileCls = "dim-cov-file";
-      if (f.pct === 0) fileCls += " dim-cov-zero";
-      else if (f.pct === 100) fileCls += " dim-cov-full";
+  function paintCovNode(node) {
+    if (node.kind === "file") {
+      var fileExpanded = isExpanded(coverExpanded, node.path, false);
+      var fileCls = "dim-tree-node dim-tree-file";
+      if (node.pct === 0) fileCls += " dim-cov-zero";
+      else if (node.pct === 100) fileCls += " dim-cov-full";
       var detail = "";
-      if (expanded) {
-        if (f.uncovered.length) {
+      if (fileExpanded) {
+        if (node.uncovered && node.uncovered.length) {
           detail =
             '<p class="dim-cov-uncovered"><strong>Uncovered:</strong> ' +
-            escapeHtml(compactLineRanges(f.uncovered)) +
+            escapeHtml(compactLineRanges(node.uncovered)) +
             "</p>";
         } else {
           detail =
             '<p class="dim-cov-uncovered"><strong>Uncovered:</strong> none</p>';
         }
       }
-      rows.push(
+      return (
         '<li class="' +
-          fileCls +
-          '">' +
-          '<button type="button" class="dim-cov-toggle" data-dim-cov-path="' +
-          escapeHtml(f.path) +
-          '" aria-expanded="' +
-          (expanded ? "true" : "false") +
-          '">' +
-          '<span class="dim-cov-chevron" aria-hidden="true">' +
-          (expanded ? "▾" : "▸") +
-          "</span>" +
-          '<span class="dim-cov-path">' +
-          escapeHtml(f.path) +
-          "</span>" +
-          '<span class="dim-cov-mini" aria-hidden="true"><span style="width:' +
-          f.pct +
-          '%"></span></span>' +
-          '<span class="dim-cov-stats">' +
-          f.hit +
-          "/" +
-          f.total +
-          " · " +
-          f.pct +
-          "%</span>" +
-          "</button>" +
-          detail +
-          "</li>",
+        fileCls +
+        '">' +
+        '<button type="button" class="dim-tree-row" data-dim-tree-path="' +
+        escapeHtml(node.path) +
+        '" data-dim-tree-kind="cover" data-dim-tree-default="0" aria-expanded="' +
+        (fileExpanded ? "true" : "false") +
+        '">' +
+        '<span class="dim-tree-chevron" aria-hidden="true">' +
+        (fileExpanded ? "▾" : "▸") +
+        "</span>" +
+        '<span class="dim-tree-label">' +
+        escapeHtml(node.name) +
+        "</span>" +
+        '<span class="dim-tree-mini" aria-hidden="true"><span style="width:' +
+        node.pct +
+        '%"></span></span>' +
+        '<span class="dim-tree-stats">' +
+        node.hit +
+        "/" +
+        node.total +
+        " · " +
+        node.pct +
+        "%</span>" +
+        "</button>" +
+        detail +
+        "</li>"
       );
+    }
+
+    aggregateCovNode(node);
+    var dirExpanded = isExpanded(coverExpanded, node.path, true);
+    var kids = sortedChildren(node);
+    var childHtml = "";
+    if (dirExpanded && kids.length) {
+      var childRows = [];
+      for (var i = 0; i < kids.length; i++) {
+        childRows.push(paintCovNode(kids[i]));
+      }
+      childHtml =
+        '<ul class="dim-tree-children">' + childRows.join("") + "</ul>";
+    }
+    return (
+      '<li class="dim-tree-node dim-tree-dir">' +
+      '<button type="button" class="dim-tree-row" data-dim-tree-path="' +
+      escapeHtml(node.path) +
+      '" data-dim-tree-kind="cover" data-dim-tree-default="1" aria-expanded="' +
+      (dirExpanded ? "true" : "false") +
+      '">' +
+      '<span class="dim-tree-chevron" aria-hidden="true">' +
+      (dirExpanded ? "▾" : "▸") +
+      "</span>" +
+      '<span class="dim-tree-label">' +
+      escapeHtml(node.name || "/") +
+      "</span>" +
+      '<span class="dim-tree-mini" aria-hidden="true"><span style="width:' +
+      (node.pct || 0) +
+      '%"></span></span>' +
+      '<span class="dim-tree-stats">' +
+      (node.hit || 0) +
+      "/" +
+      (node.total || 0) +
+      " · " +
+      (node.pct || 0) +
+      "%</span>" +
+      "</button>" +
+      childHtml +
+      "</li>"
+    );
+  }
+
+  function paintCoverageHtml() {
+    var cov = coverSummary();
+    if (!cov.total) return "";
+
+    var root = createTreeRoot();
+    for (var i = 0; i < cov.files.length; i++) {
+      var f = cov.files[i];
+      insertPathLeaf(root, f.path, {
+        kind: "file",
+        name: basename(f.path),
+        path: f.path,
+        hit: f.hit,
+        total: f.total,
+        pct: f.pct,
+        uncovered: f.uncovered,
+        children: {},
+      });
+    }
+
+    var top = sortedChildren(root);
+    var rows = [];
+    for (var j = 0; j < top.length; j++) {
+      rows.push(paintCovNode(top[j]));
     }
 
     return (
@@ -584,6 +779,185 @@
       rows.join("") +
       "</ul></div>"
     );
+  }
+
+  function testLeafStatus(r) {
+    if (r.status === "running") return "running";
+    if (r.status === "pass" || r.ok === true) return "pass";
+    if (r.status === "fail" || r.ok === false) return "fail";
+    return "pending";
+  }
+
+  function aggregateTestNode(node) {
+    if (node.kind === "test") {
+      var st = testLeafStatus(node.result || {});
+      return {
+        passed: st === "pass" ? 1 : 0,
+        failed: st === "fail" ? 1 : 0,
+        running: st === "running" ? 1 : 0,
+        pending: st === "pending" ? 1 : 0,
+        total: 1,
+      };
+    }
+    var passed = 0;
+    var failed = 0;
+    var running = 0;
+    var pending = 0;
+    var total = 0;
+    var kids = sortedChildren(node);
+    for (var i = 0; i < kids.length; i++) {
+      var a = aggregateTestNode(kids[i]);
+      passed += a.passed;
+      failed += a.failed;
+      running += a.running;
+      pending += a.pending;
+      total += a.total;
+    }
+    node.passed = passed;
+    node.failed = failed;
+    node.running = running;
+    node.pending = pending;
+    node.total = total;
+    return {
+      passed: passed,
+      failed: failed,
+      running: running,
+      pending: pending,
+      total: total,
+    };
+  }
+
+  function testGroupClass(node) {
+    var a = aggregateTestNode(node);
+    if (a.failed) return "dim-tree-fail";
+    if (a.running) return "dim-tree-running";
+    if (a.total && a.passed === a.total) return "dim-tree-pass";
+    return "";
+  }
+
+  function testGroupBadge(node) {
+    var a = aggregateTestNode(node);
+    if (a.failed) return "FAIL";
+    if (a.running) return "RUN";
+    if (a.total && a.passed === a.total) return "PASS";
+    if (!a.total) return "…";
+    return a.passed + "/" + a.total;
+  }
+
+  function paintTestLeaf(r) {
+    var cls = "dim-test-leaf dim-test-pending";
+    var badge = "…";
+    var detail = "";
+    var st = testLeafStatus(r);
+    if (st === "running") {
+      cls = "dim-test-leaf dim-test-running";
+      badge = "RUN";
+    } else if (st === "pass") {
+      cls = "dim-test-leaf dim-test-pass";
+      badge = "PASS";
+    } else if (st === "fail") {
+      cls = "dim-test-leaf dim-test-fail";
+      badge = "FAIL";
+      if (r.error) {
+        detail = "<pre>" + escapeHtml(r.error) + "</pre>";
+      }
+    }
+    return (
+      '<li class="' +
+      cls +
+      '"><span class="dim-test-badge">' +
+      badge +
+      '</span><span class="dim-test-name">' +
+      escapeHtml(r.name) +
+      "</span>" +
+      detail +
+      "</li>"
+    );
+  }
+
+  function paintTestNode(node) {
+    if (node.kind === "test") {
+      return paintTestLeaf(node.result || { name: node.name, status: "pending" });
+    }
+
+    aggregateTestNode(node);
+    var expanded = isExpanded(testExpanded, node.path, true);
+    var groupCls = testGroupClass(node);
+    var kids = sortedChildren(node);
+    var childHtml = "";
+    if (expanded && kids.length) {
+      var childRows = [];
+      for (var i = 0; i < kids.length; i++) {
+        childRows.push(paintTestNode(kids[i]));
+      }
+      childHtml =
+        '<ul class="dim-tree-children">' + childRows.join("") + "</ul>";
+    }
+    var kindCls = node.kind === "file" ? "dim-tree-file" : "dim-tree-dir";
+    return (
+      '<li class="dim-tree-node ' +
+      kindCls +
+      (groupCls ? " " + groupCls : "") +
+      '">' +
+      '<button type="button" class="dim-tree-row" data-dim-tree-path="' +
+      escapeHtml(node.path) +
+      '" data-dim-tree-kind="test" data-dim-tree-default="1" aria-expanded="' +
+      (expanded ? "true" : "false") +
+      '">' +
+      '<span class="dim-tree-chevron" aria-hidden="true">' +
+      (expanded ? "▾" : "▸") +
+      "</span>" +
+      '<span class="dim-test-badge">' +
+      escapeHtml(testGroupBadge(node)) +
+      "</span>" +
+      '<span class="dim-tree-label">' +
+      escapeHtml(node.name || "/") +
+      "</span>" +
+      '<span class="dim-tree-stats">' +
+      (node.passed || 0) +
+      "/" +
+      (node.total || 0) +
+      "</span>" +
+      "</button>" +
+      childHtml +
+      "</li>"
+    );
+  }
+
+  function paintResultsTree(results) {
+    var root = createTreeRoot();
+    for (var i = 0; i < results.length; i++) {
+      var r = results[i];
+      var filePath = r.file || "(inline)";
+      var parts = String(filePath)
+        .split("/")
+        .filter(function (p) {
+          return p !== "";
+        });
+      var node = root;
+      var accum = [];
+      for (var j = 0; j < parts.length - 1; j++) {
+        accum.push(parts[j]);
+        node = ensureDir(node, parts[j], accum.join("/"));
+      }
+      var fileName = parts.length ? parts[parts.length - 1] : "(inline)";
+      var fileNode = ensureFile(node, fileName, filePath);
+      var testKey = r.name + "#" + i;
+      fileNode.children[testKey] = {
+        kind: "test",
+        name: r.name,
+        path: filePath + "#" + testKey,
+        result: r,
+        children: {},
+      };
+    }
+
+    var top = sortedChildren(root);
+    var rows = [];
+    for (var k = 0; k < top.length; k++) {
+      rows.push(paintTestNode(top[k]));
+    }
+    return '<ul class="dim-test-tree">' + rows.join("") + "</ul>";
   }
 
   /**
@@ -627,38 +1001,6 @@
         '<span class="dim-test-status-label">Starting…</span>';
     }
 
-    var rows = [];
-    for (var i = 0; i < state.results.length; i++) {
-      var r = state.results[i];
-      var cls = "dim-test-pending";
-      var badge = "…";
-      var detail = "";
-      if (r.status === "running") {
-        cls = "dim-test-running";
-        badge = "RUN";
-      } else if (r.status === "pass" || r.ok === true) {
-        cls = "dim-test-pass";
-        badge = "PASS";
-      } else if (r.status === "fail" || r.ok === false) {
-        cls = "dim-test-fail";
-        badge = "FAIL";
-        if (r.error) {
-          detail = "<pre>" + escapeHtml(r.error) + "</pre>";
-        }
-      }
-      rows.push(
-        '<li class="' +
-          cls +
-          '"><span class="dim-test-badge">' +
-          badge +
-          '</span><span class="dim-test-name">' +
-          escapeHtml(r.name) +
-          "</span>" +
-          detail +
-          "</li>",
-      );
-    }
-
     panel.innerHTML =
       "<h1>Results</h1>" +
       '<p class="dim-test-meta"><strong>' +
@@ -679,12 +1021,10 @@
       '<div class="dim-test-status">' +
       statusHtml +
       "</div>" +
-      "<ul>" +
-      rows.join("") +
-      "</ul>" +
+      paintResultsTree(state.results || []) +
       paintCoverageHtml();
 
-    bindCoverageToggles(panel);
+    bindTreeToggles(panel);
     updateToolbar();
   }
 
@@ -698,6 +1038,7 @@
     for (var i = 0; i < suite.length; i++) {
       results.push({
         name: suite[i].name,
+        file: suite[i].file || "(inline)",
         status: "pending",
         ok: null,
       });
@@ -736,6 +1077,7 @@
           results: results.map(function (r) {
             return {
               name: r.name,
+              file: r.file || "(inline)",
               ok: r.ok,
               status: r.status,
               error: r.error,
