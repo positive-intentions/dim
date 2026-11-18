@@ -2,16 +2,19 @@
  * DimTest line instrumenter (classic script) — optional companion to
  * dim.test.global.js for in-page coverage.
  *
- * Expects global `acorn` and `DimTest` / `__DIM_COV__`. Does not rewrite
+ * Expects global `DimParse` and `DimTest` / `__DIM_COV__`. Does not rewrite
  * files on disk — returns instrumented source for eval/injection.
  *
  * Published as:
  *   https://positive-intentions.github.io/dim/lib/dim.cover.global.js
+ * (build:pages-lib concatenates parse.js + this file so DimParse is embedded)
  *
  *   <script src=".../dim.test.global.js"></script>
- *   <script src=".../acorn.min.js"></script>
  *   <script src=".../dim.cover.global.js"></script>
  *   DimTest.instrument(source, "app/lib/foo.js")
+ *
+ * Standalone parser (without cover):
+ *   <script src=".../dim.parse.global.js"></script>
  */
 (function (global) {
   "use strict";
@@ -26,7 +29,7 @@
   function isStatement(node) {
     if (!node || !node.type) return false;
     if (SKIP_TYPES[node.type]) return false;
-    // Acorn statement types end with Statement, plus Declaration forms.
+    // Statement types end with Statement, plus Declaration forms.
     if (/Statement$/.test(node.type)) return true;
     if (
       node.type === "FunctionDeclaration" ||
@@ -93,16 +96,16 @@
    * @returns {string} instrumented source
    */
   function instrument(source, file) {
-    if (typeof acorn === "undefined" || !acorn.parse) {
-      throw new Error("dim.cover: global acorn is required");
+    if (!global.DimParse || !global.DimParse.parse) {
+      throw new Error(
+        "dim.cover: global DimParse is required (load dim.cover.global.js or dim.parse.global.js)",
+      );
     }
     if (!global.DimTest || !global.DimTest.cover) {
       throw new Error("dim.cover: DimTest.cover is required (load dim.test.global.js first)");
     }
 
-    var ast = acorn.parse(source, {
-      ecmaVersion: 2022,
-      locations: true,
+    var ast = global.DimParse.parse(source, {
       allowReturnOutsideFunction: true,
       allowAwaitOutsideFunction: true,
     });

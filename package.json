@@ -58,7 +58,7 @@
     "build:wasm": "node scripts/build-wasm.mjs",
     "build:reset": "rm -rf ./Frontend && mkdir ./Frontend",
     "build:storybook": "storybook build && cp -r storybook-static/* ./Frontend",
-    "build:pages-lib": "mkdir -p Frontend/lib && cp dist/dim.global.js Frontend/lib/dim.global.js && cp dist/wasm/dim.global.js Frontend/lib/dim.wasm.global.js && cp examples/app-test/dim-test.global.js Frontend/lib/dim.test.global.js && cp examples/app-test/cover-instrument.js Frontend/lib/dim.cover.global.js && touch Frontend/.nojekyll",
+    "build:pages-lib": "mkdir -p Frontend/lib && cp dist/dim.global.js Frontend/lib/dim.global.js && cp dist/wasm/dim.global.js Frontend/lib/dim.wasm.global.js && cp examples/app-test/dim-test.global.js Frontend/lib/dim.test.global.js && cp examples/app-test/parse.js Frontend/lib/dim.parse.global.js && cat examples/app-test/parse.js examples/app-test/cover-instrument.js > Frontend/lib/dim.cover.global.js && touch Frontend/.nojekyll",
     "build:frontend": "webpack --mode development --config webpack.config.cjs && cp -r dist/* ./Frontend",
     "build:frontend:vite": "vite build && cp -r dist/* ./Frontend",
     "build:development": "webpack --mode development --config webpack.config.cjs && cp -r dist/* ./Frontend",

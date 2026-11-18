@@ -368,8 +368,9 @@ Rerun toolbar). It does not change `window.Dim`. Source:
 [`examples/app-test/dim-test.global.js`](examples/app-test/dim-test.global.js).
 Optional line instrumenter:
 [`examples/app-test/cover-instrument.js`](examples/app-test/cover-instrument.js)
-→ CDN `dim.cover.global.js`. `npm run build:pages-lib` copies both into
-`Frontend/lib/` for GitHub Pages.
+(+ embedded [`parse.js`](examples/app-test/parse.js) / `DimParse`) → CDN
+`dim.cover.global.js`. `npm run build:pages-lib` publishes the harness,
+parser, and cover bundle into `Frontend/lib/` for GitHub Pages.
 
 Try the demo (serve the repo over HTTP, then open
 `/examples/app-test/?impl=js` or `?impl=wasm`). A full notes-app suite lives in
@@ -419,17 +420,18 @@ Dim ships a tiny classic-script harness:
 | File | Role |
 | ---- | ---- |
 | [`examples/app-test/dim-test.global.js`](examples/app-test/dim-test.global.js) | Source — exposes `window.DimTest` |
-| [`examples/app-test/cover-instrument.js`](examples/app-test/cover-instrument.js) | Optional Acorn line instrumenter (`DimTest.instrument`) |
+| [`examples/app-test/parse.js`](examples/app-test/parse.js) | First-party JS subset parser (`window.DimParse`) |
+| [`examples/app-test/cover-instrument.js`](examples/app-test/cover-instrument.js) | Optional line instrumenter (`DimTest.instrument`) |
 | `https://positive-intentions.github.io/dim/lib/dim.test.global.js` | CDN harness (via `build:pages-lib`) |
-| `https://positive-intentions.github.io/dim/lib/dim.cover.global.js` | CDN instrumenter (via `build:pages-lib`) |
+| `https://positive-intentions.github.io/dim/lib/dim.parse.global.js` | CDN parser (via `build:pages-lib`) |
+| `https://positive-intentions.github.io/dim/lib/dim.cover.global.js` | CDN instrumenter + embedded DimParse |
 | [`examples/app-test/index.html`](examples/app-test/index.html) | One-component demo (`?impl=js\|wasm`) |
 
 ```html
 <script src="https://positive-intentions.github.io/dim/lib/dim.global.js"></script>
 <!-- WASM: .../dim.wasm.global.js  (?impl=wasm) -->
 <script src="https://positive-intentions.github.io/dim/lib/dim.test.global.js"></script>
-<!-- Optional live coverage: Acorn + instrumenter; app fetches its own sources -->
-<script src="https://cdn.jsdelivr.net/npm/acorn@8.14.1/dist/acorn.min.js"></script>
+<!-- Optional live coverage: DimParse is embedded in dim.cover.global.js -->
 <script src="https://positive-intentions.github.io/dim/lib/dim.cover.global.js"></script>
 <script>
   DimTest.test("counter mounts", async () => {
@@ -444,10 +446,11 @@ Dim ships a tiny classic-script harness:
 `toBeGreaterThan`), `mount(tag, props?)`, `shadowText(el)`, `run()`, `rerun()`,
 `splash(message)`, plus optional `cover.register` / `cover.hit` /
 `cover.summary` and `instrument` (from `dim.cover.global.js`) for in-page line
-coverage. The harness owns the **toolbar** (JS/WASM reload toggle, Rerun, impl
-label) and an animated **splash** during boot — load `dim.test.global.js`
-before Dim so the splash appears immediately. Apps list which files to fetch
-and instrument; production sources on disk stay untouched.
+coverage. Coverage uses first-party **DimParse** (no Acorn / jsDelivr). The
+harness owns the **toolbar** (JS/WASM reload toggle, Rerun, impl label) and an
+animated **splash** during boot — load `dim.test.global.js` before Dim so the
+splash appears immediately. Apps list which files to fetch and instrument;
+production sources on disk stay untouched.
 
 Full notes-app example (BP modules, colocated specs, `runTests.html`, live
 coverage UI, CI with Playwright):
@@ -542,7 +545,7 @@ dim/
 ├── scripts/                # verify.sh, build-wasm.mjs, …
 ├── examples/
 │   ├── todo-wasm/          # file:// demo using dist/wasm/dim.global.js
-│   └── app-test/           # DimTest harness + cover instrumenter + demo
+│   └── app-test/           # DimTest harness + DimParse + cover + demo
 ├── public/
 └── README.md
 ```
