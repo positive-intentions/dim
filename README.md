@@ -344,6 +344,35 @@ npm run test:rust    # cargo unit tests for template preparation
 npm run test:all     # JS + Rust + WASM
 ```
 
+### Testing uncompiled apps
+
+Framework unit tests stay on Jest (`npm test`). Apps that load Dim as a classic
+IIFE (no app transpile, no bundler) can use a separate browser harness:
+
+```html
+<script src="https://positive-intentions.github.io/dim/lib/dim.global.js"></script>
+<!-- or dim.wasm.global.js with ?impl=wasm -->
+<script src="https://positive-intentions.github.io/dim/lib/dim.test.global.js"></script>
+<script>
+  DimTest.test("counter mounts", async () => {
+    const el = await DimTest.mount("my-counter");
+    DimTest.expect(DimTest.shadowText(el)).toContain("0");
+  });
+  DimTest.run(); // paints a report; sets window.__DIM_TEST__
+</script>
+```
+
+`window.DimTest` provides `test`, `expect`, `mount`, `shadowText`, and `run`.
+It does not change `window.Dim`. Source:
+[`examples/app-test/dim-test.global.js`](examples/app-test/dim-test.global.js).
+`npm run build:pages-lib` copies it to `Frontend/lib/dim.test.global.js` for
+GitHub Pages.
+
+Try the demo (serve the repo over HTTP, then open
+`/examples/app-test/?impl=js` or `?impl=wasm`). A full notes-app suite lives in
+[dim-boilerplate](https://github.com/positive-intentions/dim-boilerplate)
+under `/tests/`.
+
 ### Caveats
 
 - **Size.** `dim_core_bg.wasm` is ~150 KB (~65 KB gzipped). The inline and
@@ -374,6 +403,45 @@ npm run test:all     # JS + Rust + WASM
   the identical primitive (or the same listener) as last commit, as lit does;
   `.prop` bindings are always re-assigned. External DOM edits to a bound text
   node or attribute are therefore not reverted until the value changes.
+
+### Testing uncompiled apps
+
+Framework unit tests use Jest against `src/` (see `npm test` / `npm run test:wasm`).
+**Application** code that stays uncompiled (classic scripts + `window.Dim`)
+should be tested the same way it runs: in a real browser page, with no Babel
+or bundler.
+
+Dim ships a tiny classic-script harness:
+
+| File | Role |
+| ---- | ---- |
+| [`examples/app-test/dim-test.global.js`](examples/app-test/dim-test.global.js) | Source — exposes `window.DimTest` |
+| `https://positive-intentions.github.io/dim/lib/dim.test.global.js` | CDN copy (via `build:pages-lib`) |
+| [`examples/app-test/index.html`](examples/app-test/index.html) | One-component demo (`?impl=js\|wasm`) |
+
+```html
+<script src="https://positive-intentions.github.io/dim/lib/dim.global.js"></script>
+<!-- WASM: .../dim.wasm.global.js  (?impl=wasm) -->
+<script src="https://positive-intentions.github.io/dim/lib/dim.test.global.js"></script>
+<script>
+  DimTest.test("counter mounts", async () => {
+    const el = await DimTest.mount("my-counter");
+    DimTest.expect(DimTest.shadowText(el)).toContain("0");
+  });
+  DimTest.run(); // paints a report; sets window.__DIM_TEST__
+</script>
+```
+
+`DimTest` API: `test`, `expect` (`toBe`, `toEqual`, `toBeTruthy`, `toContain`,
+`toBeGreaterThan`), `mount(tag, props?)`, `shadowText(el)`, `run()`, plus
+optional `cover.register` / `cover.hit` / `cover.summary` for in-page line
+coverage (apps instrument sources at test load — see dim-boilerplate `/tests/`).
+
+Full notes-app example (BP modules, lib + component + unlock specs, live
+coverage UI, CI with Playwright):
+[dim-boilerplate](https://github.com/positive-intentions/dim-boilerplate)
+`/tests/`. Framework Jest suites stay separate; do not load `BP.module` apps
+through Jest.
 
 ## Documentation
 
@@ -461,7 +529,9 @@ dim/
 ├── verification/lean/      # Lean 4 laws, proofs, dim-oracle
 ├── security/               # Threat model and findings
 ├── scripts/                # verify.sh, build-wasm.mjs, …
-├── examples/todo-wasm/     # file:// demo using dist/wasm/dim.global.js
+├── examples/
+│   ├── todo-wasm/          # file:// demo using dist/wasm/dim.global.js
+│   └── app-test/           # DimTest harness + uncompiled app-test demo
 ├── public/
 └── README.md
 ```

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<!--
+  DimTest demo — uncompiled classic-script app tests.
+
+  Prefer serving over HTTP (dimui-style remote modules need a real origin):
+
+    python3 -m http.server 4173
+    open http://127.0.0.1:4173/examples/app-test/
+
+  Or after `npm run build:lib` / `build:pages-lib`, point Dim at
+  ../../Frontend/lib/ (or ../../dist/). CDN URLs work without a local build.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DimTest — app-test demo</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #e2e8f0;
+        color: #0f172a;
+        font-family: system-ui, sans-serif;
+      }
+      #dim-test-root {
+        position: absolute;
+        left: -9999px;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="dim-test-root" hidden></div>
+    <div id="dim-test-report">Loading DimTest…</div>
+
+    <script>
+      (function () {
+        // HTTP demo: inject Dim without document.write (avoids Chromium
+        // parser-blocking cross-site warnings). App index.html still uses
+        // document.write for file:// sync boot.
+        var CDN = "https://positive-intentions.github.io/dim/lib/";
+        var impl = "js";
+        try {
+          var q = new URLSearchParams(location.search || "").get("impl") || "";
+          q = String(q).toLowerCase();
+          if (q === "js" || q === "wasm") impl = q;
+        } catch (e) {}
+        document.documentElement.dataset.dimRuntime = impl;
+        var dimSrc =
+          impl === "wasm"
+            ? CDN + "dim.wasm.global.js"
+            : CDN + "dim.global.js";
+
+        function loadScript(src) {
+          return new Promise(function (resolve, reject) {
+            var s = document.createElement("script");
+            s.src = src;
+            s.async = false;
+            s.onload = function () {
+              resolve();
+            };
+            s.onerror = function () {
+              reject(new Error("Failed to load " + src));
+            };
+            document.head.appendChild(s);
+          });
+        }
+
+        loadScript(dimSrc)
+          .then(function () {
+            return loadScript("./dim-test.global.js");
+          })
+          .then(function () {
+            if (!globalThis.Dim) {
+              throw new Error("Dim global missing — check CDN / ?impl=");
+            }
+            if (!globalThis.DimTest) {
+              throw new Error("DimTest global missing");
+            }
+
+            var define = Dim.define;
+            var css = Dim.css;
+
+            var Counter = define({
+              tag: "dim-test-counter",
+              component: function (_props, hooks) {
+                var html = hooks.html;
+                var useState = hooks.useState;
+                var useStyle = hooks.useStyle;
+                useStyle(css`
+                  button {
+                    font: inherit;
+                    padding: 0.5rem 0.75rem;
+                    border-radius: 6px;
+                    border: 1px solid #cbd5e1;
+                    background: #029cfd;
+                    color: white;
+                    cursor: pointer;
+                  }
+                `);
+                var pair = useState(0);
+                var count = pair[0];
+                var setCount = pair[1];
+                return html`
+                  <button type="button" @click="${function () {
+                    setCount(count + 1);
+                  }}">
+                    Count: ${count}
+                  </button>
+                `;
+              },
+            });
+
+            void Counter;
+
+            DimTest.test("dim-test-counter is registered", function () {
+              DimTest.expect(
+                customElements.get("dim-test-counter"),
+              ).toBeTruthy();
+            });
+
+            DimTest.test("counter mounts with count 0", async function () {
+              var el = await DimTest.mount("dim-test-counter");
+              DimTest.expect(el.shadowRoot).toBeTruthy();
+              DimTest.expect(DimTest.shadowText(el)).toContain("Count: 0");
+            });
+
+            DimTest.test("counter increments on click", async function () {
+              var el = await DimTest.mount("dim-test-counter");
+              var btn = el.shadowRoot.querySelector("button");
+              DimTest.expect(btn).toBeTruthy();
+              btn.click();
+              await el.updateComplete;
+              DimTest.expect(DimTest.shadowText(el)).toContain("Count: 1");
+            });
+
+            return DimTest.run();
+          })
+          .catch(function (err) {
+            var panel = document.getElementById("dim-test-report");
+            if (panel) {
+              panel.textContent = String(
+                err && err.message ? err.message : err,
+              );
+              panel.style.color = "#991b1b";
+            }
+            globalThis.__DIM_TEST__ = {
+              done: true,
+              passed: 0,
+              failed: 1,
+              results: [
+                {
+                  name: "boot",
+                  ok: false,
+                  error: String(err && err.stack ? err.stack : err),
+                },
+              ],
+            };
+            console.error(err);
+          });
+      })();
+    </script>
+  </body>
+</html>
+
