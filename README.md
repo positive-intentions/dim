@@ -362,9 +362,9 @@ IIFE (no app transpile, no bundler) can use a separate browser harness:
 </script>
 ```
 
-`window.DimTest` provides `test`, `expect`, `mount`, `shadowText`, `run`,
-`rerun`, and `splash`. It also paints the runner chrome (splash + JS/WASM /
-Rerun toolbar). It does not change `window.Dim`. Source:
+`window.DimTest` provides `test`, `expect`, `mount`, `shadowText`, `open`
+(iframe AUT), `run`, `rerun`, and `splash`. It also paints the runner chrome
+(splash + JS/WASM / Rerun toolbar). It does not change `window.Dim`. Source:
 [`examples/app-test/dim-test.global.js`](examples/app-test/dim-test.global.js).
 Optional line instrumenter:
 [`examples/app-test/cover-instrument.js`](examples/app-test/cover-instrument.js)
@@ -452,8 +452,29 @@ animated **splash** during boot — load `dim.test.global.js` before Dim so the
 splash appears immediately. Apps list which files to fetch and instrument;
 production sources on disk stay untouched.
 
+**Iframe AUT (browser automation, still no transpile):** `DimTest.open(url)`
+loads a real same-origin HTML page into an iframe (default: fetch + `srcdoc`
+with `<base href>`, IndexedDB name suffix, session-prefixed `localStorage`,
+and a no-op `serviceWorker.register` so the runner is not hijacked). Returns a
+page object with shadow-piercing `query` / `queryAll` / `click` / `fill` /
+`text` / `wait` / `close` (`click` / `fill` return promises and flush Dim
+`updateComplete` so state is visible to the next action). Opt-in
+`{ mode: "src" }` navigates the iframe directly (exercises SW; not
+recommended from `runTests.html`). Demo:
+[`examples/app-test/counter.html`](examples/app-test/counter.html) driven from
+[`examples/app-test/index.html`](examples/app-test/index.html).
+
+```js
+DimTest.test("iframe counter", async () => {
+  const page = await DimTest.open("./counter.html", { ready: "dim-test-counter" });
+  await page.click("dim-test-counter");
+  await page.wait(() => page.text("dim-test-counter").includes("Count: 1"));
+  page.close();
+});
+```
+
 Full notes-app example (BP modules, colocated specs, `runTests.html`, live
-coverage UI, CI with Playwright):
+coverage UI, iframe e2e against `index.html`, CI with Playwright):
 [dim-boilerplate](https://github.com/positive-intentions/dim-boilerplate).
 Framework Jest suites stay separate; do not load `BP.module` apps through Jest.
 

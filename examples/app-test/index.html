@@ -130,6 +130,30 @@
               DimTest.expect(DimTest.shadowText(el)).toContain("Count: 1");
             });
 
+            DimTest.test("iframe AUT: open counter.html and click", async function () {
+              DimTest.expect(typeof DimTest.open).toBe("function");
+              var page = await DimTest.open("./counter.html", {
+                ready: "dim-test-counter",
+              });
+              try {
+                await page.wait("dim-test-counter");
+                DimTest.expect(page.text("dim-test-counter")).toContain(
+                  "Count: 0",
+                );
+                await page.click("dim-test-counter");
+                await page.wait(function () {
+                  return (
+                    page.text("dim-test-counter").indexOf("Count: 1") >= 0
+                  );
+                });
+                DimTest.expect(page.text("dim-test-counter")).toContain(
+                  "Count: 1",
+                );
+              } finally {
+                page.close();
+              }
+            });
+
             DimTest.splash("Running tests…");
             return DimTest.run();
           })

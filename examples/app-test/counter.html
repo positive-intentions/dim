@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<!--
+  Tiny AUT for DimTest.open() demos. Loads Dim from CDN (or ?dimLib=) and
+  registers a one-button counter — no transpile.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DimTest counter AUT</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        font-family: system-ui, sans-serif;
+        background: #f8fafc;
+        color: #0f172a;
+      }
+      main {
+        padding: 1.25rem;
+      }
+    </style>
+    <script>
+      (function () {
+        var CDN = "https://positive-intentions.github.io/dim/lib/";
+        var dimLib = CDN;
+        var impl = "js";
+        try {
+          var params = new URLSearchParams(location.search || "");
+          var q = (params.get("impl") || "").toLowerCase();
+          if (q === "js" || q === "wasm") impl = q;
+          var dl = params.get("dimLib") || "";
+          if (dl) dimLib = dl.charAt(dl.length - 1) === "/" ? dl : dl + "/";
+          else {
+            try {
+              var stored = (localStorage.getItem("dim-boilerplate-impl") || "").toLowerCase();
+              if (stored === "js" || stored === "wasm") impl = stored;
+            } catch (e) {}
+          }
+        } catch (e2) {}
+        document.documentElement.dataset.dimRuntime = impl;
+        var src =
+          impl === "wasm"
+            ? dimLib + "dim.wasm.global.js"
+            : dimLib + "dim.global.js";
+        document.write('<script src="' + src + '"><\/script>');
+      })();
+    </script>
+  </head>
+  <body>
+    <main>
+      <h1>Counter AUT</h1>
+      <dim-test-counter></dim-test-counter>
+    </main>
+    <script>
+      (function () {
+        if (!globalThis.Dim) {
+          document.body.textContent = "Dim missing";
+          return;
+        }
+        var define = Dim.define;
+        var css = Dim.css;
+        define({
+          tag: "dim-test-counter",
+          component: function (_props, hooks) {
+            var html = hooks.html;
+            var useState = hooks.useState;
+            var useStyle = hooks.useStyle;
+            useStyle(css`
+              button {
+                font: inherit;
+                padding: 0.5rem 0.75rem;
+                border-radius: 6px;
+                border: 1px solid #cbd5e1;
+                background: #029cfd;
+                color: white;
+                cursor: pointer;
+              }
+            `);
+            var pair = useState(0);
+            var count = pair[0];
+            var setCount = pair[1];
+            return html`
+              <button
+                type="button"
+                @click="${function () {
+                  setCount(count + 1);
+                }}"
+              >
+                Count: ${count}
+              </button>
+            `;
+          },
+        });
+      })();
+    </script>
+  </body>
+</html>

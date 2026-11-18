@@ -10,6 +10,10 @@
  * Optional live line coverage (when DimTest.cover.register is used by a
  * test-only instrumenter): window.__DIM_COV__ + Coverage block in the report.
  *
+ * Optional iframe AUT driver: DimTest.open(url) fetches the page (default
+ * srcdoc + isolation: IDB suffix, localStorage wrap, SW register no-op),
+ * then returns a page object with shadow-piercing query/click/fill/wait.
+ *
  *   <script src=".../dim.test.global.js"></script>
  *   <script> DimTest.splash("Loading Dim…"); </script>
  *   <script src=".../dim.global.js"></script>
@@ -25,6 +29,9 @@
   var shellBuilt = false;
   var runInFlight = false;
   var splashVisible = false;
+  /** @type {Array<{ close: function(): void }>} */
+  var openPages = [];
+  var pageSeq = 0;
   /** @type {Record<string, { lines: number[], hits: Record<number, number> }>} */
   var coverFiles = {};
   /** @type {Record<string, boolean>} */
@@ -133,7 +140,17 @@
     return fixtureRoot;
   }
 
+  function closeAllPages() {
+    while (openPages.length) {
+      var page = openPages.pop();
+      try {
+        if (page && typeof page.close === "function") page.close();
+      } catch (e) {}
+    }
+  }
+
   function clearFixture() {
+    closeAllPages();
     var root = getFixtureRoot();
     root.innerHTML = "";
   }
@@ -158,6 +175,391 @@
     var root = el && el.shadowRoot;
     var text = root ? root.textContent || "" : "";
     return text.replace(/\s+/g, " ").trim();
+  }
+
+  function sleep(ms) {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, ms);
+    });
+  }
+
+  function isElement(value) {
+    return !!(value && value.nodeType === 1);
+  }
+
+  function collectDeep(root, selector, out) {
+    if (!root) return;
+    var nodes;
+    try {
+      nodes = root.querySelectorAll(selector);
+    } catch (e) {
+      return;
+    }
+    for (var i = 0; i < nodes.length; i++) {
+      out.push(nodes[i]);
+    }
+    var all;
+    try {
+      all = root.querySelectorAll("*");
+    } catch (e2) {
+      return;
+    }
+    for (var j = 0; j < all.length; j++) {
+      var host = all[j];
+      if (host.shadowRoot) collectDeep(host.shadowRoot, selector, out);
+    }
+  }
+
+  function pierceAll(doc, selector) {
+    var out = [];
+    if (!doc) return out;
+    collectDeep(doc, selector, out);
+    return out;
+  }
+
+  function pierceOne(doc, selector, index) {
+    var all = pierceAll(doc, selector);
+    var i = index == null ? 0 : index;
+    return all[i] || null;
+  }
+
+  function resolveEl(doc, selectorOrEl, opts) {
+    if (isElement(selectorOrEl)) return selectorOrEl;
+    var index = opts && opts.index != null ? opts.index : 0;
+    return pierceOne(doc, String(selectorOrEl || ""), index);
+  }
+
+  function deepText(el) {
+    if (!el) return "";
+    var parts = [];
+    function walk(node) {
+      if (!node) return;
+      // 3 = text, 1 = element, 11 = document fragment / ShadowRoot
+      if (node.nodeType === 3) {
+        parts.push(node.textContent || "");
+        return;
+      }
+      if (node.nodeType !== 1 && node.nodeType !== 11) return;
+      if (node.nodeType === 1) {
+        var tag = (node.tagName || "").toUpperCase();
+        if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") return;
+      }
+      if (node.shadowRoot) walk(node.shadowRoot);
+      var kids = node.childNodes;
+      for (var i = 0; i < kids.length; i++) walk(kids[i]);
+    }
+    walk(el);
+    return parts.join(" ").replace(/\s+/g, " ").trim();
+  }
+
+  function clickHost(el) {
+    if (!el) throw new Error("DimTest.page.click: element missing");
+    var btn =
+      (el.shadowRoot && el.shadowRoot.querySelector("button")) || el;
+    btn.click();
+  }
+
+  function fillHost(el, value) {
+    if (!el) throw new Error("DimTest.page.fill: element missing");
+    var input =
+      (el.shadowRoot && el.shadowRoot.querySelector("input, textarea")) ||
+      (el.matches && el.matches("input, textarea") ? el : null) ||
+      (el.querySelector && el.querySelector("input, textarea"));
+    if (!input) throw new Error("DimTest.page.fill: input/textarea missing");
+    input.value = value == null ? "" : String(value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function flushEl(el) {
+    if (!el) return Promise.resolve();
+    function once() {
+      if (el.updateComplete && typeof el.updateComplete.then === "function") {
+        return el.updateComplete;
+      }
+      return Promise.resolve();
+    }
+    return once()
+      .then(function () {
+        return sleep(0);
+      })
+      .then(once)
+      .then(function () {
+        return new Promise(function (resolve) {
+          requestAnimationFrame(function () {
+            requestAnimationFrame(resolve);
+          });
+        });
+      });
+  }
+
+  function flushTree(el) {
+    var chain = flushEl(el);
+    try {
+      var root = el && el.getRootNode && el.getRootNode();
+      if (root && root.host) {
+        chain = chain.then(function () {
+          return flushTree(root.host);
+        });
+      }
+    } catch (e) {}
+    return chain;
+  }
+
+  function isolationBootstrap(runId, seed) {
+    var seedJson = JSON.stringify(seed || {});
+    return (
+      "(function(){" +
+      "var RUN=" +
+      JSON.stringify(String(runId || "0")) +
+      ";" +
+      "var SEED=" +
+      seedJson +
+      ";" +
+      "var LIVE='DimDatabase';" +
+      "var PREFIX='__dimtest_'+RUN+'_';" +
+      "try{" +
+      "var origOpen=indexedDB.open.bind(indexedDB);" +
+      "indexedDB.open=function(name,version){" +
+      "var next=name;" +
+      "if(name===LIVE)next=LIVE+'_e2e_'+RUN;" +
+      "else if(name&&String(name).indexOf('_e2e_')<0)next=String(name)+'_e2e_'+RUN;" +
+      "return origOpen(next,version);" +
+      "};" +
+      "}catch(e){}" +
+      "try{" +
+      "var store=window.localStorage;" +
+      "var wrap={" +
+      "getItem:function(k){return store.getItem(PREFIX+k);}," +
+      "setItem:function(k,v){store.setItem(PREFIX+k,v);}," +
+      "removeItem:function(k){store.removeItem(PREFIX+k);}," +
+      "clear:function(){" +
+      "var keys=[];" +
+      "for(var i=0;i<store.length;i++){var key=store.key(i);if(key&&key.indexOf(PREFIX)===0)keys.push(key);}" +
+      "for(var j=0;j<keys.length;j++)store.removeItem(keys[j]);" +
+      "}," +
+      "key:function(i){var n=0;for(var i2=0;i2<store.length;i2++){var key=store.key(i2);if(key&&key.indexOf(PREFIX)===0){if(n===i)return key.slice(PREFIX.length);n++;}}return null;}," +
+      "get length(){var n=0;for(var i=0;i<store.length;i++){var key=store.key(i);if(key&&key.indexOf(PREFIX)===0)n++;}return n;}" +
+      "};" +
+      "try{Object.defineProperty(window,'localStorage',{configurable:true,get:function(){return wrap;}});}catch(e2){window.localStorage=wrap;}" +
+      "try{var sk;for(sk in SEED){if(Object.prototype.hasOwnProperty.call(SEED,sk)&&SEED[sk]!=null)wrap.setItem(sk,String(SEED[sk]));}}catch(eSeed){}" +
+      "}catch(e3){}" +
+      "try{" +
+      "if(navigator.serviceWorker){" +
+      "navigator.serviceWorker.register=function(){return Promise.resolve({unregister:function(){return Promise.resolve(true);}});};" +
+      "}" +
+      "}catch(e4){}" +
+      "})();"
+    );
+  }
+
+  function injectIsolation(html, baseHref, runId, seed) {
+    var baseTag = '<base href="' + String(baseHref).replace(/"/g, "&quot;") + '">';
+    var boot =
+      "<script>" + isolationBootstrap(runId, seed) + "<\/script>";
+    var inject = baseTag + boot;
+    if (/<head[^>]*>/i.test(html)) {
+      return html.replace(/<head[^>]*>/i, function (m) {
+        return m + inject;
+      });
+    }
+    if (/<html[^>]*>/i.test(html)) {
+      return html.replace(/<html[^>]*>/i, function (m) {
+        return m + "<head>" + inject + "</head>";
+      });
+    }
+    return "<!DOCTYPE html><html><head>" + inject + "</head><body>" + html + "</body></html>";
+  }
+
+  function makePage(iframe) {
+    var closed = false;
+
+    function doc() {
+      return iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+    }
+
+    function win() {
+      return iframe.contentWindow;
+    }
+
+    function ensureOpen() {
+      if (closed) throw new Error("DimTest.page: iframe already closed");
+      var d = doc();
+      if (!d) throw new Error("DimTest.page: contentDocument unavailable");
+      return d;
+    }
+
+    function query(selector, opts) {
+      return resolveEl(ensureOpen(), selector, opts || {});
+    }
+
+    function queryAll(selector) {
+      return pierceAll(ensureOpen(), selector);
+    }
+
+    function click(selectorOrEl, opts) {
+      var el = resolveEl(ensureOpen(), selectorOrEl, opts || {});
+      return flushTree(el).then(function () {
+        clickHost(el);
+        return flushTree(el);
+      });
+    }
+
+    function fill(selectorOrEl, value, opts) {
+      var el = resolveEl(ensureOpen(), selectorOrEl, opts || {});
+      fillHost(el, value);
+      // Dim setState is async — flush so subsequent click sees new values.
+      return flushTree(el);
+    }
+
+    function text(selectorOrEl, opts) {
+      if (selectorOrEl == null) {
+        return deepText(ensureOpen().body || ensureOpen().documentElement);
+      }
+      var el = resolveEl(ensureOpen(), selectorOrEl, opts || {});
+      return deepText(el);
+    }
+
+    function wait(selectorOrFn, timeoutMs) {
+      var timeout = timeoutMs || 20000;
+      var start = Date.now();
+      function tick() {
+        if (closed) {
+          return Promise.reject(new Error("DimTest.page.wait: iframe closed"));
+        }
+        var d = doc();
+        var value;
+        try {
+          if (typeof selectorOrFn === "function") {
+            value = selectorOrFn(d, win());
+          } else {
+            value = pierceOne(d, String(selectorOrFn || ""), 0);
+          }
+        } catch (e) {
+          value = null;
+        }
+        if (value) return Promise.resolve(value);
+        if (Date.now() - start >= timeout) {
+          var label =
+            typeof selectorOrFn === "function"
+              ? "condition"
+              : String(selectorOrFn || "condition");
+          return Promise.reject(
+            new Error("DimTest.page.wait: timeout waiting for " + label),
+          );
+        }
+        return sleep(50).then(tick);
+      }
+      return tick();
+    }
+
+    function close() {
+      if (closed) return;
+      closed = true;
+      var idx = openPages.indexOf(page);
+      if (idx >= 0) openPages.splice(idx, 1);
+      if (iframe && iframe.parentNode) {
+        iframe.parentNode.removeChild(iframe);
+      }
+    }
+
+    var page = {
+      iframe: iframe,
+      get window() {
+        return win();
+      },
+      get document() {
+        return doc();
+      },
+      query: query,
+      queryAll: queryAll,
+      click: click,
+      fill: fill,
+      text: text,
+      wait: wait,
+      close: close,
+    };
+    openPages.push(page);
+    return page;
+  }
+
+  function open(url, opts) {
+    opts = opts || {};
+    var timeout = opts.timeout || 30000;
+    var ready = opts.ready || "body";
+    var visible = !!opts.visible;
+    var mode = opts.mode || "srcdoc";
+    pageSeq += 1;
+    var runId =
+      Date.now().toString(36) +
+      "_" +
+      pageSeq +
+      "_" +
+      Math.random().toString(36).slice(2, 8);
+
+    var iframe = document.createElement("iframe");
+    iframe.setAttribute("title", "DimTest page");
+    iframe.setAttribute("data-dim-test-page", runId);
+    if (visible) {
+      iframe.style.cssText =
+        "display:block;width:min(100%,420px);height:640px;border:1px solid #cbd5e1;border-radius:8px;margin:1rem auto;background:#fff;";
+      var stage = document.getElementById("dim-test-stage");
+      if (stage) stage.appendChild(iframe);
+      else document.body.appendChild(iframe);
+    } else {
+      iframe.setAttribute("hidden", "");
+      iframe.style.cssText =
+        "position:absolute;left:-9999px;width:320px;height:480px;border:0;";
+      getFixtureRoot().appendChild(iframe);
+    }
+
+    var absolute = new URL(url, location.href);
+    var baseHref = absolute.href.replace(/[^/]*$/, "");
+    var seed = opts.seed || {};
+    try {
+      if (seed["dim-boilerplate-impl"] == null) {
+        var impl =
+          (document.documentElement &&
+            document.documentElement.dataset &&
+            document.documentElement.dataset.dimRuntime) ||
+          "";
+        if (!impl) {
+          try {
+            impl = localStorage.getItem("dim-boilerplate-impl") || "";
+          } catch (eLs) {}
+        }
+        if (impl === "js" || impl === "wasm") {
+          seed["dim-boilerplate-impl"] = impl;
+        }
+      }
+    } catch (eSeed) {}
+
+    function waitReady(page) {
+      return page.wait(ready, timeout).then(function () {
+        return page;
+      });
+    }
+
+    if (mode === "src") {
+      iframe.src = absolute.href;
+      var pageSrc = makePage(iframe);
+      return waitReady(pageSrc);
+    }
+
+    return fetch(absolute.href)
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error(
+            "DimTest.open: failed to fetch " + absolute.href + " (" + res.status + ")",
+          );
+        }
+        return res.text();
+      })
+      .then(function (html) {
+        iframe.srcdoc = injectIsolation(html, baseHref, runId, seed);
+        var page = makePage(iframe);
+        return waitReady(page);
+      });
   }
 
   function scriptPathFromCurrent() {
@@ -1168,6 +1570,7 @@
     expect: expect,
     mount: mount,
     shadowText: shadowText,
+    open: open,
     run: run,
     rerun: rerun,
     splash: splash,
