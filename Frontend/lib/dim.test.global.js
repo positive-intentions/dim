@@ -161,8 +161,25 @@
     }
   }
 
+  function clearE2ePreviewFrame() {
+    if (!e2ePreviewHost) return;
+    var frame = e2ePreviewHost.querySelector("#dim-test-e2e-preview-frame");
+    if (frame) {
+      frame.innerHTML = "";
+      frame.classList.remove("dim-e2e-preview-frame--multi");
+    }
+  }
+
+  function syncE2ePreviewMultiClass() {
+    var frame = getE2ePreviewFrame();
+    var count = frame.querySelectorAll("iframe").length;
+    if (count > 1) frame.classList.add("dim-e2e-preview-frame--multi");
+    else frame.classList.remove("dim-e2e-preview-frame--multi");
+  }
+
   function clearFixture() {
     closeAllPages();
+    clearE2ePreviewFrame();
     var root = getFixtureRoot();
     root.innerHTML = "";
   }
@@ -584,6 +601,9 @@
       if (iframe && iframe.parentNode) {
         iframe.parentNode.removeChild(iframe);
       }
+      try {
+        syncE2ePreviewMultiClass();
+      } catch (eSync) {}
     }
 
     var page = {
@@ -676,10 +696,11 @@
     if (visible) {
       iframe.removeAttribute("hidden");
       iframe.style.cssText =
-        "display:block;width:100%;height:100%;border:0;background:#fff;";
+        "display:block;flex:1;min-width:0;width:100%;height:100%;border:0;background:#fff;";
       var frame = getE2ePreviewFrame();
-      frame.innerHTML = "";
+      // Append so concurrent opens (e.g. two-peer e2e) stay side-by-side.
       frame.appendChild(iframe);
+      syncE2ePreviewMultiClass();
       setE2ePreviewLabel(
         currentTestName ? "Running: " + currentTestName : "E2E preview",
       );
@@ -1124,8 +1145,10 @@
       "#dim-test-e2e-slot{margin-top:1rem}" +
       "#dim-test-e2e-preview.dim-e2e-preview{display:flex;flex-direction:column;align-items:center;gap:.65rem}" +
       "#dim-test-e2e-preview .dim-e2e-preview-label{font-size:.85rem;color:#64748b;text-align:center;min-height:1.2em}" +
-      "#dim-test-e2e-preview .dim-e2e-preview-frame{width:min(100%,360px);height:640px;max-height:70vh;border:1px solid #cbd5e1;border-radius:16px;overflow:hidden;background:#0f172a;box-shadow:0 8px 28px rgba(15,23,42,.12)}" +
-      "#dim-test-e2e-preview .dim-e2e-preview-frame:empty::before{content:'Waiting for e2e…';display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:.9rem;background:#f8fafc}" +
+      "#dim-test-e2e-preview .dim-e2e-preview-frame{display:flex;flex-direction:row;gap:8px;width:min(100%,360px);height:640px;max-height:70vh;border:1px solid #cbd5e1;border-radius:16px;overflow:hidden;background:#0f172a;box-shadow:0 8px 28px rgba(15,23,42,.12)}" +
+      "#dim-test-e2e-preview .dim-e2e-preview-frame.dim-e2e-preview-frame--multi{width:min(100%,740px)}" +
+      "#dim-test-e2e-preview .dim-e2e-preview-frame > iframe{flex:1;min-width:0;height:100%;border:0;background:#fff}" +
+      "#dim-test-e2e-preview .dim-e2e-preview-frame:empty::before{content:'Waiting for e2e…';display:flex;align-items:center;justify-content:center;height:100%;width:100%;color:#94a3b8;font-size:.9rem;background:#f8fafc}" +
       "#dim-test-splash{flex:1;display:flex;align-items:center;justify-content:center;padding:2rem 1.25rem;animation:dim-test-in .4s ease both}" +
       "#dim-test-splash .dim-test-splash-card{width:min(22rem,100%);text-align:center;padding:2rem 1.5rem;border-radius:16px;background:#f8fafc;box-shadow:0 1px 2px rgba(15,23,42,.06),0 12px 32px rgba(15,23,42,.08);animation:dim-test-splash-glow 2s ease-in-out infinite}" +
       "#dim-test-splash .dim-test-splash-card h1{margin:.9rem 0 .35rem;font-size:1.35rem;letter-spacing:-.02em;animation:dim-test-pulse 1.6s ease-in-out infinite}" +
