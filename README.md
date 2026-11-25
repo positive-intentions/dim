@@ -248,9 +248,13 @@ const TodoList = (props, { useState, html, css, useStyle }) => {
   component library and custom Storybook-like explorer built on Dim (atoms,
   molecules, demos, no bundler). Live:
   https://positive-intentions.github.io/dimui/
+- **[dimurl](https://github.com/positive-intentions/dimurl)** — declarative hash
+  router (`<dimurl-router>` / `<dimurl-route>`, `#/note/:id`, …) so deep links
+  work on GitHub Pages and plain `index.html`. Live:
+  https://positive-intentions.github.io/dimurl/
 - **[dim-boilerplate](https://github.com/positive-intentions/dim-boilerplate)** —
   a larger-scale encrypted notes app (vault, folders, list/editor) that loads
-  Dim from the Pages CDN and pulls dimui atoms remotely — classic scripts, no
+  Dim from the Pages CDN and pulls dimui / dimurl remotely — classic scripts, no
   app-side transpile or bundler, with optional PWA offline support. Live:
   https://positive-intentions.github.io/dim-boilerplate/
 
@@ -450,7 +454,7 @@ Written docs (Getting Started, API, classic scripts, testing, ecosystem):
 - [Getting Started](https://positive-intentions.com/docs/projects/dim/getting-started)
 - [API overview](https://positive-intentions.com/docs/projects/dim/api-overview)
 - [Unit tests](https://positive-intentions.com/docs/projects/dim/unit-tests) · [E2E tests](https://positive-intentions.com/docs/projects/dim/e2e-tests) · [Coverage](https://positive-intentions.com/docs/projects/dim/coverage)
-- [dimui](https://positive-intentions.com/docs/projects/dim/dimui) · [dim-boilerplate](https://positive-intentions.com/docs/projects/dim/dim-boilerplate)
+- [dimui](https://positive-intentions.com/docs/projects/dim/dimui) · [dimurl](https://positive-intentions.com/docs/projects/dim/dimurl) · [dim-boilerplate](https://positive-intentions.com/docs/projects/dim/dim-boilerplate)
 
 Interactive demos and Storybook: [dim.positive-intentions.com](https://dim.positive-intentions.com).
 
