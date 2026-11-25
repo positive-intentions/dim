@@ -4,16 +4,18 @@ import { useState, useRef, useEffect } from 'react';
 
 // src/core/store/crypto-manager.js
 var DEFAULT_ITERATIONS = 1e6;
+var PAYLOAD_VERSION = 2;
 var CryptoManager = class {
+  /**
+   * @param {string} password
+   * @param {{ iterations?: number }} [options]
+   */
   constructor(password, options = {}) {
     this.password = password;
     this.iterations = options.iterations || DEFAULT_ITERATIONS;
     this._keyCache = /* @__PURE__ */ new Map();
     this.key = null;
-    this.keyPromise = this.generateKey(password).then((key) => {
-      this.key = key;
-      return key;
-    });
+    this.keyPromise = null;
   }
   arrayBufferToString(buffer) {
     const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
@@ -34,9 +36,7 @@ var CryptoManager = class {
     }
     return bytes;
   }
-  // Derive the deterministic fallback salt for a password (legacy behaviour).
-  // Only used when no explicit salt is supplied. Real encryption always uses
-  // a random per-record salt embedded in the payload.
+  // Derive the deterministic fallback salt for a password (legacy decrypt only).
   async _fallbackSalt(password) {
     const encoder = new TextEncoder();
     const hash = await crypto.subtle.digest(
@@ -47,20 +47,22 @@ var CryptoManager = class {
   }
   /**
    * Derive an AES-GCM key from a password and salt using PBKDF2.
+   * Keys are non-extractable.
    * @param {string} password
-   * @param {Uint8Array|ArrayBuffer} [salt] - random salt; falls back to a
-   *   deterministic salt derived from the password when omitted.
+   * @param {Uint8Array|ArrayBuffer} [salt]
+   * @param {number} [iterations]
    * @returns {Promise<CryptoKey>}
    */
-  async getKeyFromPassword(password, salt) {
+  async getKeyFromPassword(password, salt, iterations) {
     const encoder = new TextEncoder();
+    const iter = iterations || this.iterations;
     let saltBytes;
     if (salt === void 0 || salt === null) {
       saltBytes = await this._fallbackSalt(password);
     } else {
       saltBytes = salt instanceof Uint8Array ? salt : new Uint8Array(salt);
     }
-    const cacheKey = `${password}::${this.arrayBufferToString(saltBytes)}`;
+    const cacheKey = `${iter}::${this.arrayBufferToString(saltBytes)}`;
     if (this._keyCache.has(cacheKey)) {
       return this._keyCache.get(cacheKey);
     }
@@ -76,7 +78,7 @@ var CryptoManager = class {
         {
           name: "PBKDF2",
           salt: saltBytes,
-          iterations: this.iterations,
+          iterations: iter,
           hash: "SHA-256"
         },
         passwordKey,
@@ -84,24 +86,26 @@ var CryptoManager = class {
           name: "AES-GCM",
           length: 256
         },
-        true,
+        false,
+        // non-extractable
         ["encrypt", "decrypt"]
       );
     })();
     this._keyCache.set(cacheKey, keyPromise);
     return keyPromise;
   }
-  // Legacy wrapper retained for backwards compatibility.
+  // Legacy wrapper — still derives with fallback salt (decrypt/compat only).
   async generateKey(password) {
     const key = await this.getKeyFromPassword(password);
     this.key = key;
+    this.keyPromise = Promise.resolve(key);
     return key;
   }
   async encryptData(data) {
     const enc = new TextEncoder();
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const salt = crypto.getRandomValues(new Uint8Array(16));
-    const key = await this.getKeyFromPassword(this.password, salt);
+    const key = await this.getKeyFromPassword(this.password, salt, this.iterations);
     const dataString = typeof data === "string" ? data : JSON.stringify(data);
     const encryptedData = await crypto.subtle.encrypt(
       {
@@ -112,9 +116,11 @@ var CryptoManager = class {
       enc.encode(dataString)
     );
     return JSON.stringify({
-      encryptedData: this.arrayBufferToString(encryptedData),
+      v: PAYLOAD_VERSION,
+      iter: this.iterations,
+      salt: this.arrayBufferToString(salt),
       iv: this.arrayBufferToString(iv),
-      salt: this.arrayBufferToString(salt)
+      encryptedData: this.arrayBufferToString(encryptedData)
     });
   }
   async decryptData(encryptedPayload) {
@@ -131,7 +137,8 @@ var CryptoManager = class {
     if (!payload || typeof payload !== "object") {
       throw new Error("Invalid encrypted payload format");
     }
-    const { encryptedData, iv, salt } = payload;
+    const encryptedData = payload.encryptedData || payload.data;
+    const { iv, salt, iter } = payload;
     if (!encryptedData || !iv) {
       throw new Error("Invalid encrypted payload: missing encryptedData or iv");
     }
@@ -141,7 +148,12 @@ var CryptoManager = class {
       );
     }
     const saltBytes = salt ? new Uint8Array(this.stringToArrayBuffer(salt)) : void 0;
-    const key = await this.getKeyFromPassword(this.password, saltBytes);
+    const iterations = typeof iter === "number" && iter > 0 ? iter : this.iterations;
+    const key = await this.getKeyFromPassword(
+      this.password,
+      saltBytes,
+      iterations
+    );
     try {
       const decryptedData = await crypto.subtle.decrypt(
         {
@@ -166,6 +178,9 @@ var CryptoManager = class {
           throw new Error(
             "Decryption returned encrypted payload structure - possible password mismatch"
           );
+        }
+        if (parseError instanceof Error && parseError.message.includes("encrypted payload structure")) {
+          throw parseError;
         }
         return decryptedString;
       }

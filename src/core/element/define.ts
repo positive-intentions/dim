@@ -18,12 +18,23 @@ import { useStore } from "../store/useStore";
 import { useViewTransition } from "../transitions/useViewTransition.js";
 import { AutoTransitionHost } from "../transitions/auto-transition-host.js";
 import { useFS as _useFS } from "../fs/useFS.js";
+import { validateProps } from "../contracts/contract.js";
 
 /**
  * Register a functional component as a custom element.
  * Stamps `component.tag = tag` and returns the component for useScope({ Comp }).
+ * Optional `inputs` (a `t.record` schema) validates + sanitizes props before
+ * every render; rejected props render nothing and log a console error.
  */
-export function define({ tag, component: CustomFunctionalComponent }) {
+export function define({
+  tag,
+  component: CustomFunctionalComponent,
+  inputs = null,
+}: {
+  tag: string;
+  component: any;
+  inputs?: any;
+}) {
   class DimComponent extends DimElement {
     constructor() {
       super();
@@ -152,11 +163,21 @@ export function define({ tag, component: CustomFunctionalComponent }) {
         childElements,
       );
 
+      let props = componentProps;
+      if (inputs) {
+        const checked = validateProps(inputs, componentProps);
+        if (!checked.ok) {
+          setCurrentInstance(null);
+          console.error(
+            `[dim] <${tag}> props rejected at ${checked.path}: ${checked.reason}`,
+          );
+          return html``;
+        }
+        props = checked.value;
+      }
+
       // Call the functional component
-      const result = CustomFunctionalComponent(
-        componentProps,
-        sharedDependencies,
-      );
+      const result = CustomFunctionalComponent(props, sharedDependencies);
 
       // Clear the current instance context
       setCurrentInstance(null);
@@ -183,5 +204,6 @@ export function define({ tag, component: CustomFunctionalComponent }) {
 
   // Stamp tag on the functional component for useScope({ Comp }) DX
   CustomFunctionalComponent.tag = tag;
+  CustomFunctionalComponent.inputs = inputs;
   return CustomFunctionalComponent;
 }

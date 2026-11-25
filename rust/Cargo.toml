@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["dim-core", "dim-spec-core"]
+members = ["dim-core", "dim-spec-core", "dim-contract-core", "dim-verify-core"]
 
 [profile.release]
 opt-level = "z"

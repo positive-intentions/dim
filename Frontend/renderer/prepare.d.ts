@@ -1,18 +1,12 @@
 export function prepareTemplate(strings: any): {
     element: HTMLTemplateElement;
-    partInfo: ({
-        kind: number;
-        rawText: boolean;
-        name?: undefined;
-        valuePrefix?: undefined;
-        valueSuffix?: undefined;
-    } | {
-        kind: number;
+    partInfo: {
+        kind: any;
         name: any;
         valuePrefix: any;
-        valueSuffix: string;
-        rawText?: undefined;
-    })[];
+        valueSuffix: any;
+        rawText: any;
+    }[];
 };
 export function createInstance(template: any): {
     fragment: any;
@@ -48,16 +42,14 @@ export function createInstance(template: any): {
         end?: undefined;
     })[];
 };
-/**
- * Template preparation — marker-based parts.
- * Turns html strings into a <template> plus a part-info list, then
- * instantiates a fragment with live part records.
- */
-export const CHILD_PART: 0;
-export const ATTR_PART: 1;
-export const PROP_PART: 2;
-export const EVENT_PART: 3;
-export const BOOL_PART: 4;
-export const REF_PART: 5;
 export const templateCache: WeakMap<object, any>;
+import { CHILD_PART } from "./pure/index.js";
+import { ATTR_PART } from "./pure/index.js";
+import { PROP_PART } from "./pure/index.js";
+import { EVENT_PART } from "./pure/index.js";
+import { BOOL_PART } from "./pure/index.js";
+import { REF_PART } from "./pure/index.js";
+import { COMMENT_MARKER } from "./pure/index.js";
+import { TEXT_MARKER } from "./pure/index.js";
+export { CHILD_PART, ATTR_PART, PROP_PART, EVENT_PART, BOOL_PART, REF_PART, COMMENT_MARKER, TEXT_MARKER };
 //# sourceMappingURL=prepare.d.ts.map

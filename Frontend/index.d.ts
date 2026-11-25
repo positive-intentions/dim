@@ -15,4 +15,5 @@ export { default as AsyncronousStateManager } from "./store/async-manager.js";
 export { debouncedDispatcher } from "./store/events.js";
 export { useViewTransition, viewTransitionStyles, } from "./transitions/index.js";
 export { useFS } from "./fs/useFS.js";
+export { t, contract, fold, validateValue, getValidatorEngine, } from "./contracts/index.js";
 //# sourceMappingURL=index.d.ts.map

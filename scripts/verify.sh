@@ -17,9 +17,12 @@ bash scripts/aeneas-regenerate.sh
 
 echo "==> Rust pure-core + oracle conformance"
 cargo test --manifest-path rust/dim-spec-core/Cargo.toml
+cargo test --manifest-path rust/dim-contract-core/Cargo.toml
+cargo test --manifest-path rust/dim-verify-core/Cargo.toml --lib || \
+  cargo test --manifest-path rust/Cargo.toml -p dim-verify-core --lib
 cargo test --manifest-path rust/dim-core/Cargo.toml --lib
 
-echo "==> JS pure-core + oracle differential"
-npm test -- --testPathPattern='pure.test|renderer.test|crypto-manager'
+echo "==> JS pure-core + contracts + verify + oracle differential"
+npm test -- --testPathPattern='pure.test|renderer.test|crypto-manager|contracts.test|conformance.test|verify.test'
 
 echo "==> ALL VERIFY CHECKS PASSED"

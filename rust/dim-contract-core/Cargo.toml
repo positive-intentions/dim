@@ -1,0 +1,22 @@
+[package]
+name = "dim-contract-core"
+version = "0.1.2"
+edition = "2021"
+license = "GPL-3.0"
+description = "DOM-free contract validator for Dim (mirror of src/core/contracts/validate.js)"
+repository = "https://github.com/positive-intentions/dim"
+publish = false
+
+[lib]
+name = "dim_contract_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "dim-contract-cli"
+path = "src/bin/cli.rs"
+
+[dependencies]
+dim-spec-core = { path = "../dim-spec-core" }
+
+[dev-dependencies]
+proptest = "1.5"

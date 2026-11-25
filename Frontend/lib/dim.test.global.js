@@ -50,6 +50,8 @@
   var testExpanded = {};
   /** @type {Record<string, string>} */
   var instrumentCache = {};
+  /** @type {null | object} */
+  var lastVerification = null;
 
   function deepEqual(a, b) {
     if (Object.is(a, b)) return true;
@@ -739,10 +741,14 @@
       });
     }
 
-    if (mode === "src") {
+    function openViaSrc() {
       iframe.src = absolute.href;
       var pageSrc = makePage(iframe);
       return waitReady(pageSrc);
+    }
+
+    if (mode === "src") {
+      return openViaSrc();
     }
 
     return fetch(absolute.href)
@@ -768,6 +774,14 @@
         iframe.srcdoc = srcdoc;
         var page = makePage(iframe);
         return waitReady(page);
+      })
+      .catch(function (err) {
+        // Chrome file:// blocks fetch of local HTML; classic iframe.src still works
+        // (same soft-degrade as unit coverage — no HTML rewrite / cover inject).
+        var isFile =
+          typeof location !== "undefined" && location.protocol === "file:";
+        if (!isFile) throw err;
+        return openViaSrc();
       });
   }
 
@@ -1431,6 +1445,111 @@
     );
   }
 
+  function paintVerificationHtml(verification) {
+    var verifyApi = global.DimTest && global.DimTest.verify;
+    var summary = (verification && verification.summary) || {};
+    var obligations = (verification && verification.obligations) || [];
+    var missing = (verification && verification.missing) || [];
+    if (!obligations.length && !missing.length) {
+      // Keep the Formal verification section visible after a verify pass when
+      // the harness loaded but no sources were registered (typical Chrome
+      // file://: fetch/XHR cannot read local scripts for verify.add).
+      if (!verifyApi || verification == null) return "";
+      return (
+        '<section class="dim-test-verify" style="margin:1.25rem 0 0">' +
+        "<h2>Formal verification</h2>" +
+        '<p class="dim-test-meta">No sources registered (coverage/verify need http(s); file:// cannot read local scripts).</p>' +
+        "</section>"
+      );
+    }
+
+    var byFile = {};
+    function ensureFile(file) {
+      if (!byFile[file]) byFile[file] = [];
+      return byFile[file];
+    }
+    for (var i = 0; i < obligations.length; i++) {
+      ensureFile(obligations[i].file || "(inline)").push(obligations[i]);
+    }
+    for (var m = 0; m < missing.length; m++) {
+      ensureFile(missing[m].file || "(inline)").push({
+        name: missing[m].name || "(missing)",
+        kind: "missing-contract",
+        status: "missing",
+        jsStatus: "missing",
+        rustStatus: "skipped",
+        agree: true,
+        reason: missing[m].reason || "missing contract",
+      });
+    }
+
+    var files = Object.keys(byFile).sort();
+    var rows = [];
+    for (var f = 0; f < files.length; f++) {
+      var file = files[f];
+      var items = byFile[file];
+      rows.push(
+        '<li class="dim-tree-node dim-tree-dir">' +
+          '<div class="dim-tree-row" style="cursor:default">' +
+          '<span class="dim-tree-label">' +
+          escapeHtml(file) +
+          "</span></div><ul class=\"dim-tree-children\">",
+      );
+      for (var j = 0; j < items.length; j++) {
+        var ob = items[j];
+        var st = ob.status || "pending";
+        var jsSt = ob.jsStatus || st;
+        var rsSt = ob.rustStatus || "skipped";
+        var agree = ob.agree !== false;
+        var color =
+          st === "proved"
+            ? "#16a34a"
+            : st === "refuted" || st === "missing"
+              ? "#dc2626"
+              : "#ca8a04";
+        rows.push(
+          '<li class="dim-tree-node">' +
+            '<div class="dim-tree-row" style="cursor:default">' +
+            '<span class="dim-tree-label">' +
+            escapeHtml(ob.name || "(anon)") +
+            ' <small style="color:#64748b">(' +
+            escapeHtml(ob.kind || "fn") +
+            ")</small></span>" +
+            '<span class="dim-tree-stats" style="color:' +
+            color +
+            '">' +
+            escapeHtml(st) +
+            " · js=" +
+            escapeHtml(jsSt) +
+            " · rust=" +
+            escapeHtml(rsSt) +
+            (agree ? " · agree" : " · DISAGREE") +
+            "</span></div></li>",
+        );
+      }
+      rows.push("</ul></li>");
+    }
+
+    return (
+      '<section class="dim-test-verify" style="margin:1.25rem 0 0">' +
+      "<h2>Formal verification</h2>" +
+      '<p class="dim-test-meta"><strong>' +
+      (summary.proved || 0) +
+      "</strong> proved, <strong>" +
+      (summary.refuted || 0) +
+      "</strong> refuted, <strong>" +
+      (summary.unsupported || 0) +
+      "</strong> unsupported, <strong>" +
+      (summary.missing || 0) +
+      "</strong> missing, <strong>" +
+      (summary.disagreements || 0) +
+      "</strong> disagreements</p>" +
+      '<ul class="dim-tree" data-dim-tree-kind="verify">' +
+      rows.join("") +
+      "</ul></section>"
+    );
+  }
+
   function paintCoverageHtml(opts) {
     opts = opts || {};
     var bucket = normalizeCoverBucket(opts.bucket);
@@ -1812,6 +1931,7 @@
           ? '<p class="dim-test-meta">No unit tests in this run.</p>'
           : "")) +
       paintCoverageHtml({ bucket: "unit", title: "Coverage" }) +
+      paintVerificationHtml(lastVerification) +
       e2eHtml;
 
     if (savedPreview) {
@@ -1863,7 +1983,50 @@
         total: total,
         coverage: coverSummary({ bucket: "unit" }),
         coverageE2e: coverSummary({ bucket: "e2e" }),
+        verification: lastVerification,
       };
+    }
+
+    function runVerification() {
+      lastVerification = null;
+      var v = global.DimTest && global.DimTest.verify;
+      if (!v || typeof v.runDual !== "function") return null;
+      try {
+        var parseFn =
+          global.DimParse && global.DimParse.parse
+            ? global.DimParse.parse.bind(global.DimParse)
+            : null;
+        var rustProve = null;
+        if (global.DimVerifyRust && typeof global.DimVerifyRust.prove === "function") {
+          rustProve = function (ob) {
+            return global.DimVerifyRust.prove(ob);
+          };
+        }
+        lastVerification = v.runDual(parseFn, rustProve);
+        return lastVerification;
+      } catch (err) {
+        lastVerification = {
+          summary: {
+            proved: 0,
+            refuted: 0,
+            unsupported: 1,
+            missing: 0,
+            disagreements: 0,
+          },
+          obligations: [
+            {
+              name: "verify-run",
+              file: "(harness)",
+              kind: "engine",
+              status: "unsupported",
+              reason: String(err && err.message ? err.message : err),
+              agree: true,
+            },
+          ],
+          missing: [],
+        };
+        return lastVerification;
+      }
     }
 
     function publish(runningName) {
@@ -1882,6 +2045,7 @@
 
     function next() {
       if (index >= suite.length) {
+        runVerification();
         var summary = {
           done: true,
           passed: passed,
@@ -1899,6 +2063,17 @@
           total: total,
           coverage: coverSummary({ bucket: "unit" }),
           coverageE2e: coverSummary({ bucket: "e2e" }),
+          verification: lastVerification
+            ? {
+                proved: (lastVerification.summary || {}).proved || 0,
+                refuted: (lastVerification.summary || {}).refuted || 0,
+                unsupported: (lastVerification.summary || {}).unsupported || 0,
+                missing: (lastVerification.summary || {}).missing || 0,
+                disagreements:
+                  (lastVerification.summary || {}).disagreements || 0,
+                obligations: lastVerification.obligations || [],
+              }
+            : null,
         };
         global.__DIM_TEST__ = summary;
         paintReport(summary);

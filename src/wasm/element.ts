@@ -20,6 +20,7 @@ import { useStore } from "../core/store/useStore";
 import { useViewTransition } from "../core/transitions/useViewTransition.js";
 import { AutoTransitionHost } from "../core/transitions/auto-transition-host.js";
 import { useFS as _useFS } from "../core/fs/useFS.js";
+import { validateProps } from "../core/contracts/contract.js";
 
 export class DimElement extends HTMLElement {
   [key: string]: any;
@@ -116,7 +117,15 @@ export function createComponentProps(
  * Register a functional component as a custom element.
  * Stamps `component.tag = tag` and returns the component for useScope({ Comp }).
  */
-export function define({ tag, component: CustomFunctionalComponent }) {
+export function define({
+  tag,
+  component: CustomFunctionalComponent,
+  inputs = null,
+}: {
+  tag: string;
+  component: any;
+  inputs?: any;
+}) {
   class DimComponent extends DimElement {
     constructor() {
       super();
@@ -230,7 +239,21 @@ export function define({ tag, component: CustomFunctionalComponent }) {
           childElements,
         );
 
-        result = CustomFunctionalComponent(componentProps, sharedDependencies);
+        let props = componentProps;
+        if (inputs) {
+          const checked = validateProps(inputs, componentProps);
+          if (checked.ok) {
+            props = checked.value;
+          } else {
+            console.error(
+              `[dim] <${tag}> props rejected at ${checked.path}: ${checked.reason}`,
+            );
+            props = null;
+          }
+        }
+        result = props
+          ? CustomFunctionalComponent(props, sharedDependencies)
+          : html``;
       } finally {
         wasm.endRender();
       }
@@ -253,6 +276,7 @@ export function define({ tag, component: CustomFunctionalComponent }) {
   }
 
   CustomFunctionalComponent.tag = tag;
+  CustomFunctionalComponent.inputs = inputs;
   return CustomFunctionalComponent;
 }
 

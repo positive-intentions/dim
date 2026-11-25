@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 dim-spec-core = { path = "../dim-spec-core" }
+dim-contract-core = { path = "../dim-contract-core" }
 wasm-bindgen = { version = "0.2.100", features = ["enable-interning"] }
 js-sys = "0.3.77"
 web-sys = { version = "0.3.77", features = [

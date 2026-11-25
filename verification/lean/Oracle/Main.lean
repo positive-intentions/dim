@@ -1,4 +1,6 @@
 import Dim.Spec.Policy
+import Oracle.Validate
+import Oracle.Cert
 
 /-!
   JSON-lines oracle: reads requests from stdin, writes responses to stdout.
@@ -63,6 +65,8 @@ def hasSubstr (haystack needle : String) : Bool :=
 def handleLine (line : String) : String :=
   let line := line.trim
   if line.isEmpty then okResult ""
+  else if hasSubstr line "\"op\":\"validate\"" then Oracle.Validate.handle line
+  else if hasSubstr line "\"op\":\"checkCert\"" then Oracle.Cert.handle line
   else if hasSubstr line "\"ping\"" then okResult "pong"
   else if hasSubstr line "\"sanitizeUrl\"" then
     match extractStringField line "name", extractStringField line "value" with

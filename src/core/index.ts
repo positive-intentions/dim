@@ -47,3 +47,12 @@ export {
 
 // File system
 export { useFS } from "./fs/useFS.js";
+
+// Contracts (typed inputs / outputs, verified by src/verify)
+export {
+  t,
+  contract,
+  fold,
+  validateValue,
+  getValidatorEngine,
+} from "./contracts/index.js";

@@ -8,6 +8,9 @@ package «dim-verify» where
 lean_lib Dim where
   roots := #[`Dim]
 
+lean_lib OracleSupport where
+  roots := #[`Oracle.Validate, `Oracle.Cert]
+
 lean_exe «dim-oracle» where
   root := `Oracle.Main
   supportInterpreter := true

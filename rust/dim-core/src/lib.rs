@@ -6,6 +6,8 @@
 pub mod template;
 
 #[cfg(target_arch = "wasm32")]
+pub mod contracts;
+#[cfg(target_arch = "wasm32")]
 pub mod css;
 #[cfg(target_arch = "wasm32")]
 pub mod dom;

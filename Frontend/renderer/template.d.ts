@@ -11,16 +11,13 @@ export function keyed(key: any, result: any): {
 };
 /**
  * Render a string as HTML (trusted content only).
+ * When Trusted Types is enforced, pass a TrustedHTML value or a string that
+ * the installed `dim` policy will create.
  */
 export function unsafeHTML(value: any): {
     _$dimType$: 3;
     value: any;
 };
-/**
- * Template result types and the public `html` tagged template.
- * Parts-based: updates values in place so focus, selection, and child
- * custom-element state survive re-renders.
- */
 /** @type {1} TemplateResult */
 export const HTML_RESULT: 1;
 /** @type {2} Keyed wrapper */

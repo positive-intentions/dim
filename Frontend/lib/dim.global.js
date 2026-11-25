@@ -16,20 +16,22 @@ var Dim = (function (exports) {
   __export(crypto_manager_exports, {
     default: () => exports.CryptoManager
   });
-  var DEFAULT_ITERATIONS, CryptoManager; exports.CryptoManager = void 0;
+  var DEFAULT_ITERATIONS, PAYLOAD_VERSION, CryptoManager; exports.CryptoManager = void 0;
   var init_crypto_manager = __esm({
     "src/core/store/crypto-manager.js"() {
       DEFAULT_ITERATIONS = 1e6;
+      PAYLOAD_VERSION = 2;
       CryptoManager = class {
+        /**
+         * @param {string} password
+         * @param {{ iterations?: number }} [options]
+         */
         constructor(password, options = {}) {
           this.password = password;
           this.iterations = options.iterations || DEFAULT_ITERATIONS;
           this._keyCache = /* @__PURE__ */ new Map();
           this.key = null;
-          this.keyPromise = this.generateKey(password).then((key) => {
-            this.key = key;
-            return key;
-          });
+          this.keyPromise = null;
         }
         arrayBufferToString(buffer) {
           const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
@@ -50,9 +52,7 @@ var Dim = (function (exports) {
           }
           return bytes;
         }
-        // Derive the deterministic fallback salt for a password (legacy behaviour).
-        // Only used when no explicit salt is supplied. Real encryption always uses
-        // a random per-record salt embedded in the payload.
+        // Derive the deterministic fallback salt for a password (legacy decrypt only).
         async _fallbackSalt(password) {
           const encoder = new TextEncoder();
           const hash = await crypto.subtle.digest(
@@ -63,20 +63,22 @@ var Dim = (function (exports) {
         }
         /**
          * Derive an AES-GCM key from a password and salt using PBKDF2.
+         * Keys are non-extractable.
          * @param {string} password
-         * @param {Uint8Array|ArrayBuffer} [salt] - random salt; falls back to a
-         *   deterministic salt derived from the password when omitted.
+         * @param {Uint8Array|ArrayBuffer} [salt]
+         * @param {number} [iterations]
          * @returns {Promise<CryptoKey>}
          */
-        async getKeyFromPassword(password, salt) {
+        async getKeyFromPassword(password, salt, iterations) {
           const encoder = new TextEncoder();
+          const iter = iterations || this.iterations;
           let saltBytes;
           if (salt === void 0 || salt === null) {
             saltBytes = await this._fallbackSalt(password);
           } else {
             saltBytes = salt instanceof Uint8Array ? salt : new Uint8Array(salt);
           }
-          const cacheKey = `${password}::${this.arrayBufferToString(saltBytes)}`;
+          const cacheKey = `${iter}::${this.arrayBufferToString(saltBytes)}`;
           if (this._keyCache.has(cacheKey)) {
             return this._keyCache.get(cacheKey);
           }
@@ -92,7 +94,7 @@ var Dim = (function (exports) {
               {
                 name: "PBKDF2",
                 salt: saltBytes,
-                iterations: this.iterations,
+                iterations: iter,
                 hash: "SHA-256"
               },
               passwordKey,
@@ -100,24 +102,26 @@ var Dim = (function (exports) {
                 name: "AES-GCM",
                 length: 256
               },
-              true,
+              false,
+              // non-extractable
               ["encrypt", "decrypt"]
             );
           })();
           this._keyCache.set(cacheKey, keyPromise);
           return keyPromise;
         }
-        // Legacy wrapper retained for backwards compatibility.
+        // Legacy wrapper — still derives with fallback salt (decrypt/compat only).
         async generateKey(password) {
           const key = await this.getKeyFromPassword(password);
           this.key = key;
+          this.keyPromise = Promise.resolve(key);
           return key;
         }
         async encryptData(data) {
           const enc = new TextEncoder();
           const iv = crypto.getRandomValues(new Uint8Array(12));
           const salt = crypto.getRandomValues(new Uint8Array(16));
-          const key = await this.getKeyFromPassword(this.password, salt);
+          const key = await this.getKeyFromPassword(this.password, salt, this.iterations);
           const dataString = typeof data === "string" ? data : JSON.stringify(data);
           const encryptedData = await crypto.subtle.encrypt(
             {
@@ -128,9 +132,11 @@ var Dim = (function (exports) {
             enc.encode(dataString)
           );
           return JSON.stringify({
-            encryptedData: this.arrayBufferToString(encryptedData),
+            v: PAYLOAD_VERSION,
+            iter: this.iterations,
+            salt: this.arrayBufferToString(salt),
             iv: this.arrayBufferToString(iv),
-            salt: this.arrayBufferToString(salt)
+            encryptedData: this.arrayBufferToString(encryptedData)
           });
         }
         async decryptData(encryptedPayload) {
@@ -147,7 +153,8 @@ var Dim = (function (exports) {
           if (!payload || typeof payload !== "object") {
             throw new Error("Invalid encrypted payload format");
           }
-          const { encryptedData, iv, salt } = payload;
+          const encryptedData = payload.encryptedData || payload.data;
+          const { iv, salt, iter } = payload;
           if (!encryptedData || !iv) {
             throw new Error("Invalid encrypted payload: missing encryptedData or iv");
           }
@@ -157,7 +164,12 @@ var Dim = (function (exports) {
             );
           }
           const saltBytes = salt ? new Uint8Array(this.stringToArrayBuffer(salt)) : void 0;
-          const key = await this.getKeyFromPassword(this.password, saltBytes);
+          const iterations = typeof iter === "number" && iter > 0 ? iter : this.iterations;
+          const key = await this.getKeyFromPassword(
+            this.password,
+            saltBytes,
+            iterations
+          );
           try {
             const decryptedData = await crypto.subtle.decrypt(
               {
@@ -182,6 +194,9 @@ var Dim = (function (exports) {
                 throw new Error(
                   "Decryption returned encrypted payload structure - possible password mismatch"
                 );
+              }
+              if (parseError instanceof Error && parseError.message.includes("encrypted payload structure")) {
+                throw parseError;
               }
               return decryptedString;
             }
@@ -263,6 +278,53 @@ var Dim = (function (exports) {
     return new CSSResult(cssText, strings, constructionToken);
   };
 
+  // src/core/renderer/pure/static-strings.js
+  function expandSelfClosing(input) {
+    return input.replace(
+      /<([a-z][a-z0-9]*-[a-z0-9-]*)([^>]*?)\s*\/>/gi,
+      "<$1$2></$1>"
+    );
+  }
+  function processStaticStrings(strings, normalizeJson) {
+    if (!strings || strings.length === 0) return null;
+    const valueCount = strings.length - 1;
+    let fullTemplate = strings[0];
+    for (let i = 0; i < valueCount; i++) {
+      fullTemplate += `__VALUE_${i}__` + strings[i + 1];
+    }
+    const original = fullTemplate;
+    fullTemplate = expandSelfClosing(fullTemplate);
+    const objectAttrRegex = /(\w+)=\{\{([^}]+)\}\}/g;
+    const replacements = [];
+    let match;
+    while ((match = objectAttrRegex.exec(fullTemplate)) !== null) {
+      const [fullMatch, attrName, attrValue] = match;
+      const json = normalizeJson("{" + attrValue + "}");
+      if (json != null) {
+        replacements.push({
+          from: fullMatch,
+          to: `${attrName}='${json}'`
+        });
+      }
+    }
+    for (const replacement of replacements) {
+      fullTemplate = fullTemplate.replace(replacement.from, replacement.to);
+    }
+    if (fullTemplate === original) {
+      return null;
+    }
+    const parts = fullTemplate.split(/__VALUE_(\d+)__/);
+    const newStrings = [];
+    newStrings.push(parts[0]);
+    for (let i = 1; i < parts.length; i += 2) {
+      newStrings.push(parts[i + 1] || "");
+    }
+    while (newStrings.length < valueCount + 1) {
+      newStrings.push("");
+    }
+    return newStrings;
+  }
+
   // src/core/renderer/template.js
   var HTML_RESULT = 1;
   var KEYED_RESULT = 2;
@@ -277,74 +339,33 @@ var Dim = (function (exports) {
     return value != null && typeof value === "object" && value._$dimType$ === UNSAFE_HTML_RESULT;
   }
   var processedStringsCache = /* @__PURE__ */ new WeakMap();
-  function processStaticStrings(strings) {
-    const valueCount = strings.length - 1;
-    let fullTemplate = strings[0];
-    for (let i = 0; i < valueCount; i++) {
-      fullTemplate += `__VALUE_${i}__` + strings[i + 1];
+  function normalizeJsonObjectLiteral(bodyWithBraces) {
+    try {
+      const objValue = JSON.parse(bodyWithBraces);
+      return JSON.stringify(objValue);
+    } catch {
+      console.warn(
+        "Failed to parse object attribute as JSON (use .props for functions/non-JSON values):",
+        bodyWithBraces
+      );
+      return null;
     }
-    const original = fullTemplate;
-    fullTemplate = fullTemplate.replace(
-      /<([a-z][a-z0-9]*-[a-z0-9-]*)([^>]*?)\s*\/>/gi,
-      "<$1$2></$1>"
-    );
-    const objectAttrRegex = /(\w+)=\{\{([^}]+)\}\}/g;
-    let replacements = [];
-    let match;
-    while ((match = objectAttrRegex.exec(fullTemplate)) !== null) {
-      const [fullMatch, attrName, attrValue] = match;
-      try {
-        const objValue = JSON.parse("{" + attrValue + "}");
-        const jsonString = JSON.stringify(objValue);
-        replacements.push({
-          from: fullMatch,
-          to: `${attrName}='${jsonString}'`
-        });
-      } catch (e) {
-        console.warn(
-          "Failed to parse object attribute as JSON (use .props for functions/non-JSON values):",
-          attrValue
-        );
-      }
-    }
-    replacements.forEach((replacement) => {
-      fullTemplate = fullTemplate.replace(replacement.from, replacement.to);
-    });
-    if (fullTemplate === original) {
-      return strings;
-    }
-    const parts = fullTemplate.split(/__VALUE_(\d+)__/);
-    const newStrings = [];
-    newStrings.push(parts[0]);
-    for (let i = 1; i < parts.length; i += 2) {
-      newStrings.push(parts[i + 1] || "");
-    }
-    while (newStrings.length < valueCount + 1) {
-      newStrings.push("");
-    }
-    newStrings.raw = [...newStrings];
-    return newStrings;
+  }
+  function processCached(strings) {
+    const processed = processStaticStrings(strings, normalizeJsonObjectLiteral);
+    if (!processed) return strings;
+    processed.raw = [...processed];
+    return processed;
   }
   var html = (strings, ...values) => {
-    if (!strings || !strings.raw) {
-      if (typeof strings === "string") {
-        const templateStrings = [strings];
-        templateStrings.raw = [strings];
-        return {
-          _$dimType$: HTML_RESULT,
-          strings: templateStrings,
-          values
-        };
-      }
-      return {
-        _$dimType$: HTML_RESULT,
-        strings,
-        values
-      };
+    if (!strings || typeof strings !== "object" || !Array.isArray(strings.raw) || !Array.isArray(strings)) {
+      throw new Error(
+        "html`...` requires a template literal (TemplateStringsArray with .raw). Do not call html() with a plain string or crafted array."
+      );
     }
     let processedStrings = processedStringsCache.get(strings);
     if (!processedStrings) {
-      processedStrings = processStaticStrings(strings);
+      processedStrings = processCached(strings);
       processedStringsCache.set(strings, processedStrings);
     }
     return {
@@ -362,10 +383,7 @@ var Dim = (function (exports) {
   var renderChildren = (children) => {
     if (!children) return html``;
     if (typeof children === "string") {
-      if (children.includes("-") && children.includes("<") && children.includes(">")) {
-        return html`<slot></slot>`;
-      }
-      return html`${unsafeHTML(children)}`;
+      return html`${children}`;
     }
     if (Array.isArray(children)) {
       return html`<slot></slot>`;
@@ -425,14 +443,89 @@ var Dim = (function (exports) {
     }
   }
 
-  // src/core/renderer/prepare.js
+  // src/core/renderer/pure/policy.js
   var CHILD_PART = 0;
   var ATTR_PART = 1;
   var PROP_PART = 2;
   var EVENT_PART = 3;
   var BOOL_PART = 4;
   var REF_PART = 5;
-  var templateCache = /* @__PURE__ */ new WeakMap();
+  var FORBIDDEN_ATTR_NAMES = /* @__PURE__ */ new Set(["srcdoc"]);
+  var FORBIDDEN_PROP_NAMES = /* @__PURE__ */ new Set(["innerHTML", "outerHTML"]);
+  var URL_ATTR_NAMES = /* @__PURE__ */ new Set([
+    "href",
+    "src",
+    "action",
+    "formaction",
+    "xlink:href",
+    "poster",
+    "ping"
+  ]);
+  var ALLOWED_SCHEMES = /* @__PURE__ */ new Set(["http:", "https:", "mailto:", "tel:"]);
+  function isEventHandlerAttr(name) {
+    if (!name || name.length < 3) return false;
+    const lower2 = name.toLowerCase();
+    return lower2.startsWith("on") && /^[a-z]+$/.test(lower2.slice(2));
+  }
+  function checkBindingPolicy(kind, name) {
+    if (kind === ATTR_PART) {
+      const lower2 = String(name || "").toLowerCase();
+      if (isEventHandlerAttr(lower2)) {
+        return {
+          ok: false,
+          reason: `Attribute binding "${name}" is forbidden; use @${lower2.slice(2)} instead of on* attributes`
+        };
+      }
+      if (FORBIDDEN_ATTR_NAMES.has(lower2)) {
+        return {
+          ok: false,
+          reason: `Attribute binding "${name}" is forbidden`
+        };
+      }
+    }
+    if (kind === PROP_PART) {
+      if (FORBIDDEN_PROP_NAMES.has(String(name || ""))) {
+        return {
+          ok: false,
+          reason: `Property binding ".${name}" is forbidden; use text children or unsafeHTML for trusted HTML`
+        };
+      }
+    }
+    return { ok: true };
+  }
+  function sanitizeUrl(name, value) {
+    if (value == null || value === false) return "";
+    const raw = String(value).trim();
+    if (!raw) return "";
+    const lowerName = String(name || "").toLowerCase();
+    const lower2 = raw.toLowerCase();
+    if (raw.startsWith("//")) {
+      return "about:invalid#dim";
+    }
+    const colon = raw.indexOf(":");
+    if (colon > 0) {
+      const scheme = lower2.slice(0, colon + 1);
+      if (ALLOWED_SCHEMES.has(scheme)) {
+        return raw;
+      }
+      if (lowerName === "src" && scheme === "data:" && /^data:image\/[a-z0-9.+-]+/i.test(raw)) {
+        return raw;
+      }
+      if (scheme === "about:" && lower2.startsWith("about:invalid")) {
+        return "about:invalid#dim";
+      }
+      return "about:invalid#dim";
+    }
+    return raw;
+  }
+  function isUrlAttr(name) {
+    return URL_ATTR_NAMES.has(String(name || "").toLowerCase());
+  }
+  function escapeText(text) {
+    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  // src/core/renderer/pure/prepare.js
   var COMMENT_MARKER = `<!--{{dim}}-->`;
   var TEXT_MARKER = `\uFFF0dim\uFFF1`;
   var RAW_TEXT_TAGS = /* @__PURE__ */ new Set(["style", "script", "textarea", "title"]);
@@ -483,18 +576,17 @@ var Dim = (function (exports) {
         matchLength: partial[0].length,
         valuePrefix,
         valueSuffix: "",
-        // filled in prepareTemplate from the next string
         partial: true
       };
     }
     return { kind: CHILD_PART };
   }
   function isInsideRawText(htmlSoFar) {
-    const lower = htmlSoFar.toLowerCase();
+    const lower2 = htmlSoFar.toLowerCase();
     let inRaw = null;
     const tagRe = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi;
     let m;
-    while ((m = tagRe.exec(lower)) !== null) {
+    while ((m = tagRe.exec(lower2)) !== null) {
       const name = m[1];
       const isClose = m[0][1] === "/";
       if (RAW_TEXT_TAGS.has(name)) {
@@ -507,12 +599,14 @@ var Dim = (function (exports) {
     }
     return inRaw != null;
   }
-  function prepareTemplate(strings) {
-    const element = document.createElement("template");
-    const segs = [...strings];
+  function prepare(strings) {
+    const segs = Array.from(strings, (s) => String(s));
     const parts = [];
     let out = "";
     let openAttr = null;
+    if (segs.length === 0) {
+      return { html: out, parts };
+    }
     for (let i = 0; i < segs.length - 1; i++) {
       const s = segs[i];
       if (openAttr) {
@@ -530,11 +624,14 @@ var Dim = (function (exports) {
             openAttr = null;
           }
         }
+        const policy2 = checkBindingPolicy(ATTR_PART, attrName);
+        if (!policy2.ok) throw new Error(policy2.reason);
         parts.push({
           kind: ATTR_PART,
           name: attrName,
           valuePrefix,
-          valueSuffix
+          valueSuffix,
+          rawText: false
         });
         continue;
       }
@@ -542,8 +639,16 @@ var Dim = (function (exports) {
       if (binding.kind === CHILD_PART) {
         const rawText = isInsideRawText(out + s);
         out += s + (rawText ? TEXT_MARKER : COMMENT_MARKER);
-        parts.push({ kind: CHILD_PART, rawText });
+        parts.push({
+          kind: CHILD_PART,
+          name: "",
+          valuePrefix: "",
+          valueSuffix: "",
+          rawText
+        });
       } else {
+        const policy2 = checkBindingPolicy(binding.kind, binding.name);
+        if (!policy2.ok) throw new Error(policy2.reason);
         out += s.slice(0, s.length - binding.matchLength) + ` data-dim-${i}=""`;
         let valueSuffix = binding.valueSuffix || "";
         const valuePrefix = binding.valuePrefix || "";
@@ -570,13 +675,49 @@ var Dim = (function (exports) {
           kind: binding.kind,
           name: binding.name,
           valuePrefix,
-          valueSuffix
+          valueSuffix,
+          rawText: false
         });
       }
     }
     out += segs[segs.length - 1];
-    element.innerHTML = out;
-    return { element, partInfo: parts };
+    return { html: out, parts };
+  }
+
+  // src/core/renderer/prepare.js
+  var templateCache = /* @__PURE__ */ new WeakMap();
+  var dimTrustedTypesPolicy = null;
+  function toTrustedHtml(htmlString) {
+    if (dimTrustedTypesPolicy === null) {
+      const tt = globalThis.trustedTypes;
+      if (tt && typeof tt.createPolicy === "function") {
+        try {
+          dimTrustedTypesPolicy = tt.createPolicy("dim", {
+            createHTML: (s) => s
+          });
+        } catch {
+          dimTrustedTypesPolicy = typeof tt.getPolicy === "function" ? tt.getPolicy("dim") : void 0;
+        }
+      } else {
+        dimTrustedTypesPolicy = void 0;
+      }
+    }
+    return dimTrustedTypesPolicy ? dimTrustedTypesPolicy.createHTML(htmlString) : htmlString;
+  }
+  function prepareTemplate(strings) {
+    const pure = prepare(strings);
+    const element = document.createElement("template");
+    element.innerHTML = toTrustedHtml(pure.html);
+    return {
+      element,
+      partInfo: pure.parts.map((p) => ({
+        kind: p.kind,
+        name: p.name,
+        valuePrefix: p.valuePrefix,
+        valueSuffix: p.valueSuffix,
+        rawText: p.rawText
+      }))
+    };
   }
   function linkAttrGroups(parts) {
     const byElement = /* @__PURE__ */ new Map();
@@ -696,10 +837,38 @@ var Dim = (function (exports) {
 
   // src/core/renderer/commit.js
   var containerState = /* @__PURE__ */ new WeakMap();
+  var dimTrustedTypesPolicy2 = null;
+  function getDimPolicy() {
+    if (dimTrustedTypesPolicy2 !== null) return dimTrustedTypesPolicy2;
+    const tt = globalThis.trustedTypes;
+    if (tt && typeof tt.createPolicy === "function") {
+      try {
+        dimTrustedTypesPolicy2 = tt.createPolicy("dim", {
+          createHTML: (s) => s
+        });
+      } catch {
+        dimTrustedTypesPolicy2 = typeof tt.getPolicy === "function" ? tt.getPolicy("dim") : void 0;
+      }
+    } else {
+      dimTrustedTypesPolicy2 = void 0;
+    }
+    return dimTrustedTypesPolicy2;
+  }
+  function toTrustedHtml2(htmlString) {
+    const policy2 = getDimPolicy();
+    if (policy2) return policy2.createHTML(htmlString);
+    return htmlString;
+  }
   function formatAttrMid(value) {
     if (value == null || value === false) return "";
     if (value === true) return "";
     return String(value);
+  }
+  function finalizeAttrValue(name, value) {
+    if (isUrlAttr(name)) {
+      return sanitizeUrl(name, value);
+    }
+    return value;
   }
   function commitAttrGroup(part) {
     const group = part.attrGroup;
@@ -710,7 +879,11 @@ var Dim = (function (exports) {
       if ((part.committed == null || part.committed === false) && !prefix && !suffix) {
         part.element.removeAttribute(part.name);
       } else {
-        part.element.setAttribute(part.name, prefix + mid + suffix);
+        const raw = prefix + mid + suffix;
+        part.element.setAttribute(
+          part.name,
+          finalizeAttrValue(part.name, raw)
+        );
       }
       return;
     }
@@ -721,7 +894,10 @@ var Dim = (function (exports) {
       result += formatAttrMid(g.committed);
     }
     result += group[group.length - 1].valueSuffix || "";
-    part.element.setAttribute(part.name, result);
+    part.element.setAttribute(
+      part.name,
+      finalizeAttrValue(part.name, result)
+    );
   }
   function clearNodesBetween(start, end) {
     let node = start.nextSibling;
@@ -749,14 +925,15 @@ var Dim = (function (exports) {
       return;
     }
     if (isUnsafeHTML(value)) {
-      const htmlString = value.value == null ? "" : String(value.value);
-      if (part.committed && isUnsafeHTML(part.committed) && part.committed.value === htmlString) {
+      const raw = value.value;
+      const htmlString = raw == null ? "" : typeof raw === "object" && raw !== null && "toString" in raw ? String(raw) : String(raw);
+      if (part.committed && isUnsafeHTML(part.committed) && part.committed.value === value.value) {
         return;
       }
       clearNodesBetween(part.start, part.end);
       if (htmlString) {
         const tpl = document.createElement("template");
-        tpl.innerHTML = htmlString;
+        tpl.innerHTML = toTrustedHtml2(htmlString);
         part.end.parentNode.insertBefore(tpl.content, part.end);
       }
       part.committed = value;
@@ -1124,8 +1301,8 @@ var Dim = (function (exports) {
   }
   function readProp(obj, name) {
     if (obj[name] !== void 0) return obj[name];
-    const lower = name.toLowerCase();
-    const key = Object.keys(obj).find((k) => k.toLowerCase() === lower);
+    const lower2 = name.toLowerCase();
+    const key = Object.keys(obj).find((k) => k.toLowerCase() === lower2);
     return key !== void 0 ? obj[key] : void 0;
   }
   function createComponentProps(attributes, hostProps, children, childElements) {
@@ -1138,9 +1315,9 @@ var Dim = (function (exports) {
     return new Proxy(rawProps, {
       get(target, key) {
         if (typeof key === "string" && !(key in target)) {
-          const lower = key.toLowerCase();
+          const lower2 = key.toLowerCase();
           const match = Object.keys(target).find(
-            (k) => k.toLowerCase() === lower
+            (k) => k.toLowerCase() === lower2
           );
           if (match !== void 0) return target[match];
         }
@@ -2529,6 +2706,15 @@ var Dim = (function (exports) {
   }
 
   // src/core/fs/useFS.js
+  function pathSegments(path) {
+    const parts = String(path || "").split("/").filter(Boolean);
+    for (const part of parts) {
+      if (part === "." || part === "..") {
+        throw new Error(`useFS: invalid path segment "${part}"`);
+      }
+    }
+    return parts;
+  }
   function useFS(options = {}, hooks) {
     const { opfs = false, encrypt = false, encryptionPassword } = options;
     const { useState: useState2, useEffect: useEffect2, useStore: useStore2 } = hooks;
@@ -2784,7 +2970,7 @@ var Dim = (function (exports) {
         const dirHandle = await getCurrentDirectoryHandle();
         let targetHandle = dirHandle;
         if (path) {
-          const pathParts = path.split("/").filter(Boolean);
+          const pathParts = pathSegments(path);
           for (const part of pathParts) {
             targetHandle = await targetHandle.getDirectoryHandle(part);
           }
@@ -2815,7 +3001,7 @@ var Dim = (function (exports) {
         const dirHandle = await getCurrentDirectoryHandle();
         let targetHandle = dirHandle;
         if (path) {
-          const pathParts = path.split("/").filter(Boolean);
+          const pathParts = pathSegments(path);
           for (const part of pathParts) {
             targetHandle = await targetHandle.getDirectoryHandle(part);
           }
@@ -2873,7 +3059,7 @@ var Dim = (function (exports) {
         }
         let targetHandle = dirHandle;
         if (path) {
-          const pathParts = path.split("/").filter(Boolean);
+          const pathParts = pathSegments(path);
           for (const part of pathParts) {
             try {
               targetHandle = await targetHandle.getDirectoryHandle(part);
@@ -2927,7 +3113,7 @@ var Dim = (function (exports) {
       }
       let targetHandle = dirHandle;
       if (path) {
-        const pathParts = path.split("/").filter(Boolean);
+        const pathParts = pathSegments(path);
         for (const part of pathParts) {
           try {
             targetHandle = await targetHandle.getDirectoryHandle(part);
@@ -2949,7 +3135,7 @@ var Dim = (function (exports) {
         const dirHandle = await getCurrentDirectoryHandle();
         let targetHandle = dirHandle;
         if (path) {
-          const pathParts = path.split("/").filter(Boolean);
+          const pathParts = pathSegments(path);
           for (const part of pathParts) {
             targetHandle = await targetHandle.getDirectoryHandle(part);
           }
@@ -2967,7 +3153,7 @@ var Dim = (function (exports) {
         const dirHandle = await getCurrentDirectoryHandle();
         let targetHandle = dirHandle;
         if (path) {
-          const pathParts = path.split("/").filter(Boolean);
+          const pathParts = pathSegments(path);
           for (const part of pathParts) {
             targetHandle = await targetHandle.getDirectoryHandle(part);
           }
@@ -3093,8 +3279,345 @@ var Dim = (function (exports) {
     };
   }
 
+  // src/core/contracts/validate.js
+  var UNDEF = Object.freeze({ $u: 1 });
+  var NOOP_FN = Object.freeze({ $fn: -1 });
+  function isPlaceholder(v, key) {
+    if (v === null || typeof v !== "object" || Array.isArray(v)) return false;
+    const keys = Object.keys(v);
+    return keys.length === 1 && keys[0] === key;
+  }
+  var PLACEHOLDER_KEYS = ["$u", "$fn", "$o", "$nf"];
+  function isRecordValue(v) {
+    if (v === null || typeof v !== "object" || Array.isArray(v)) return false;
+    return !PLACEHOLDER_KEYS.some((k) => isPlaceholder(v, k));
+  }
+  var ASCII_WS = /* @__PURE__ */ new Set([" ", "	", "\n", "\v", "\f", "\r"]);
+  function trimAscii(s) {
+    let a = 0;
+    let b = s.length;
+    while (a < b && ASCII_WS.has(s[a])) a += 1;
+    while (b > a && ASCII_WS.has(s[b - 1])) b -= 1;
+    return s.slice(a, b);
+  }
+  function normalizeNewlines(s) {
+    return s.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  }
+  function truncate16(s, max) {
+    let out = "";
+    let len = 0;
+    for (const ch of s) {
+      if (len + ch.length > max) break;
+      out += ch;
+      len += ch.length;
+    }
+    return out;
+  }
+  function charAllowed(cls, ch) {
+    const c = ch.codePointAt(0);
+    switch (cls) {
+      case "id":
+        return c >= 48 && c <= 57 || c >= 65 && c <= 90 || c >= 97 && c <= 122 || c === 95 || c === 46 || c === 58 || c === 45;
+      case "digits":
+        return c >= 48 && c <= 57;
+      case "line":
+        return c === 9 || c >= 32 && c !== 127;
+      default:
+        return true;
+    }
+  }
+  function filterChars(cls, s) {
+    let out = "";
+    for (const ch of s) if (charAllowed(cls, ch)) out += ch;
+    return out;
+  }
+  var ok = (value) => ({ ok: true, value });
+  function fail(s, path, reason) {
+    if (s.coerce && Object.prototype.hasOwnProperty.call(s, "default")) {
+      return ok(s.default);
+    }
+    return { ok: false, path, reason };
+  }
+  function propagate(s, r) {
+    if (r.ok) return r;
+    if (s.coerce && Object.prototype.hasOwnProperty.call(s, "default")) {
+      return ok(s.default);
+    }
+    return r;
+  }
+  var INT_STRING = /^-?[0-9]{1,15}$/;
+  function validateNumber(s, path, n) {
+    if (n >= s.min && n <= s.max) return ok(n);
+    if (s.coerce) return ok(n < s.min ? s.min : s.max);
+    return fail(s, path, "out of range");
+  }
+  function validate(s, v, path = "$") {
+    switch (s.k) {
+      case "any":
+        return ok(v);
+      case "bool":
+        if (typeof v === "boolean") return ok(v);
+        if (s.coerce && typeof v === "string") {
+          if (v === "true" || v === "") return ok(true);
+          if (v === "false") return ok(false);
+        }
+        return fail(s, path, "expected boolean");
+      case "int":
+        if (typeof v === "number" && Number.isInteger(v)) {
+          return validateNumber(s, path, v);
+        }
+        if (s.coerce && typeof v === "string" && INT_STRING.test(v)) {
+          return validateNumber(s, path, Number(v));
+        }
+        return fail(s, path, "expected integer");
+      case "num":
+        if (typeof v === "number") return validateNumber(s, path, v);
+        return fail(s, path, "expected finite number");
+      case "str": {
+        if (typeof v !== "string") return fail(s, path, "expected string");
+        let out = s.nl ? normalizeNewlines(v) : v;
+        if (s.trim) out = trimAscii(out);
+        if (s.chars !== "any") {
+          const filtered = filterChars(s.chars, out);
+          if (filtered !== out) {
+            if (!s.coerce) return fail(s, path, `disallowed characters (${s.chars})`);
+            out = s.trim ? trimAscii(filtered) : filtered;
+          }
+        }
+        if (out.length > s.max) {
+          if (!s.coerce) return fail(s, path, `longer than ${s.max}`);
+          out = truncate16(out, s.max);
+          if (s.trim) out = trimAscii(out);
+        }
+        if (out.length < s.min) return fail(s, path, `shorter than ${s.min}`);
+        return ok(out);
+      }
+      case "text": {
+        if (typeof v !== "string") return fail(s, path, "expected string");
+        let out = v;
+        if (out.length > s.max) {
+          if (!s.coerce) return fail(s, path, `longer than ${s.max}`);
+          out = truncate16(out, s.max);
+        }
+        return ok(escapeText(out));
+      }
+      case "url":
+        if (typeof v !== "string") return fail(s, path, "expected url string");
+        return ok(sanitizeUrl(s.attr, v));
+      case "enum":
+        for (const x of s.values) if (x === v) return ok(v);
+        return fail(s, path, "not one of the allowed values");
+      case "rec": {
+        if (!isRecordValue(v)) return fail(s, path, "expected object");
+        const out = {};
+        for (const [name, fs] of s.fields) {
+          const has = Object.prototype.hasOwnProperty.call(v, name);
+          const r = validate(fs, has ? v[name] : UNDEF, `${path}.${name}`);
+          if (!r.ok) return propagate(s, r);
+          if (!isPlaceholder(r.value, "$u")) out[name] = r.value;
+        }
+        return ok(out);
+      }
+      case "arr": {
+        if (!Array.isArray(v)) return fail(s, path, "expected array");
+        let items = v;
+        if (items.length > s.max) {
+          if (!s.coerce) return fail(s, path, `more than ${s.max} items`);
+          items = items.slice(0, s.max);
+        }
+        const out = [];
+        for (let i = 0; i < items.length; i++) {
+          const r = validate(s.of, items[i], `${path}[${i}]`);
+          if (!r.ok) return propagate(s, r);
+          out.push(r.value);
+        }
+        if (out.length < s.min) return fail(s, path, `fewer than ${s.min} items`);
+        return ok(out);
+      }
+      case "opt":
+        if (isPlaceholder(v, "$u")) return ok(v);
+        return validate(s.of, v, path);
+      case "nullable":
+        if (v === null) return ok(null);
+        return propagate(s, validate(s.of, v, path));
+      case "union":
+        for (const alt of s.of) {
+          const r = validate(alt, v, path);
+          if (r.ok) return r;
+        }
+        return fail(s, path, "no union alternative matched");
+      case "fn":
+        if (isPlaceholder(v, "$fn")) return ok(v);
+        if (s.coerce) return ok(NOOP_FN);
+        return fail(s, path, "expected function");
+      default:
+        return { ok: false, path, reason: `unknown schema kind ${s.k}` };
+    }
+  }
+
+  // src/core/contracts/lower.js
+  function isPlainObject(v) {
+    if (v === null || typeof v !== "object") return false;
+    const proto = Object.getPrototypeOf(v);
+    return proto === Object.prototype || proto === null;
+  }
+  function lower(value) {
+    const fns = [];
+    const opaques = [];
+    const seen = /* @__PURE__ */ new Set();
+    const opaque = (v) => {
+      opaques.push(v);
+      return { $o: opaques.length - 1 };
+    };
+    const go = (v) => {
+      if (v === void 0) return UNDEF;
+      if (v === null || typeof v === "boolean" || typeof v === "string") return v;
+      if (typeof v === "number") return Number.isFinite(v) ? v : { $nf: String(v) };
+      if (typeof v === "function") {
+        fns.push(v);
+        return { $fn: fns.length - 1 };
+      }
+      if (typeof v !== "object") return opaque(v);
+      if (seen.has(v)) return opaque(v);
+      if (Array.isArray(v)) {
+        seen.add(v);
+        const out2 = v.map((x) => go(x));
+        seen.delete(v);
+        return out2;
+      }
+      if (!isPlainObject(v)) return opaque(v);
+      seen.add(v);
+      const out = {};
+      for (const key of Object.keys(v)) {
+        if (v[key] === void 0) continue;
+        out[key] = go(v[key]);
+      }
+      seen.delete(v);
+      return out;
+    };
+    return { value: go(value), fns, opaques };
+  }
+  var noop = () => {
+  };
+  function raise(schema, value, ctx, wrap) {
+    const go = (s, v) => {
+      if (v === null || typeof v !== "object") return v;
+      if (isPlaceholder(v, "$u")) return void 0;
+      if (isPlaceholder(v, "$fn")) {
+        const fn = v.$fn >= 0 ? ctx.fns[v.$fn] : noop;
+        return s && s.k === "fn" && wrap ? wrap(fn, s) : fn;
+      }
+      if (isPlaceholder(v, "$o")) return ctx.opaques[v.$o];
+      if (isPlaceholder(v, "$nf")) return Number(v.$nf);
+      const inner = s && (s.k === "opt" || s.k === "nullable") ? s.of : s;
+      if (Array.isArray(v)) {
+        const of = inner && inner.k === "arr" ? inner.of : null;
+        return v.map((x) => go(of, x));
+      }
+      const fieldSchema = (name) => {
+        if (!inner || inner.k !== "rec") return null;
+        const f = inner.fields.find((p) => p[0] === name);
+        return f ? f[1] : null;
+      };
+      const out = {};
+      for (const key of Object.keys(v)) out[key] = go(fieldSchema(key), v[key]);
+      return out;
+    };
+    return go(schema, value);
+  }
+
+  // src/core/contracts/engine.js
+  var engine = validate;
+  var engineName = "js";
+  function getValidatorEngine() {
+    return { engine, name: engineName };
+  }
+  function runValidator(schema, lowered) {
+    return engine(schema, lowered);
+  }
+
+  // src/core/contracts/contract.js
+  var wrapped = /* @__PURE__ */ new WeakMap();
+  function wrapCallback(fn, schema) {
+    if (!schema.args || schema.args.length === 0) return fn;
+    let bySchema = wrapped.get(fn);
+    if (!bySchema) {
+      bySchema = /* @__PURE__ */ new WeakMap();
+      wrapped.set(fn, bySchema);
+    }
+    const cached = bySchema.get(schema);
+    if (cached) return cached;
+    const wrapper = function(...args) {
+      const clean = validateArgs(schema.args, args, "callback");
+      if (!clean.ok) {
+        console.error(`[dim] callback payload rejected: ${clean.message}`);
+        return void 0;
+      }
+      return fn.apply(this, clean.values);
+    };
+    bySchema.set(schema, wrapper);
+    return wrapper;
+  }
+  function validateValue(schema, value) {
+    const lowered = lower(value);
+    const r = runValidator(schema, lowered.value);
+    if (!r.ok) return r;
+    return { ok: true, value: raise(schema, r.value, lowered, wrapCallback) };
+  }
+  function validateArgs(schemas, args, label) {
+    const values = [];
+    for (let i = 0; i < schemas.length; i++) {
+      const r = validateValue(schemas[i], args[i]);
+      if (!r.ok) {
+        return {
+          ok: false,
+          message: `${label} argument ${i} at ${r.path}: ${r.reason}`
+        };
+      }
+      values.push(r.value);
+    }
+    for (let i = schemas.length; i < args.length; i++) values.push(args[i]);
+    return { ok: true, values };
+  }
+  function contract(spec, fn) {
+    if (!spec || !Array.isArray(spec.args) || typeof fn !== "function") {
+      throw new TypeError("contract(spec, fn): spec.args array and fn required");
+    }
+    const name = spec.name || fn.name || "contract";
+    const contracted = function(...args) {
+      const clean = validateArgs(spec.args, args, name);
+      if (!clean.ok) throw new TypeError(`[dim] contract violation: ${clean.message}`);
+      return fn.apply(this, clean.values);
+    };
+    contracted.contract = spec;
+    contracted.impl = fn;
+    return contracted;
+  }
+  function fold(items, init, step, inv) {
+    return items.reduce(step, init);
+  }
+  var PASSTHROUGH = ["children", "childElements"];
+  function validateProps(inputs, props) {
+    const raw = {};
+    for (const [name] of inputs.fields) {
+      const v = props[name];
+      if (v !== void 0) raw[name] = v;
+    }
+    const r = validateValue(inputs, raw);
+    if (!r.ok) return r;
+    const out = r.value;
+    for (const key of PASSTHROUGH) {
+      if (!Object.prototype.hasOwnProperty.call(out, key)) out[key] = props[key];
+    }
+    return { ok: true, value: out };
+  }
+
   // src/core/element/define.ts
-  function define({ tag, component: CustomFunctionalComponent }) {
+  function define({
+    tag,
+    component: CustomFunctionalComponent,
+    inputs = null
+  }) {
     class DimComponent extends DimElement {
       constructor() {
         super();
@@ -3190,10 +3713,19 @@ var Dim = (function (exports) {
           children,
           childElements
         );
-        const result = CustomFunctionalComponent(
-          componentProps,
-          sharedDependencies
-        );
+        let props = componentProps;
+        if (inputs) {
+          const checked = validateProps(inputs, componentProps);
+          if (!checked.ok) {
+            setCurrentInstance(null);
+            console.error(
+              `[dim] <${tag}> props rejected at ${checked.path}: ${checked.reason}`
+            );
+            return html``;
+          }
+          props = checked.value;
+        }
+        const result = CustomFunctionalComponent(props, sharedDependencies);
         setCurrentInstance(null);
         if (autoTransition) {
           return this._transitionHost.wrapRender(autoTransition, result, html);
@@ -3210,21 +3742,118 @@ var Dim = (function (exports) {
       window.customElements.define(tag, DimComponent);
     }
     CustomFunctionalComponent.tag = tag;
+    CustomFunctionalComponent.inputs = inputs;
     return CustomFunctionalComponent;
   }
 
   // src/core/index.ts
   init_crypto_manager();
 
+  // src/core/contracts/t.js
+  var MAX_SAFE = 9007199254740991;
+  var DEFAULT_STR_MAX = 1e5;
+  var DEFAULT_ARR_MAX = 1e5;
+  function policy(node, opts) {
+    if (opts && opts.onInvalid === "coerce") node.coerce = true;
+    if (opts && Object.prototype.hasOwnProperty.call(opts, "default")) {
+      node.default = opts.default;
+    }
+    return node;
+  }
+  function num(v, fallback) {
+    return typeof v === "number" && Number.isFinite(v) ? v : fallback;
+  }
+  var CHAR_CLASSES = ["any", "id", "digits", "line"];
+  var t = {
+    any: () => ({ k: "any" }),
+    bool: (opts) => policy({ k: "bool" }, opts),
+    int: (opts = {}) => policy(
+      {
+        k: "int",
+        min: Math.trunc(num(opts.min, -9007199254740991)),
+        max: Math.trunc(num(opts.max, MAX_SAFE))
+      },
+      opts
+    ),
+    num: (opts = {}) => policy(
+      { k: "num", min: num(opts.min, -9007199254740991), max: num(opts.max, MAX_SAFE) },
+      opts
+    ),
+    string: (opts = {}) => {
+      const chars = CHAR_CLASSES.includes(opts.chars) ? opts.chars : "any";
+      return policy(
+        {
+          k: "str",
+          min: Math.max(0, Math.trunc(num(opts.min, 0))),
+          max: Math.max(0, Math.trunc(num(opts.max, DEFAULT_STR_MAX))),
+          trim: Boolean(opts.trim),
+          nl: Boolean(opts.normalizeNewlines),
+          chars
+        },
+        opts
+      );
+    },
+    /** Identifier: trimmed, non-empty, [A-Za-z0-9_.:-], at most `max` units. */
+    id: (opts = {}) => t.string({
+      min: 1,
+      max: num(opts.max, 128),
+      trim: true,
+      chars: "id",
+      ...opts
+    }),
+    /** Escaped text (proven: never contains '<'). */
+    text: (opts = {}) => policy(
+      { k: "text", max: Math.max(0, Math.trunc(num(opts.max, DEFAULT_STR_MAX))) },
+      opts
+    ),
+    /** URL for attribute `attr`, run through the proven sanitizeUrl. */
+    url: (opts = {}) => policy({ k: "url", attr: String(opts.attr || "href") }, opts),
+    enum: (values, opts) => policy({ k: "enum", values: values.slice() }, opts),
+    lit: (value, opts) => policy({ k: "enum", values: [value] }, opts),
+    record: (fields, opts) => policy(
+      { k: "rec", fields: Object.keys(fields).map((name) => [name, fields[name]]) },
+      opts
+    ),
+    array: (of, opts = {}) => policy(
+      {
+        k: "arr",
+        of,
+        min: Math.max(0, Math.trunc(num(opts.min, 0))),
+        max: Math.max(0, Math.trunc(num(opts.max, DEFAULT_ARR_MAX)))
+      },
+      opts
+    ),
+    optional: (of) => ({ k: "opt", of }),
+    nullable: (of, opts) => policy({ k: "nullable", of }, opts),
+    union: (alternatives, opts) => policy({ k: "union", of: alternatives.slice() }, opts),
+    /**
+     * Callback. Payloads are validated against `args` when called. A missing or
+     * non-function value becomes a no-op unless onInvalid: "reject".
+     */
+    fn: (args = [], ret, opts = {}) => {
+      const node = policy(
+        { k: "fn", args: args.slice(), ret: ret || { k: "any" } },
+        opts
+      );
+      if (opts.onInvalid !== "reject") node.coerce = true;
+      return node;
+    },
+    void: () => ({ k: "any" })
+  };
+
   exports.AsyncronousStateManager = async_manager_default;
   exports.DimElement = DimElement;
   exports.StorageManager = storage_manager_default;
+  exports.contract = contract;
   exports.css = css;
   exports.debouncedDispatcher = debouncedDispatcher;
   exports.define = define;
+  exports.fold = fold;
+  exports.getValidatorEngine = getValidatorEngine;
   exports.html = html;
   exports.keyed = keyed;
   exports.renderChildren = renderChildren;
+  exports.t = t;
   exports.unsafeCSS = unsafeCSS;
   exports.unsafeHTML = unsafeHTML;
   exports.useEffect = useEffect;
@@ -3237,6 +3866,7 @@ var Dim = (function (exports) {
   exports.useStore = useStore;
   exports.useStyle = useStyle;
   exports.useViewTransition = useViewTransition;
+  exports.validateValue = validateValue;
   exports.viewTransitionStyles = viewTransitionStyles;
 
   return exports;

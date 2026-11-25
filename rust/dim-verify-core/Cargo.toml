@@ -1,0 +1,24 @@
+[package]
+name = "dim-verify-core"
+version = "0.1.2"
+edition = "2021"
+license = "GPL-3.0"
+description = "Prover + certificate checker for Dim contracts (mirror of src/verify)"
+repository = "https://github.com/positive-intentions/dim"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "dim-verify-cli"
+path = "src/bin/cli.rs"
+
+[dependencies]
+dim-contract-core = { path = "../dim-contract-core" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { version = "0.2.100" }
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]

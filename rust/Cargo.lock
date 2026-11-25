@@ -108,9 +108,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "dim-core"
-version = "0.2.0"
+name = "dim-contract-core"
+version = "0.1.2"
 dependencies = [
+ "dim-spec-core",
+ "proptest",
+]
+
+[[package]]
+name = "dim-core"
+version = "0.1.2"
+dependencies = [
+ "dim-contract-core",
  "dim-spec-core",
  "js-sys",
  "wasm-bindgen",
@@ -119,11 +128,19 @@ dependencies = [
 
 [[package]]
 name = "dim-spec-core"
-version = "0.2.0"
+version = "0.1.2"
 dependencies = [
  "proptest",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "dim-verify-core"
+version = "0.1.2"
+dependencies = [
+ "dim-contract-core",
+ "wasm-bindgen",
 ]
 
 [[package]]

@@ -65,8 +65,14 @@ jobs:
       - name: Rust pure-core + oracle
         run: cargo test --manifest-path rust/dim-spec-core/Cargo.toml
 
-      - name: JS pure-core + oracle
-        run: npm test -- --testPathPattern='pure.test'
+      - name: Rust contract validator
+        run: cargo test --manifest-path rust/dim-contract-core/Cargo.toml
+
+      - name: Rust verify-core
+        run: cargo test --manifest-path rust/Cargo.toml -p dim-verify-core --lib
+
+      - name: JS pure-core + contracts + verify + oracle
+        run: npm test -- --testPathPattern='pure.test|contracts.test|conformance.test|verify.test'
 
   security:
     runs-on: ubuntu-latest

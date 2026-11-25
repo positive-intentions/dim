@@ -49,3 +49,12 @@ export {
 
 // File system
 export { useFS } from "../core/fs/useFS.js";
+
+// Contracts: same API, Rust validator installed by ./contracts
+export {
+  t,
+  contract,
+  fold,
+  validateValue,
+  getValidatorEngine,
+} from "./contracts";
