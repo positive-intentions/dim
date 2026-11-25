@@ -14,7 +14,7 @@
 
 <div align="center">
   
-[**Live Demo & Documentation**](https://dim.positive-intentions.com) | [**Getting Started**](https://dim.positive-intentions.com/?path=/docs/getting-started--docs) | [**Demo**](https://dim.positive-intentions.com/?path=/story/getting-started--live-demo) | [**API Reference**](https://dim.positive-intentions.com/?path=/docs/api-reference--docs)
+[**Docs**](https://positive-intentions.com/docs/projects/dim/getting-started) | [**Live Demo / Storybook**](https://dim.positive-intentions.com) | [**API Overview**](https://positive-intentions.com/docs/projects/dim/api-overview) | [**CDN**](https://positive-intentions.github.io/dim/lib/)
 
 </div>
 
@@ -41,29 +41,41 @@ Dim is a lightweight framework that brings React's component model and hooks to 
 
 > **Upgrading?** See [MIGRATION.md](MIGRATION.md) for API changes (including **0.1.2 security** hardening). See [CHANGELOG.md](CHANGELOG.md) for release notes. Vulnerability reports: [SECURITY.md](SECURITY.md).
 
-## Install
+## Use from `index.html` (CDN)
 
-```bash
-npm install @positive-intentions/dim
+Apps load Dim as a classic script. No npm install, no bundler:
+
+```html
+<!DOCTYPE html>
+<html>
+  <body>
+    <my-counter></my-counter>
+    <script src="https://positive-intentions.github.io/dim/lib/dim.global.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
 ```
+
+WASM: `…/dim/lib/dim.wasm.global.js`. Serve over HTTP (`python3 -m http.server`). See [Getting Started](https://positive-intentions.com/docs/projects/dim/getting-started).
 
 ## Features
 
 - **React-like DX** - Familiar hooks API (`useState`, `useEffect`, `useMemo`, etc.)
 - **Web Standards** - Built on native Web Components and Shadow DOM
 - **Scoped Styling** - CSS-in-JS with automatic style isolation
-- **Zero runtime deps** - Own template renderer; pure JS for the core (no React on the main entry)
+- **Zero runtime deps** - Own template renderer; pure JS for the core (no React on the CDN IIFE)
 - **Lightweight** - Parts-based updates preserve focus, selection, and child state
 - **State Persistence** - Built-in global state management with `useStore`
+- **CDN-first** - `window.Dim` from GitHub Pages; works from plain `index.html`
 
 ## Getting Started
 
 ### Quick Example
 
 ```javascript
-import { html, css, define, useState, useStyle } from "@positive-intentions/dim";
+// app.js — after dim.global.js
+const { define } = Dim;
 
-// Create a component
 const Counter = (props, { useState, html, css, useStyle }) => {
   const [count, setCount] = useState(0);
 
@@ -91,22 +103,20 @@ const Counter = (props, { useState, html, css, useStyle }) => {
   `;
 };
 
-// Register as custom element
 define({ tag: "my-counter", component: Counter });
-
-// Use it
-// <my-counter></my-counter>
 ```
 
-### React interop
+Hooks and `html`/`css` come from the component’s **second argument** (injected by `define`).
 
-The main package entry does **not** import React, so it works with native ES modules in the browser. For the React hook that shares Dim's encrypted store:
+### React interop (npm exception)
+
+CDN apps use `window.Dim` only. Mixed React + Dim trees are the exception — use the package subpath:
 
 ```javascript
 import { useDimStore } from "@positive-intentions/dim/react";
 ```
 
-`react` is an optional peer dependency required only when you use this subpath.
+`react` is an optional peer. See [useDimStore docs](https://positive-intentions.com/docs/projects/dim/use-dim-store-react).
 
 ## Core Concepts
 
@@ -250,87 +260,34 @@ Dim ships a second, drop-in runtime whose renderer core (template
 preparation, commit/diff, focus preservation), hook bookkeeping, update
 scheduling, style flushing and prop parsing are written in Rust
 (`rust/dim-core`, plain `wasm-bindgen` + `web-sys`) and compiled to
-WebAssembly. The public JS API is identical, so existing components run
-unchanged; only the import changes. Stores, crypto, storage, view transitions
-and `useFS` are shared with the JS runtime.
+WebAssembly. The public API on `window.Dim` is identical; only the script URL
+changes. Stores, crypto, storage, view transitions and `useFS` are shared with
+the JS runtime.
 
-| Entry                                  | Loads WASM                               | Works from `file://` |
-| -------------------------------------- | ---------------------------------------- | -------------------- |
-| `@positive-intentions/dim`             | — (pure JS)                              | no (ES module)\*     |
-| `@positive-intentions/dim/global`      | — (pure JS, classic → `window.Dim`)      | **yes**              |
-| `@positive-intentions/dim/wasm`        | inlined (base64, `initSync`)             | no (ES module)\*     |
-| `@positive-intentions/dim/wasm/split`  | `fetch` of `dim_core_bg.wasm` (streamed) | no                   |
-| `@positive-intentions/dim/wasm/global` | inlined, classic script → `window.Dim`   | **yes**              |
-
-\* Chrome refuses `<script type="module">` on `file://` (an opaque origin), for
-either runtime. Classic scripts (`./global` and `./wasm/global`) still work.
+| CDN file | Runtime |
+| -------- | ------- |
+| `https://positive-intentions.github.io/dim/lib/dim.global.js` | Pure JS (default) |
+| `https://positive-intentions.github.io/dim/lib/dim.wasm.global.js` | Rust core, WASM inlined |
 
 ### Switching runtimes
 
-With an import map, swap one line:
+Load the matching CDN script (or use `?impl=js|wasm` in dimui / dim-boilerplate):
 
 ```html
-<script type="importmap">
-  {
-    "imports": {
-      "@positive-intentions/dim": "./node_modules/@positive-intentions/dim/dist/wasm/index.mjs"
-    }
-  }
-</script>
-```
-
-Or import it directly: `import { define } from "@positive-intentions/dim/wasm";`.
-
-To open a page straight from disk (double-click `index.html`, no server), use
-a classic-script build. Pure JS:
-
-```html
-<script src="./node_modules/@positive-intentions/dim/dist/dim.global.js"></script>
-<script>
-  const { define, html } = Dim;
-</script>
-```
-
-WASM (see also [`examples/todo-wasm/index.html`](examples/todo-wasm/index.html)):
-
-```html
-<script src="./node_modules/@positive-intentions/dim/dist/wasm/dim.global.js"></script>
-<script>
-  const { define, html } = Dim;
-</script>
-```
-
-To combine a classic Dim runtime with remote un-transpiled ESM (for example
-components hosted on GitHub Pages), load the global script first, then map
-`@positive-intentions/dim` to a `data:` module that re-exports `globalThis.Dim`:
-
-```html
-<!-- Local copy, or the GitHub Pages CDN after `npm run build` publishes Frontend/lib/: -->
+<!-- JS -->
 <script src="https://positive-intentions.github.io/dim/lib/dim.global.js"></script>
-<!-- WASM: https://positive-intentions.github.io/dim/lib/dim.wasm.global.js -->
+
+<!-- WASM -->
+<script src="https://positive-intentions.github.io/dim/lib/dim.wasm.global.js"></script>
 <script>
-  const keys = Object.keys(Dim).join(",");
-  const shim = `const D=globalThis.Dim;export const{${keys}}=D;`;
-  const s = document.createElement("script");
-  s.type = "importmap";
-  s.textContent = JSON.stringify({
-    imports: {
-      "@positive-intentions/dim": "data:text/javascript," + encodeURIComponent(shim),
-      "dimui/": "https://positive-intentions.github.io/dimui/src/",
-    },
-  });
-  document.currentScript.after(s);
+  const { define, html } = Dim;
 </script>
 ```
 
-Remote modules then share the same classic IIFE runtime (one `customElements`
-registry). Classic `https://` scripts work from `file://`; dimui atoms use
-`import()` of ESM URLs instead. See the
-[larger examples](#larger-examples) —
-[dimui](https://github.com/positive-intentions/dimui) and
-[dim-boilerplate](https://github.com/positive-intentions/dim-boilerplate) —
-for this pattern end to end. The dimui explorer switches runtimes with
-`?impl=js|wasm`.
+Serve over HTTP. See [dimui](https://github.com/positive-intentions/dimui) and
+[dim-boilerplate](https://github.com/positive-intentions/dim-boilerplate) for
+end-to-end CDN + `BP.module` apps. Local harness iteration:
+`?dimLib=http://127.0.0.1:8765/lib/` while serving `Frontend/`.
 
 ### Building and testing
 
@@ -482,29 +439,24 @@ coverage UI, iframe e2e against `index.html`, CI with Playwright):
 [dim-boilerplate](https://github.com/positive-intentions/dim-boilerplate).
 Framework Jest suites stay separate; do not load `BP.module` apps through Jest.
 
+Long-form guides: [Unit tests](https://positive-intentions.com/docs/projects/dim/unit-tests),
+[E2E tests](https://positive-intentions.com/docs/projects/dim/e2e-tests),
+[Coverage](https://positive-intentions.com/docs/projects/dim/coverage).
+
 ## Documentation
 
-The framework includes comprehensive documentation through Storybook:
+Written docs (Getting Started, API, classic scripts, testing, ecosystem):
 
-### Main Sections
+- [Getting Started](https://positive-intentions.com/docs/projects/dim/getting-started)
+- [API overview](https://positive-intentions.com/docs/projects/dim/api-overview)
+- [Unit tests](https://positive-intentions.com/docs/projects/dim/unit-tests) · [E2E tests](https://positive-intentions.com/docs/projects/dim/e2e-tests) · [Coverage](https://positive-intentions.com/docs/projects/dim/coverage)
+- [dimui](https://positive-intentions.com/docs/projects/dim/dimui) · [dim-boilerplate](https://positive-intentions.com/docs/projects/dim/dim-boilerplate)
 
-1. **Getting Started** - Introduction and quick start guide
-2. **Core Concepts** - Deep dive into hooks and component architecture
-3. **Tutorial** - Step-by-step guide to building applications
-4. **Examples** - Real-world patterns and implementations
-5. **API Reference** - Detailed documentation for each hook
-
-### Hook Categories
-
-- **State Management**: `useState`, `useStore`
-- **Effects & Lifecycle**: `useEffect`, `useRef`
-- **Performance**: `useMemo`
-- **Styling**: `useStyle`
-- **Composition**: `useScope`
-
-Visit the [live documentation](https://dim.positive-intentions.com) for interactive examples and detailed guides.
+Interactive demos and Storybook: [dim.positive-intentions.com](https://dim.positive-intentions.com).
 
 ## Development
+
+For **contributors** working on the Dim repo (not required for CDN apps):
 
 ### Setup
 
@@ -512,7 +464,7 @@ Visit the [live documentation](https://dim.positive-intentions.com) for interact
 # Clone the repository
 git clone https://github.com/positive-intentions/dim.git
 
-# Install dependencies
+# Install dependencies (framework development only)
 npm install
 
 # Start Storybook dev server
