@@ -48,6 +48,8 @@
   var coverExpandedE2e = {};
   /** @type {Record<string, boolean>} */
   var testExpanded = {};
+  /** @type {Record<string, boolean>} */
+  var verifyExpanded = {};
   /** @type {Record<string, string>} */
   var instrumentCache = {};
   /** @type {null | object} */
@@ -1312,7 +1314,9 @@
               ? testExpanded
               : kind === "cover-e2e"
                 ? coverExpandedE2e
-                : coverExpanded;
+                : kind === "verify"
+                  ? verifyExpanded
+                  : coverExpanded;
           var defaultExpanded =
             btn.getAttribute("data-dim-tree-default") === "1";
           var current = isExpanded(map, path, defaultExpanded);
@@ -1445,19 +1449,50 @@
     );
   }
 
+  function verifyStatusLabel(st) {
+    if (st === "proved") return "Proved";
+    if (st === "refuted") return "Refuted";
+    if (st === "missing") return "Missing";
+    if (st === "unsupported") return "Unsupported";
+    if (st === "pending") return "Pending";
+    return st ? String(st) : "Pending";
+  }
+
+  function verifyStatusColor(st) {
+    if (st === "proved") return "#16a34a";
+    if (st === "refuted" || st === "missing") return "#dc2626";
+    if (st === "unsupported") return "#ca8a04";
+    return "#64748b";
+  }
+
   function paintVerificationHtml(verification) {
     var verifyApi = global.DimTest && global.DimTest.verify;
-    var summary = (verification && verification.summary) || {};
-    var obligations = (verification && verification.obligations) || [];
-    var missing = (verification && verification.missing) || [];
-    if (!obligations.length && !missing.length) {
-      // Keep the Formal verification section visible after a verify pass when
-      // the harness loaded but no sources were registered (typical Chrome
-      // file://: fetch/XHR cannot read local scripts for verify.add).
-      if (!verifyApi || verification == null) return "";
+    if (!verifyApi) return "";
+
+    var blurb =
+      '<p class="dim-test-meta">Checks <code>Dim.define</code> / <code>Dim.contract</code> obligations with the in-browser symbolic prover (JS; Rust dual when loaded).</p>';
+
+    var header =
+      '<section class="dim-test-verify" style="margin:1.25rem 0 0">' +
+      "<h2>Formal verification</h2>" +
+      blurb;
+
+    // Suite still running — verify has not run yet (align with E2E visibility).
+    if (verification == null) {
       return (
-        '<section class="dim-test-verify" style="margin:1.25rem 0 0">' +
-        "<h2>Formal verification</h2>" +
+        header +
+        '<p class="dim-test-meta">Pending — runs after tests finish.</p>' +
+        "</section>"
+      );
+    }
+
+    var summary = verification.summary || {};
+    var obligations = verification.obligations || [];
+    var missing = verification.missing || [];
+
+    if (!obligations.length && !missing.length) {
+      return (
+        header +
         '<p class="dim-test-meta">No sources registered (coverage/verify need http(s); file:// cannot read local scripts).</p>' +
         "</section>"
       );
@@ -1483,67 +1518,117 @@
       });
     }
 
+    var proved = summary.proved || 0;
+    var refuted = summary.refuted || 0;
+    var unsupported = summary.unsupported || 0;
+    var missingCount = summary.missing || 0;
+    var disagreements = summary.disagreements || 0;
+    var totalOb = obligations.length + missing.length;
+
+    var summaryBits =
+      "<strong>" +
+      proved +
+      "</strong> proved of <strong>" +
+      totalOb +
+      "</strong> obligations";
+    if (refuted) {
+      summaryBits +=
+        ", <strong>" + refuted + "</strong> refuted";
+    }
+    if (unsupported) {
+      summaryBits +=
+        ", <strong>" + unsupported + "</strong> unsupported";
+    }
+    if (missingCount) {
+      summaryBits +=
+        ", <strong>" + missingCount + "</strong> missing";
+    }
+    if (disagreements) {
+      summaryBits +=
+        ", <strong>" + disagreements + "</strong> JS/Rust disagreements";
+    }
+
     var files = Object.keys(byFile).sort();
     var rows = [];
     for (var f = 0; f < files.length; f++) {
       var file = files[f];
       var items = byFile[file];
+      var path = "verify/" + file;
+      var expanded = isExpanded(verifyExpanded, path, false);
+      var fileProved = 0;
+      for (var p = 0; p < items.length; p++) {
+        if ((items[p].status || "") === "proved") fileProved += 1;
+      }
+      var childHtml = "";
+      if (expanded) {
+        var childRows = [];
+        for (var j = 0; j < items.length; j++) {
+          var ob = items[j];
+          var st = ob.status || "pending";
+          var jsSt = ob.jsStatus || st;
+          var rsSt = ob.rustStatus || "skipped";
+          var agree = ob.agree !== false;
+          var color = verifyStatusColor(st);
+          var detail =
+            "JS " +
+            verifyStatusLabel(jsSt).toLowerCase() +
+            " · Rust " +
+            verifyStatusLabel(rsSt).toLowerCase() +
+            (agree ? "" : " · engines disagree");
+          if (ob.reason && st !== "proved") {
+            detail += " — " + String(ob.reason);
+          }
+          childRows.push(
+            '<li class="dim-tree-node">' +
+              '<div class="dim-tree-row" style="cursor:default">' +
+              '<span class="dim-test-badge" style="background:' +
+              color +
+              ';color:#fff">' +
+              escapeHtml(verifyStatusLabel(st)) +
+              "</span>" +
+              '<span class="dim-tree-label">' +
+              escapeHtml(ob.name || "(anon)") +
+              ' <small style="color:#64748b">(' +
+              escapeHtml(ob.kind || "fn") +
+              ")</small>" +
+              '<br/><small style="color:#64748b">' +
+              escapeHtml(detail) +
+              "</small></span>" +
+              "</div></li>",
+          );
+        }
+        childHtml =
+          '<ul class="dim-tree-children">' + childRows.join("") + "</ul>";
+      }
       rows.push(
         '<li class="dim-tree-node dim-tree-dir">' +
-          '<div class="dim-tree-row" style="cursor:default">' +
+          '<button type="button" class="dim-tree-row" data-dim-tree-path="' +
+          escapeHtml(path) +
+          '" data-dim-tree-kind="verify" data-dim-tree-default="0" aria-expanded="' +
+          (expanded ? "true" : "false") +
+          '">' +
+          '<span class="dim-tree-chevron" aria-hidden="true">' +
+          (expanded ? "▾" : "▸") +
+          "</span>" +
           '<span class="dim-tree-label">' +
           escapeHtml(file) +
-          "</span></div><ul class=\"dim-tree-children\">",
+          "</span>" +
+          '<span class="dim-tree-stats">' +
+          fileProved +
+          "/" +
+          items.length +
+          " proved</span>" +
+          "</button>" +
+          childHtml +
+          "</li>",
       );
-      for (var j = 0; j < items.length; j++) {
-        var ob = items[j];
-        var st = ob.status || "pending";
-        var jsSt = ob.jsStatus || st;
-        var rsSt = ob.rustStatus || "skipped";
-        var agree = ob.agree !== false;
-        var color =
-          st === "proved"
-            ? "#16a34a"
-            : st === "refuted" || st === "missing"
-              ? "#dc2626"
-              : "#ca8a04";
-        rows.push(
-          '<li class="dim-tree-node">' +
-            '<div class="dim-tree-row" style="cursor:default">' +
-            '<span class="dim-tree-label">' +
-            escapeHtml(ob.name || "(anon)") +
-            ' <small style="color:#64748b">(' +
-            escapeHtml(ob.kind || "fn") +
-            ")</small></span>" +
-            '<span class="dim-tree-stats" style="color:' +
-            color +
-            '">' +
-            escapeHtml(st) +
-            " · js=" +
-            escapeHtml(jsSt) +
-            " · rust=" +
-            escapeHtml(rsSt) +
-            (agree ? " · agree" : " · DISAGREE") +
-            "</span></div></li>",
-        );
-      }
-      rows.push("</ul></li>");
     }
 
     return (
-      '<section class="dim-test-verify" style="margin:1.25rem 0 0">' +
-      "<h2>Formal verification</h2>" +
-      '<p class="dim-test-meta"><strong>' +
-      (summary.proved || 0) +
-      "</strong> proved, <strong>" +
-      (summary.refuted || 0) +
-      "</strong> refuted, <strong>" +
-      (summary.unsupported || 0) +
-      "</strong> unsupported, <strong>" +
-      (summary.missing || 0) +
-      "</strong> missing, <strong>" +
-      (summary.disagreements || 0) +
-      "</strong> disagreements</p>" +
+      header +
+      '<p class="dim-test-meta">' +
+      summaryBits +
+      "</p>" +
       '<ul class="dim-tree" data-dim-tree-kind="verify">' +
       rows.join("") +
       "</ul></section>"
@@ -1937,17 +2022,15 @@
     if (savedPreview) {
       e2ePreviewHost = savedPreview;
     }
-    if (split.e2es.length) {
+    // Only show the phone preview while an e2e test is actively running.
+    // During unit tests (and after the suite finishes) leave it detached.
+    var e2eRunning = !done && currentTestKind === "e2e";
+    if (e2eRunning && split.e2es.length) {
       reattachE2ePreview();
-      if (done && openPages.length) {
-        setE2ePreviewLabel("Last e2e preview");
-      } else if (!done && currentTestKind === "e2e" && currentTestName) {
+      if (currentTestName) {
         setE2ePreviewLabel("Running: " + currentTestName);
-      } else if (
-        !getE2ePreviewFrame().querySelector("iframe") &&
-        !openPages.length
-      ) {
-        setE2ePreviewLabel("Waiting for e2e…");
+      } else {
+        setE2ePreviewLabel("E2E preview");
       }
     }
 
